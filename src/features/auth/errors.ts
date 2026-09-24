@@ -7,7 +7,7 @@ export const loginErrorMessages: Record<LoginErrorCode, string> = {
   oauth: 'Google couldn’t complete the sign-in. Please try again.',
   callback: 'We couldn’t finish signing you in. Please try again.',
   session: 'Your session couldn’t be restored. Please sign in again.',
-  unavailable: 'DevDoc can’t reach the sign-in service right now. Check your connection and try again.',
+  unavailable: 'DevDock can’t reach the sign-in service right now. Check your connection and try again.',
   'not-configured': 'Google sign-in isn’t configured for this environment yet.',
 }
 

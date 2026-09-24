@@ -2,7 +2,7 @@ import { createContext, useContext } from 'react'
 
 export type Theme = 'light' | 'dark' | 'system'
 
-export const THEME_STORAGE_KEY = 'devdoc-theme'
+export const THEME_STORAGE_KEY = 'devdock-theme'
 
 type ThemeContextValue = {
   theme: Theme

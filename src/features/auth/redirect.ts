@@ -1,7 +1,7 @@
 // Where to send the user after sign-in. Only same-origin app paths are allowed,
-// so a crafted ?next= can't turn DevDoc into an open redirect.
+// so a crafted ?next= can't turn DevDock into an open redirect.
 
-const NEXT_KEY = 'devdoc:auth-next'
+const NEXT_KEY = 'devdock:auth-next'
 export const DEFAULT_AFTER_LOGIN = '/app'
 
 export function safeNextPath(value: string | null | undefined): string {

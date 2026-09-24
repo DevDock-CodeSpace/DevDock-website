@@ -1,5 +1,6 @@
-import { CircleAlert, LoaderCircle, SquareTerminal } from 'lucide-react'
+import { CircleAlert, LoaderCircle } from 'lucide-react'
 import { useLoaderData } from 'react-router'
+import { LogoMark, LogoWordmark } from '@/components/Logo'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { Button } from '@/components/ui/button'
 import { GoogleIcon } from '@/features/auth/components/GoogleIcon'
@@ -29,13 +30,8 @@ export function LoginPage() {
 
       <main className="w-full max-w-sm">
         <div className="mb-8 flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <SquareTerminal className="size-5" />
-          </div>
-          <div className="leading-tight">
-            <p className="font-semibold">DevDoc</p>
-            <p className="font-mono text-xs text-muted-foreground">workspace</p>
-          </div>
+          <LogoMark className="h-11" />
+          <LogoWordmark className="h-7" />
         </div>
 
         <h1 className="text-2xl font-semibold tracking-tight">Sign in</h1>

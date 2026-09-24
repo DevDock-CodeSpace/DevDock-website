@@ -1,8 +1,6 @@
-# DevDoc
+# DevDock
 
-DevDoc is a private software-engineering teaching workspace for **one instructor and a small group of students** (single digits). It is not a public product. Optimize for clarity, low maintenance, and low hosting cost over scale.
-
-> Repo folder is named `DevDock-website`; the product name is **DevDoc**.
+DevDock is a private software-engineering teaching workspace for **one instructor and a small group of students** (single digits). It is not a public product. Optimize for clarity, low maintenance, and low hosting cost over scale.
 
 ## Current status
 
@@ -86,8 +84,9 @@ supabase/
 ### UI
 
 - shadcn/ui uses the `radix-nova` style (`components.json`); add components with `npx shadcn@latest add <name>`. Class merging uses `cn()` from `@/lib/utils`, which re-exports shadcn's official `cn` package.
-- Theme: `.dark` class on `<html>`, set by `ThemeProvider` (localStorage key `devdoc-theme`) and by an inline script in `index.html` that prevents a theme flash on load. Use the semantic color tokens (`bg-background`, `text-muted-foreground`, …), never raw grays.
+- Theme: `.dark` class on `<html>`, set by `ThemeProvider` (localStorage key `devdock-theme`) and by an inline script in `index.html` that prevents a theme flash on load. Use the semantic color tokens (`bg-background`, `text-muted-foreground`, …), never raw grays.
 - Visual tone: developer workspace. Neutral palette, Geist Sans, and Geist Mono (`font-mono`) for codes, numbers, handles, and times.
+- **Brand:** the product is **DevDock**. Show the logo only through `LogoMark` / `LogoWordmark` in `src/components/Logo.tsx`; `LogoWordmark` switches to the light-text version in dark mode. Don't hand-edit files in `src/assets/brand/` or the favicons in `public/`; they're generated from `brand/source/` by `brand/build.py` (see `brand/README.md`).
 - `.oxlintrc.json` turns off two rules for generated shadcn files only. Don't widen that override to app code.
 
 ## Supabase

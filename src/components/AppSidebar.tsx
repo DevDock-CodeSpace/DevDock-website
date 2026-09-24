@@ -1,5 +1,5 @@
-import { SquareTerminal } from 'lucide-react'
 import { Link, matchPath, useLocation } from 'react-router'
+import { LogoMark, LogoWordmark } from '@/components/Logo'
 import {
   Sidebar,
   SidebarContent,
@@ -31,15 +31,10 @@ export function AppSidebar() {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild tooltip="DevDoc home">
+            <SidebarMenuButton size="lg" asChild tooltip="DevDock home">
               <Link to="/app" onClick={closeOnMobile}>
-                <div className="flex aspect-square size-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
-                  <SquareTerminal className="size-4" />
-                </div>
-                <div className="grid flex-1 text-left leading-tight">
-                  <span className="truncate font-semibold">DevDoc</span>
-                  <span className="truncate font-mono text-xs text-muted-foreground">workspace</span>
-                </div>
+                <LogoMark className="size-8 object-contain" />
+                <LogoWordmark className="h-[18px]" />
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

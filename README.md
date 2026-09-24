@@ -1,4 +1,4 @@
-# DevDoc
+# DevDock
 
 A private software-engineering teaching workspace for one instructor and a few students.
 
@@ -29,7 +29,7 @@ Node 22 LTS is recommended. Node 20 is end-of-life, and newer `@supabase/supabas
 
 ### What it's for
 
-| Supabase feature | DevDoc use |
+| Supabase feature | DevDock use |
 |---|---|
 | Auth | Sign-in with Google (OAuth, PKCE flow) |
 | Postgres | Profiles now; courses, lessons, members, and resources later |
@@ -144,8 +144,8 @@ Code lives in `src/features/auth/` (`api.ts`, `loaders.ts`, `hooks.ts`, `session
 
 In [Google Cloud Console](https://console.cloud.google.com/) → **Google Auth Platform**:
 
-1. **Branding / Audience:** set the app name (DevDoc) and support email. The user type is **External**.
-   - While the publishing status is **Testing**, only the accounts listed under **Audience → Test users** can sign in. Add yourself and your students, or publish the app. DevDoc only uses the basic `openid`, `email` and `profile` scopes, which don't require Google's app verification.
+1. **Branding / Audience:** set the app name (DevDock) and support email. The user type is **External**.
+   - While the publishing status is **Testing**, only the accounts listed under **Audience → Test users** can sign in. Add yourself and your students, or publish the app. DevDock only uses the basic `openid`, `email` and `profile` scopes, which don't require Google's app verification.
 2. **Data Access:** the scopes are `openid`, `.../auth/userinfo.email` and `.../auth/userinfo.profile`.
 3. **Clients → Create client → Web application:**
    - **Authorized JavaScript origins:** `http://localhost:5173`, plus each deployed origin later.
