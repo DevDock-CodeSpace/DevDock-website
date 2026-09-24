@@ -1,0 +1,25 @@
+:root {
+  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.5;
+  color-scheme: light dark;
+  color: #1f2937;
+  background: #ffffff;
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color: #e5e7eb;
+    background: #111827;
+  }
+}
+
+body {
+  margin: 0;
+}
+
+.app-shell {
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: 4rem 1rem;
+}
