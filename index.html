@@ -5,6 +5,15 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>DevDoc</title>
+    <script>
+      // Apply the saved theme before first paint to avoid a light/dark flash.
+      // Keep the key in sync with THEME_STORAGE_KEY in src/hooks/use-theme.ts.
+      try {
+        var t = localStorage.getItem('devdoc-theme')
+        if (t === 'dark' || ((!t || t === 'system') && matchMedia('(prefers-color-scheme: dark)').matches))
+          document.documentElement.classList.add('dark')
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

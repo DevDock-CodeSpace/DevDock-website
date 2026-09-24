@@ -6,7 +6,7 @@ DevDoc is a private software-engineering teaching workspace for **one instructor
 
 ## Current status
 
-Bootstrapped only: React + TypeScript + Vite with a placeholder `App.tsx`. None of the stack below beyond React/TS/Vite is installed yet. **Add each piece only when a task needs it**, and don't build ahead.
+**Phase 1 done: frontend shell.** React Router, Tailwind v4, shadcn/ui, and TanStack Query are installed. The app has a responsive sidebar layout, light/dark/system theme, and placeholder pages driven by **mock data** (`src/features/courses/mock-data.ts`). TipTap, draw.io, Jitsi, and Supabase are not installed yet. **Add each piece only when a task needs it**, and don't build ahead.
 
 Explicitly **not yet**: authentication, Supabase integration.
 
@@ -25,7 +25,7 @@ Explicitly **not yet**: authentication, Supabase integration.
 | Diagrams           | diagrams.net / draw.io (embed)  | Store diagram XML, not just images |
 | Live sessions      | Jitsi Meet (embed)              | |
 | Code               | GitHub links                    | Link to repos/PRs; no GitHub API integration unless asked |
-| Hosting            | Vercel                          | Static SPA; needs a rewrite to `index.html` for client routes |
+| Hosting            | Vercel                          | Static SPA; `vercel.json` rewrites all paths to `index.html` |
 
 ## Commands
 
@@ -47,21 +47,37 @@ Before calling a task done, run `npm run typecheck`, `npm run lint`, and `npm ru
 - **Linting:** oxlint (`.oxlintrc.json`), not ESLint.
 - **Components:** PascalCase `.tsx` files, one exported component per file. Named exports, except where a route/lazy-load needs a default.
 - **Data access:** components never call Supabase directly. Go through a typed function in `src/lib/`/feature `api.ts`, wrapped in a TanStack Query hook.
-- **Styling:** Tailwind utility classes once installed. No new global CSS beyond the base layer.
+- **Styling:** Tailwind utility classes. No new global CSS beyond the base layer in `src/index.css`.
 - Keep dependencies lean. Ask before adding libraries outside the target stack.
 
-### Planned layout (create folders as needed, not up front)
+### Layout (create new folders only when needed)
 
 ```
 src/
-  main.tsx, App.tsx
-  routes/            # route components / layouts
-  features/<name>/   # feature-scoped components, hooks, api.ts
-  components/ui/     # shadcn/ui generated components
-  components/        # shared app components
-  lib/               # clients (supabase, queryClient), utils
-  types/             # shared types (incl. generated Supabase types)
+  main.tsx           # providers: QueryClient → Theme → Tooltip → Router
+  router.tsx         # all routes (createBrowserRouter, data mode)
+  layouts/           # AppLayout: sidebar + header + <Outlet/>
+  routes/            # page components; routes/course/* for /courses/:courseId/*
+  features/<name>/   # feature-scoped components, types, api.ts, hooks
+  components/ui/     # shadcn/ui generated components (don't hand-edit much)
+  components/        # shared app components (AppSidebar, PageHeader, Theme*)
+  hooks/             # shared hooks
+  lib/               # queryClient, utils
 ```
+
+### Routing & data
+
+- Routes: `/app` (workspace home), `/courses/:courseId` (overview) plus `lessons`, `live`, `resources`, `members`, `settings`. `/` redirects to `/app`.
+- Course sidebar items are defined once in `src/features/courses/nav.ts`; the sidebar and breadcrumb both read it.
+- Data pattern: `features/<name>/api.ts` exports `queryOptions`. The layout route's `loader` primes the cache with `queryClient.ensureQueryData`, and components read with `useSuspenseQuery` (e.g. `useCurrentCourse()`). To move to Supabase, replace the fetcher bodies in `api.ts` and keep the query keys.
+- Avoid `Date.now()` in render (oxlint `react/purity`); capture it with `useState(Date.now)`.
+
+### UI
+
+- shadcn/ui uses the `radix-nova` style (`components.json`); add components with `npx shadcn@latest add <name>`. Class merging uses `cn()` from `@/lib/utils`, which re-exports shadcn's official `cn` package.
+- Theme: `.dark` class on `<html>`, set by `ThemeProvider` (localStorage key `devdoc-theme`) and by an inline script in `index.html` that prevents a theme flash on load. Use the semantic color tokens (`bg-background`, `text-muted-foreground`, …), never raw grays.
+- Visual tone: developer workspace. Neutral palette, Geist Sans, and Geist Mono (`font-mono`) for codes, numbers, handles, and times.
+- `.oxlintrc.json` turns off two rules for generated shadcn files only. Don't widen that override to app code.
 
 ## Environment & secrets
 
