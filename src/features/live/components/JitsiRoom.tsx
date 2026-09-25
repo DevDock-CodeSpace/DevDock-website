@@ -26,7 +26,7 @@ function Spinner() {
  */
 export default function JitsiRoom({ jaas, subject, displayName, email, onLeave }: JitsiRoomProps) {
   return (
-    <div className="h-[calc(100svh-11rem)] min-h-[480px] overflow-hidden rounded-lg border bg-muted">
+    <div className="size-full overflow-hidden bg-muted">
       <JaaSMeeting
         appId={jaas.appId}
         roomName={jaas.roomName}
