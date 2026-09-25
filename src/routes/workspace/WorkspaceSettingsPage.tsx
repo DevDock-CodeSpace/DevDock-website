@@ -20,6 +20,7 @@ import {
   type WorkspaceModule,
   type WorkspaceType,
 } from '@/features/workspaces/api'
+import { IssueSettingsSection } from '@/features/issues/components/IssueSettingsSection'
 import { ModulePicker } from '@/features/workspaces/components/ModulePicker'
 import { WorkspaceTypeSelect } from '@/features/workspaces/components/WorkspaceTypeSelect'
 import { errorMessage } from '@/lib/errors'
@@ -39,6 +40,7 @@ export function WorkspaceSettingsPage() {
     <div>
       <DetailsSection key={workspace.updated_at} />
       <ToolsSection key={workspace.modules.join()} />
+      {workspace.modules.includes('issues') && <IssueSettingsSection key={workspace.issue_key} />}
       {can.canDelete && <DangerSection />}
     </div>
   )
@@ -171,7 +173,7 @@ function DangerSection() {
     <SettingsSection title="Danger zone" tone="danger" description="Irreversible actions.">
       <DangerRow
         title="Delete this workspace"
-        description="Removes it and everyone’s access to it. People stay in the team."
+        description="Removes it, its docs, and everyone’s access to it. People stay in the team. Team-wide docs aren’t affected."
         action={
           <Button variant="destructive" size="sm" onClick={() => setConfirming(true)}>
             Delete

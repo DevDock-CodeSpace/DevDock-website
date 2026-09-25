@@ -4,13 +4,29 @@ DevDock is a private software-engineering teaching workspace for **one instructo
 
 ## Current status
 
-**Phase 1 done: frontend shell.** React Router, Tailwind v4, shadcn/ui, and TanStack Query are installed. The app has a responsive sidebar layout, light/dark/system theme, and placeholder pages driven by mock data (replaced by real data in Phase 4). TipTap, draw.io, and Jitsi are not installed yet. **Add each piece only when a task needs it**, and don't build ahead.
+**Phase 1 done: frontend shell.** React Router, Tailwind v4, shadcn/ui, and TanStack Query are installed. The app has a responsive sidebar layout, light/dark/system theme, and placeholder pages driven by mock data (replaced by real data in Phase 4). TipTap (Phase 5b) and React Flow (Phase 5c) are installed; Jitsi is not installed yet. **Add each piece only when a task needs it**, and don't build ahead.
 
 **Phase 2 done: Supabase foundation.** `@supabase/supabase-js`, a typed browser client (`src/lib/supabase.ts`), the `supabase/` CLI project, and the first migration (`profiles` + RLS + a sign-up trigger), **applied to the hosted project** (ref `ejqrrxxiatvvdiyxtvid`, linked via `supabase link`).
 
 **Phase 3 done: Google sign-in** via Supabase Auth (PKCE). All app routes require a session, and the sidebar shows the signed-in user's profile. Sign-in verified end-to-end with a real Google account. The app now **requires** the Supabase env vars.
 
-**Phase 4 (in progress): Team → Workspace model is real.** A **team** (owner/admin/member; type learning/development/general) contains **workspaces** (lead/member; type course/project/general). Invite codes join a team, and workspace access is assigned separately. The UI has onboarding (create a team or join with a code), a team switcher, and real workspace, member, invite and settings pages. The mock data is gone. Lessons, Live Session and Resources are placeholder pages (no tables yet); Lessons shows only for course workspaces. Current status and next steps: `docs/STATUS.md`.
+**Phase 4 (in progress): Team → Workspace model is real.** A **team** (owner/admin/member; type learning/development/general) contains **workspaces** (lead/member; type course/project/general). Invite codes join a team, and workspace access is assigned separately. The UI has onboarding (create a team or join with a code), a team switcher, and real workspace, member, invite and settings pages. The mock data is gone.
+
+**Phase 5a done: Docs.** A `documents` table (team-wide or assigned to a workspace) with RLS, Team → Docs and Workspace → Docs lists.
+
+**Phase 5b done: rich docs editor (Dropbox Paper-style).** TipTap v3 (MIT extensions only) with highlight.js via lowlight, stored as TipTap JSON in `documents.body`; images in the private `doc-images` Storage bucket. Autosave.
+
+**Phase 5c done: Diagrams (Lucidchart-style).** A `diagrams` table (same scope and RLS rules as `documents`) holding React Flow JSON, with Team → Diagrams and Workspace → Diagrams lists and an in-app editor styled like DevDock: a shape/icon library, containers, connectors, a properties panel, undo/redo, copy/paste, alignment guides, autosave. 
+
+**Phase 6a done: Issues (Linear-style), part 1.** Workspace-only issues with IDs like `CAP-12` (per-workspace `issue_key` + counter). Each issue has a status workflow, priority, assignee, labels, estimate, due date and sub-issues. Views are a List grouped by status and a Board with drag-and-drop; the issue page has a rich description (the Docs editor, without images), sub-issues, comments and a properties panel. Any workspace member can create and edit issues. Leads and team owners/admins delete issues and manage labels and the key. 
+
+**Phase 6b done: Issues, part 2.**
+- **Cycles:** Linear's sprints, numbered per workspace and never overlapping; managers create, edit and delete them, and there's a "move open issues to the next cycle" action.
+- **Views:** All / Active / Backlog / My issues tabs, and filters (status, priority, assignee, labels, cycle) kept in the URL.
+- **Activity log:** written by DB triggers and shown with comments as an Activity feed.
+- **Keyboard shortcuts:** Linear-style; press `?` for the list.
+
+Live, Learning and the other tools are still placeholder pages. Current status and next steps: `docs/STATUS.md`.
 
 ## Target stack
 
@@ -23,8 +39,8 @@ DevDock is a private software-engineering teaching workspace for **one instructo
 | Components         | shadcn/ui                       | Generated into `src/components/ui/`; uses `@/` alias |
 | Server state       | TanStack Query                  | All remote data goes through queries/mutations |
 | Backend            | Supabase (Postgres, Auth, Storage) | Row Level Security is the authorization layer |
-| Rich text / notes  | TipTap                          | |
-| Diagrams           | diagrams.net / draw.io (embed)  | Store diagram XML, not just images |
+| Rich text / notes  | TipTap v3 (+ lowlight/highlight.js) | Dropbox Paper look; MIT extensions only (drag handle pulls in yjs as a peer dep). Lazy-loaded with the doc page |
+| Diagrams           | React Flow (`@xyflow/react`, MIT) | Own UI in DevDock's style (not an embed); stored as JSON in `diagrams.data`. Lazy-loaded with the diagram page |
 | Live sessions      | Jitsi Meet (embed)              | |
 | Code               | GitHub links                    | Link to repos/PRs; no GitHub API integration unless asked |
 | Hosting            | Vercel                          | Static SPA; `vercel.json` rewrites all paths to `index.html` |
@@ -63,7 +79,7 @@ src/
   router.tsx         # all routes (createBrowserRouter, data mode)
   layouts/           # AppLayout (team shell: sidebar + header + <Suspense><Outlet/>), app-loader.ts (auth guard)
   routes/            # page components: team/* (under /t/:teamSlug) and workspace/* (under …/w/:workspaceId)
-  features/<name>/   # feature-scoped components, types, api.ts, hooks (auth/, teams/, workspaces/)
+  features/<name>/   # feature-scoped components, types, api.ts, hooks (auth/, teams/, workspaces/, docs/, diagrams/, issues/)
   components/ui/     # shadcn/ui generated components (don't hand-edit much)
   components/        # shared app components (AppSidebar, PageHeader, Theme*)
   hooks/             # shared hooks
@@ -87,11 +103,31 @@ supabase/
 - **Access checks in loaders** (`features/teams/loaders.ts`): `teamLoader` 404s when the user isn't a team member; `workspaceLoader` 404s when the workspace isn't visible (RLS) or belongs to another team.
 - **Current context:** `useCurrentTeam()` and `useCurrentWorkspace()` (`features/teams/hooks.ts`) return the entity, the user's role, and `can`, a permissions object from `features/teams/permissions.ts` that mirrors RLS. **`can` is for showing and hiding UI only.** Every write is re-checked by RLS. Type labels and icons are in `teamTypes` and `workspaceTypes` in the same file.
 - **Navigation:** the **sidebar is the hierarchy**: team switcher, Home, the **team tools** (Docs, Diagrams, Live; `TEAM_TOOLS`), the team's workspaces grouped by **workspace** type (Courses, Projects, Workspaces; empty sections hidden; team type only decides which section comes first and the default type for "+ New", via `workspaceTypeOrder`/`defaultWorkspaceType`), one "+ New", team Members and Settings. **Workspace features are horizontal tabs** under the workspace title (`WorkspaceLayout`), **generated from the workspace's enabled tools** (`workspace_modules`; `getWorkspaceTabs(teamSlug, id, modules)` in `features/teams/nav.ts`): Overview, then the tools in `MODULE_ORDER`, then Members. Workspace *type* only picks default tools (`defaultModules`, which mirrors `public.default_workspace_modules`). Create workspaces with `rpc('create_workspace')` and change tools with `rpc('set_workspace_modules')`; both are atomic and run under RLS. Don't put workspace features in the sidebar.
-- **Team tools vs workspace tabs:** Docs, Diagrams and Live exist at both levels as views of the same data. Future rows have `team_id` (required) + `workspace_id` (nullable: null = team-wide). The team page (`TeamToolPage`) shows everything the caller can access; the workspace tab shows only that workspace's rows. Issues, Learning, Exercises, GitHub and Resources are workspace-only.
+- **Team tools vs workspace tabs:** Docs, Diagrams and Live exist at both levels as views of the same data. Rows have `team_id` (required) + `workspace_id` (nullable: null = team-wide; composite FK `(workspace_id, team_id) → workspaces(id, team_id)` keeps it in the same team). The team page shows everything the caller can access; the workspace tab shows only that workspace's rows. Docs and Diagrams are built this way (`documents`/`diagrams`, `Team…Page`/`Workspace…Page`, one `DocPage`/`DiagramPage` for both routes, `docLoader`/`diagramLoader`); Live still uses the placeholder `TeamToolPage`. The "New …" dialog is the shared `CreateInScopeDialog`. Built workspace tools sit under `WorkspaceToolGate`, which 404s when the tool is off. Issues, Learning, Exercises, GitHub and Resources are workspace-only.
+- **Issues** (`features/issues/`, routes `…/w/:id/issues` (`?view=board`) and `…/issues/:issueNumber`, `issueLoader`):
+  - Rows are addressed by **number within the workspace**, not UUID. The identifier is `issueIdentifier(workspace.issue_key, number)`.
+  - `number`, `team_id` and `created_by` are set by DB triggers (`private.issue_counters`). The assignee-is-a-member, same-workspace-parent and no-loop rules are enforced by the `check_issue` trigger.
+  - Labels on an issue are replaced with `rpc('set_issue_labels')`.
+  - Field edits go through `useUpdateIssue()` (optimistic, rolls back with a toast). Pickers use the searchable `Picker` popover.
+  - `useIssueContext().canManage` mirrors `private.can_manage_workspace` (UI only).
+  - Cycles live under `…/issues/cycles[/:cycleNumber]` (`cycleLoader`). Numbering and the no-overlap rule are enforced by the `prepare_issue_cycle` trigger; `rpc('move_open_issues')` rolls open issues over.
+  - `issue_activity` is written only by triggers (`log_issue_activity`, `log_issue_label_activity`); clients can only read it. Don't add client-side activity writes.
+  - Views are URL state: `?tab=`, filter facets (`readFilters`/`writeFilters`, `useIssueFilters`), `?view=board`.
+  - Shortcuts use `useShortcuts` (ignored while typing or while a menu/dialog is open). Lists get J/K focus and per-row menus through `IssueCollection` + `IssueNavContext`.
 - **Data pattern:** `features/<name>/api.ts` exports `queryOptions` and mutation functions.
   - Loaders prime what the shell needs with `ensureQueryData`. Pages read with `useSuspenseQuery`; `AppLayout` has a Suspense boundary, so pages may also load secondary data that way.
   - Errors go through `lib/errors.ts` (`toDataError`, `requireAffected`), because RLS makes forbidden UPDATE/DELETE return 0 rows, not an error. Show them with `toast.error(errorMessage(e))`.
-- **Query keys:** `['teams', …]` and `['workspaces', …]`; invalidate by prefix after mutations.
+- **Query keys:** `['teams', …]`, `['workspaces', …]`, `['documents', …]`, `['diagrams', …]` and `['issues', …]` (built by `issueKeys`); invalidate by prefix after mutations.
+- **Docs editor** (`features/docs/editor/`, page body `features/docs/components/DocView.tsx`, lazy-loaded by `routes/DocPage.tsx`):
+  - Extensions are listed in `extensions.ts`, and the typography lives in `styles.ts` as Tailwind classes (no global CSS).
+  - `documents.body` (TipTap JSON) is the source of truth; `content` is a plain-text copy written with it.
+  - Images are the custom `docImage` node, which stores a Storage **path** (`<team>/<doc>/<uuid>.<ext>`), never a URL; the view signs it (`docImageUrlQuery`). Upload with `uploadDocImage`. `deleteDocument` removes the doc's image folder first.
+  - Collapsed headings are per-viewer plugin state (`CollapsibleHeadings.ts`), never saved.
+  - Don't add paid TipTap extensions.
+- **Diagram editor** (`features/diagrams/editor/`, page body `features/diagrams/components/DiagramView.tsx`, lazy-loaded by `routes/DiagramPage.tsx`):
+  - `model.ts` is the saved format: node types `shape`/`icon`/`container`, edge type `connector`. `serialize()` saves only content (no selection or measurements), and `parse()` validates stored JSON. Colors are stored as keys (`colors.ts` maps them to Tailwind classes, so diagrams work in both themes). Icon keys in `icons.ts` are saved, so never rename one.
+  - Layers: React Flow runs with `zIndexMode="manual"`. Containers sit below connectors, and connectors below shapes. `normalizeOrder()` keeps parents before children and sets the z-indexes, so call it after any reorder or reparent.
+  - Undo is snapshot-based (`useHistory`). Call `snapshot()` *before* every change.
 - **Leaving or deleting** the current team or workspace: navigate away *first*, then invalidate (see `useExitTeam`). Otherwise the page crashes when its data disappears, or `/app` bounces back through the stale cache.
 - Avoid `Date.now()` in render (oxlint `react/purity`); capture it with `useState(Date.now)`.
 

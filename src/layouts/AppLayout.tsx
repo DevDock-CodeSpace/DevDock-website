@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query'
 import { Fragment, Suspense } from 'react'
 import { Link, matchPath, Outlet, useLocation, useParams } from 'react-router'
 import { AppSidebar } from '@/components/AppSidebar'
@@ -13,8 +14,13 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
+import { diagramQuery } from '@/features/diagrams/api'
+import { documentQuery } from '@/features/docs/api'
+import { issueQuery } from '@/features/issues/api'
+import { issueIdentifier } from '@/features/issues/meta'
 import { useCurrentTeam, useCurrentWorkspace } from '@/features/teams/hooks'
 import { getTeamNav, getWorkspaceTabs, teamPath, workspacePath, type NavItem } from '@/features/teams/nav'
+import { workspaceQuery } from '@/features/workspaces/api'
 
 // The shadcn sidebar writes its open/collapsed state to this cookie but doesn't read it back.
 const sidebarStartsOpen = () => !document.cookie.includes('sidebar_state=false')
@@ -25,7 +31,8 @@ export function AppLayout() {
   return (
     <SidebarProvider defaultOpen={sidebarStartsOpen()}>
       <AppSidebar />
-      <SidebarInset>
+      {/* min-w-0: wide content (the issue board) scrolls inside the page instead of widening it. */}
+      <SidebarInset className="min-w-0">
         <header className="sticky top-0 z-10 flex h-12 shrink-0 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur md:px-6">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4 data-vertical:self-center" />
@@ -54,7 +61,8 @@ function TeamBreadcrumb() {
   const { team } = useCurrentTeam()
   const { tools, members, settings } = getTeamNav(team.slug)
   const section = useSection([...tools, members, settings])
-  return <Crumbs crumbs={[{ label: team.name, to: teamPath(team.slug) }, ...section]} />
+  const item = useItemCrumb()
+  return <Crumbs crumbs={[{ label: team.name, to: teamPath(team.slug) }, ...section, ...item]} />
 }
 
 function WorkspaceBreadcrumb() {
@@ -65,15 +73,48 @@ function WorkspaceBreadcrumb() {
     ...getWorkspaceTabs(team.slug, workspace.id, workspace.modules),
     { title: 'Settings', to: `${base}/settings`, icon: getTeamNav(team.slug).settings.icon },
   ])
+  const item = useItemCrumb()
   return (
     <Crumbs
       crumbs={[
         { label: team.name, to: teamPath(team.slug) },
         { label: workspace.title, to: workspacePath(team.slug, workspace.id) },
         ...section,
+        ...item,
       ]}
     />
   )
+}
+
+/**
+ * On a doc, diagram or issue page, its title (issue: identifier) as the last
+ * crumb, but only where its loader would show it (same team/workspace).
+ */
+function useItemCrumb(): Crumb[] {
+  const { docId, diagramId, issueNumber, cycleNumber, workspaceId } = useParams()
+  const { pathname } = useLocation()
+  const { team } = useCurrentTeam()
+  const doc = useQuery({ ...documentQuery(docId ?? ''), enabled: docId !== undefined }).data
+  const diagram = useQuery({ ...diagramQuery(diagramId ?? ''), enabled: diagramId !== undefined }).data
+  const issue = useQuery({
+    ...issueQuery(workspaceId ?? '', Number(issueNumber)),
+    enabled: issueNumber !== undefined && workspaceId !== undefined,
+  }).data
+  const workspace = useQuery({ ...workspaceQuery(workspaceId ?? ''), enabled: workspaceId !== undefined }).data
+  if (issueNumber && issue && workspace) {
+    return [{ label: issueIdentifier(workspace.issue_key, issue.number), to: pathname }]
+  }
+  if (workspaceId && pathname.includes('/issues/cycles')) {
+    const cycles = `${pathname.split('/issues/cycles')[0]}/issues/cycles`
+    return [
+      { label: 'Cycles', to: cycles },
+      ...(cycleNumber ? [{ label: `Cycle ${cycleNumber}`, to: pathname }] : []),
+    ]
+  }
+  const item = docId ? doc : diagramId ? diagram : undefined
+  const belongs =
+    item && item.team_id === team.id && (workspaceId === undefined || item.workspace_id === workspaceId)
+  return belongs ? [{ label: item.title, to: pathname }] : []
 }
 
 /** The current non-index nav item as a crumb, if any. */
