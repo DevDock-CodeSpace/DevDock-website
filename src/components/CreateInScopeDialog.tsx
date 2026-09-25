@@ -25,8 +25,10 @@ type CreateInScopeDialogProps = {
   /** Singular, lower case: "doc", "diagram". */
   noun: string
   placeholder: string
-  /** Fixes the scope (used inside a workspace tab). */
+  /** Fixes the scope to this workspace (used inside a workspace tab). */
   workspaceId?: string
+  /** Fixes the scope to group-wide (e.g. inside a group-wide folder). */
+  groupWideOnly?: boolean
   /** Who may create in a scope (null = team-wide). Mirrors RLS; UI only. */
   canWrite: (workspaceId: string | null) => boolean
   create: (input: { teamId: string; workspaceId: string | null; title: string }) => Promise<{ id: string }>
@@ -44,6 +46,7 @@ export function CreateInScopeDialog({
   noun,
   placeholder,
   workspaceId,
+  groupWideOnly = false,
   canWrite,
   create: createItem,
   queryKey,
@@ -58,7 +61,11 @@ export function CreateInScopeDialog({
     ? canWrite(workspaceId)
       ? [workspaceId]
       : []
-    : [...(canWrite(null) ? [TEAM_WIDE] : []), ...workspaces.filter((w) => canWrite(w.id)).map((w) => w.id)]
+    : groupWideOnly
+      ? canWrite(null)
+        ? [TEAM_WIDE]
+        : []
+      : [...(canWrite(null) ? [TEAM_WIDE] : []), ...workspaces.filter((w) => canWrite(w.id)).map((w) => w.id)]
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState('')
   const [scope, setScope] = useState(options[0] ?? TEAM_WIDE)
@@ -118,7 +125,7 @@ export function CreateInScopeDialog({
               autoFocus
             />
           </div>
-          {!workspaceId && (
+          {!workspaceId && !groupWideOnly && (
             <div className="space-y-1.5">
               <Label htmlFor="new-item-scope">Belongs to</Label>
               <Select value={scope} onValueChange={setScope}>

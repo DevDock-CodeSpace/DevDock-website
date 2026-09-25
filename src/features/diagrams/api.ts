@@ -7,8 +7,8 @@ import type { Json } from '@/types/database.types'
 // Diagrams: same scope model and access rules as docs (workspace_id null =
 // team-wide). RLS decides who sees what; these queries ask for "everything I can see".
 
-/** Same shape as a doc summary, so the doc list/scope components render diagrams too. */
-export type DiagramSummary = DocSummary
+/** A doc summary minus folders (diagrams have none), so the doc list/scope components render diagrams too. */
+export type DiagramSummary = Omit<DocSummary, 'folder_id'>
 /** `data` is the editor JSON ({ nodes, edges }); parsed by the editor. */
 export type Diagram = DiagramSummary & { data: Json }
 

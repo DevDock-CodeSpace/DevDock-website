@@ -1,8 +1,8 @@
-import { useQueryClient } from '@tanstack/react-query'
+import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import type { JSONContent } from '@tiptap/core'
 import DragHandle from '@tiptap/extension-drag-handle-react'
 import { EditorContent, useEditor, type Editor } from '@tiptap/react'
-import { ArrowLeft, GripVertical, Trash2 } from 'lucide-react'
+import { ArrowLeft, ChevronRight, GripVertical, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { Link, useBlocker, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
@@ -18,12 +18,14 @@ import { cn } from '@/lib/utils'
 import {
   deleteDocument,
   documentQuery,
+  foldersQuery,
   IMAGE_TYPES,
   updateDocument,
   uploadDocImage,
   type Doc,
 } from '../api'
 import { docExtensions } from '../editor/extensions'
+import { folderPath } from '../folders'
 import { FormatBubble } from '../editor/FormatBubble'
 import { InsertMenu } from '../editor/InsertMenu'
 import { docContentClass } from '../editor/styles'
@@ -50,7 +52,12 @@ export default function DocView({ doc, canWrite }: { doc: Doc; canWrite: boolean
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [now] = useState(Date.now)
-  const backTo = docsPath(team.slug, workspaceId)
+  const folders = useSuspenseQuery(foldersQuery(doc.team_id, doc.workspace_id)).data
+  const path = folderPath(doc.folder_id, folders)
+  const listPath = docsPath(team.slug, workspaceId)
+  const folderLink = (folderId: string | null) => (folderId ? `${listPath}?folder=${folderId}` : listPath)
+  // Back (and after deleting): the folder the doc is in.
+  const backTo = folderLink(doc.folder_id)
 
   // ------------------------------------------------------------ autosave
   const [title, setTitle] = useState(doc.title)
@@ -219,9 +226,19 @@ export default function DocView({ doc, canWrite }: { doc: Doc; canWrite: boolean
     <div className="max-w-[820px] pl-6 md:pl-16" onKeyDown={onKeyDown}>
       <div className="mb-8 flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3 text-xs text-muted-foreground">
-          <Link to={backTo} className="inline-flex shrink-0 items-center gap-1 hover:text-foreground">
-            <ArrowLeft className="size-3.5" /> Docs
-          </Link>
+          <nav aria-label="Folder path" className="flex min-w-0 items-center gap-1">
+            <Link to={listPath} className="inline-flex shrink-0 items-center gap-1 hover:text-foreground">
+              <ArrowLeft className="size-3.5" /> Docs
+            </Link>
+            {path.map((folder) => (
+              <span key={folder.id} className="flex min-w-0 items-center gap-1">
+                <ChevronRight className="size-3 shrink-0" />
+                <Link to={folderLink(folder.id)} className="max-w-32 truncate hover:text-foreground">
+                  {folder.name}
+                </Link>
+              </span>
+            ))}
+          </nav>
           {/* In a workspace the scope is obvious from the tabs above. */}
           {!workspaceId && (
             <>

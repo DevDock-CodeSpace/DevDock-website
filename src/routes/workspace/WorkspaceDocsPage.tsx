@@ -1,39 +1,40 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { ArrowRight } from 'lucide-react'
 import { Link } from 'react-router'
-import { workspaceDocsQuery } from '@/features/docs/api'
-import { CreateDocDialog } from '@/features/docs/components/CreateDocDialog'
-import { DocList } from '@/features/docs/components/DocList'
+import { foldersQuery, workspaceDocsQuery } from '@/features/docs/api'
+import { DocBrowser } from '@/features/docs/components/DocBrowser'
+import { useCanWriteDocs } from '@/features/docs/hooks'
 import { useCurrentTeam, useCurrentWorkspace } from '@/features/teams/hooks'
 import { docPath, docsPath } from '@/features/teams/nav'
 
-/** Workspace → Docs: only docs assigned to this workspace (WorkspaceToolGate checks the tool is on). */
+/** Workspace → Docs: this workspace's folders and docs (WorkspaceToolGate checks the tool is on). */
 export function WorkspaceDocsPage() {
   const { team } = useCurrentTeam()
   const { workspace, can } = useCurrentWorkspace()
   const docs = useSuspenseQuery(workspaceDocsQuery(workspace.id)).data
+  const folders = useSuspenseQuery(foldersQuery(team.id, workspace.id)).data
+  const canWrite = useCanWriteDocs()(workspace.id)
 
   return (
     <>
-      <div className="mb-3 flex items-center justify-between gap-4">
-        <div className="flex items-baseline gap-3">
-          <h2 className="text-sm font-semibold">Docs</h2>
-          <span className="font-mono text-xs text-muted-foreground">{docs.length}</span>
-          <Link
-            to={docsPath(team.slug)}
-            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-          >
-            All group docs <ArrowRight className="size-3" />
-          </Link>
-        </div>
-        <CreateDocDialog workspaceId={workspace.id} />
+      <div className="mb-3 flex justify-end">
+        <Link
+          to={docsPath(team.slug)}
+          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+        >
+          All group docs <ArrowRight className="size-3" />
+        </Link>
       </div>
-      <DocList
+      <DocBrowser
+        teamId={team.id}
+        workspaceId={workspace.id}
         docs={docs}
-        href={(doc) => docPath(team.slug, doc.id, workspace.id)}
+        folders={folders}
+        canWrite={canWrite}
+        docHref={(doc) => docPath(team.slug, doc.id, workspace.id)}
         empty={
           can.canEdit
-            ? 'No docs in this workspace yet. Create the first one.'
+            ? 'No docs in this workspace yet. Create a doc or a folder.'
             : 'No docs in this workspace yet. The workspace lead can add some.'
         }
       />
