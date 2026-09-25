@@ -5,6 +5,7 @@ import { watchAuthIdentity } from '@/features/auth/session'
 import { diagramLoader } from '@/features/diagrams/loaders'
 import { docLoader } from '@/features/docs/loaders'
 import { cycleLoader, issueLoader } from '@/features/issues/loaders'
+import { lessonLoader } from '@/features/learning/loaders'
 import { TEAM_TOOLS } from '@/features/teams/nav'
 import { appIndexLoader, onboardingLoader, teamLoader, workspaceLoader } from '@/features/teams/loaders'
 import { AppLayout } from '@/layouts/AppLayout'
@@ -27,6 +28,9 @@ import { WorkspaceDocsPage } from '@/routes/workspace/WorkspaceDocsPage'
 import { IssueCyclePage } from '@/routes/workspace/IssueCyclePage'
 import { IssueCyclesPage } from '@/routes/workspace/IssueCyclesPage'
 import { IssuePage } from '@/routes/workspace/IssuePage'
+import { LearningProgressPage } from '@/routes/workspace/LearningProgressPage'
+import { LessonPage } from '@/routes/workspace/LessonPage'
+import { WorkspaceLearningPage } from '@/routes/workspace/WorkspaceLearningPage'
 import { WorkspaceIssuesPage } from '@/routes/workspace/WorkspaceIssuesPage'
 import { WorkspaceLayout } from '@/routes/workspace/WorkspaceLayout'
 import { WorkspaceMembersPage } from '@/routes/workspace/WorkspaceMembersPage'
@@ -122,6 +126,16 @@ export const router = createBrowserRouter([
                       { path: 'cycles', element: <IssueCyclesPage /> },
                       { path: 'cycles/:cycleNumber', loader: cycleLoader, element: <IssueCyclePage /> },
                       { path: ':issueNumber', loader: issueLoader, element: <IssuePage /> },
+                    ],
+                  },
+                  {
+                    // Course outline, lessons and class progress.
+                    path: 'learning',
+                    element: <WorkspaceToolGate tool="learning" />,
+                    children: [
+                      { index: true, element: <WorkspaceLearningPage /> },
+                      { path: 'progress', element: <LearningProgressPage /> },
+                      { path: ':lessonId', loader: lessonLoader, element: <LessonPage /> },
                     ],
                   },
                   // Feature tabs that don't exist yet (Live, …); checked against the enabled tools.

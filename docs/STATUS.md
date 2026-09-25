@@ -32,6 +32,7 @@ A private software-engineering teaching workspace for one instructor and a few s
 | 5c: Diagrams (Lucidchart-style editor, React Flow) | 🟡 Migration applied to hosted project, types regenerated; RLS verified locally (55/55); editor checked with mocked Supabase (40 browser checks); **not yet tried with real accounts** | `feat/diagrams` (from `feat/docs`) |
 | 6a: Issues, part 1 (Linear-style: issues, sub-issues, status/priority/assignee/labels, List + Board, comments) | 🟡 Migration applied to hosted project, types regenerated; RLS verified locally (87/87); UI checked with mocked Supabase (49 browser checks, 4 clean runs); **not yet tried with real accounts** | `feat/issues` (from `feat/diagrams`) |
 | 6b: Issues, part 2 (cycles, tabs + filters, activity log, keyboard shortcuts) | 🟡 Migration applied to hosted project, types regenerated; RLS verified locally (52/52, plus 87/87 and 55/55 still pass); UI checked with mocked Supabase (99 browser checks incl. phase 1, 3 clean runs); **not yet tried with real accounts** | `feat/issues` |
+| 8: Learning (modules → lessons, progress) | 🟡 Migration applied to hosted project, types regenerated; RLS verified locally (50/50, all other suites still pass); UI checked with mocked Supabase (31 browser checks, 2 clean runs) | `feat/learning` |
 | 7: Doc folders (Dropbox-style, 3 levels) | 🟡 Migration applied to hosted project, types regenerated; RLS verified locally (36/36; docs 50/50, diagrams 55/55, issues 87/87 + 52/52 still pass); UI checked with mocked Supabase (27 browser checks, 2 clean runs) | `feat/doc-folders` |
 
 ### Phase 1: frontend shell
@@ -543,6 +544,30 @@ Migration `20260925001632_add_workspace_invites.sql`: tested locally (28 checks)
   - The UI has no Resources tab, picker option or defaults, and stale rows are filtered out.
   - Future idea: file and link items inside Docs folders.
   - The older phase notes above still mention Resources as they were at the time.
+
+### Phase 8: Learning
+- **Scope chosen by the product owner:** modules → lessons, plus "mark lessons done" and progress. Drafts/publishing, due dates and lesson questions were left out.
+- **Migration** `20260925092210_create_learning.sql`:
+  - **`learning_modules`**: `workspace_id`, `title`, `position`.
+  - **`lessons`**: `module_id` + `workspace_id` via a composite FK, so a lesson stays in its module's workspace and module deletes cascade; `title`, `body` (TipTap JSON, up to 1 MB), `position`, `created_by`.
+  - **`lesson_progress`**: PK `(lesson_id, user_id)`; `user_id` defaults to `auth.uid()` and has no insert grant.
+  - **Triggers and functions:** the `position_learning_item` trigger puts new modules and lessons (and lessons moved to another module) last. `reorder_learning_modules` and `reorder_lessons` are security-invoker RPCs, so RLS limits them to managers.
+  - **RLS:** modules and lessons are readable by workspace viewers and writable by managers. Progress: you insert and delete your own rows, you read your own, and managers read everyone's.
+- **Local RLS tests: 50/50:**
+  - Manager-only writes and trigger positions.
+  - Reordering, and moving a lesson (it goes last); cross-workspace modules refused.
+  - Member reads; outsiders, plain members and anon see nothing.
+  - Progress: own only, no duplicates, can't mark for others, managers see all, students see only their own.
+  - Cascades on lesson, module and workspace delete.
+- **UI:**
+  - **Outline** (the Learning tab): your progress bar and a Start/Continue button to the next unfinished lesson, then numbered modules (1, 2…) with lessons (1.1, 1.2…) and round done-checkboxes.
+    - Leads also get: New module, Add lesson, move up/down for modules and lessons, Move to module, Rename, Delete (confirmed), and Class progress.
+  - **Lesson page** (lazy-loaded):
+    - A path (Learning › 1. Week 1 › 1.2), and the title plus the Docs editor with autosave for leads; the same content read-only for students.
+    - Mark as done / not done, and Previous / "Done, next lesson" cards. Moving on to the next lesson marks the current one done, as on most course sites.
+  - **Class progress** (leads): a person × module grid (done/total, highlighted when complete), overall %, and when they last finished a lesson. Students come first by progress, then leads.
+- **Browser tests** (`scratchpad/learning-test.mjs`, 31 checks, 2 clean runs): building a course from scratch, autosave, reordering and moving, delete, the Class progress order, student read-only and progress flows (including the user_id left to the DB), the 404s, and the tool being off. Folders (27) and Issues (99) suites still pass.
+- **Shared:** `NameDialog` (moved from docs' FolderNameDialog) is used by folders and Learning.
 
 ## Current configuration (hosted)
 - **Supabase URL Configuration:** Site URL `http://localhost:5173`; Redirect URLs `http://localhost:5173/**`.
