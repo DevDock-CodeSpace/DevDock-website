@@ -1,5 +1,6 @@
-import { Fragment } from 'react'
-import { Link, matchPath, Outlet, useLocation } from 'react-router'
+import { useQuery } from '@tanstack/react-query'
+import { Fragment, Suspense } from 'react'
+import { Link, matchPath, Outlet, useLocation, useParams } from 'react-router'
 import { AppSidebar } from '@/components/AppSidebar'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import {
@@ -11,29 +12,37 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb'
 import { Separator } from '@/components/ui/separator'
+import { Skeleton } from '@/components/ui/skeleton'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
-import { getCourseNav } from '@/features/courses/nav'
-import { useCurrentCourse } from '@/features/courses/use-course'
+import { documentQuery } from '@/features/docs/api'
+import { useCurrentTeam, useCurrentWorkspace } from '@/features/teams/hooks'
+import { getTeamNav, getWorkspaceTabs, teamPath, workspacePath, type NavItem } from '@/features/teams/nav'
 
 // The shadcn sidebar writes its open/collapsed state to this cookie but doesn't read it back.
 const sidebarStartsOpen = () => !document.cookie.includes('sidebar_state=false')
 
+/** Team shell: sidebar + header + page. Rendered for /t/:teamSlug/*. */
 export function AppLayout() {
+  const { workspaceId } = useParams()
   return (
     <SidebarProvider defaultOpen={sidebarStartsOpen()}>
       <AppSidebar />
       <SidebarInset>
-        <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur">
+        <header className="sticky top-0 z-10 flex h-12 shrink-0 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur md:px-6">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4 data-vertical:self-center" />
-          <AppBreadcrumb />
+          {workspaceId ? <WorkspaceBreadcrumb /> : <TeamBreadcrumb />}
           <div className="ml-auto">
             <ThemeToggle />
           </div>
         </header>
-        <div className="flex-1 px-4 py-6 md:px-8 md:py-8">
-          <div className="mx-auto w-full max-w-5xl">
-            <Outlet />
+        {/* Left-aligned next to the sidebar, not a narrow centered column. */}
+        <div className="flex-1 px-4 py-6 md:px-8 md:py-8 lg:px-12">
+          <div className="w-full max-w-[1200px]">
+            {/* Pages may load secondary data with useSuspenseQuery. */}
+            <Suspense fallback={<PageSkeleton />}>
+              <Outlet />
+            </Suspense>
           </div>
         </div>
       </SidebarInset>
@@ -41,37 +50,62 @@ export function AppLayout() {
   )
 }
 
-function AppBreadcrumb() {
-  const course = useCurrentCourse()
-  const { pathname } = useLocation()
+type Crumb = { label: string; to: string }
 
-  if (!pathname.startsWith('/courses/')) {
-    return (
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbPage>Home</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-    )
-  }
+function TeamBreadcrumb() {
+  const { team } = useCurrentTeam()
+  const { tools, members, settings } = getTeamNav(team.slug)
+  const section = useSection([...tools, members, settings])
+  const doc = useDocCrumb()
+  return <Crumbs crumbs={[{ label: team.name, to: teamPath(team.slug) }, ...section, ...doc]} />
+}
 
-  const section = getCourseNav(course.id).find(
-    (item) => matchPath({ path: item.to, end: item.end ?? false }, pathname) !== null,
+function WorkspaceBreadcrumb() {
+  const { team } = useCurrentTeam()
+  const { workspace } = useCurrentWorkspace()
+  const base = workspacePath(team.slug, workspace.id)
+  const section = useSection([
+    ...getWorkspaceTabs(team.slug, workspace.id, workspace.modules),
+    { title: 'Settings', to: `${base}/settings`, icon: getTeamNav(team.slug).settings.icon },
+  ])
+  const doc = useDocCrumb()
+  return (
+    <Crumbs
+      crumbs={[
+        { label: team.name, to: teamPath(team.slug) },
+        { label: workspace.title, to: workspacePath(team.slug, workspace.id) },
+        ...section,
+        ...doc,
+      ]}
+    />
   )
-  const crumbs = [
-    { label: course.title, to: `/courses/${course.id}` },
-    ...(section && !section.end ? [{ label: section.title, to: section.to }] : []),
-  ]
+}
 
+/** On a doc page, its title as the last crumb, but only where docLoader would show it (same team/workspace). */
+function useDocCrumb(): Crumb[] {
+  const { docId, workspaceId } = useParams()
+  const { pathname } = useLocation()
+  const { team } = useCurrentTeam()
+  const doc = useQuery({ ...documentQuery(docId ?? ''), enabled: docId !== undefined }).data
+  const belongs = doc && doc.team_id === team.id && (workspaceId === undefined || doc.workspace_id === workspaceId)
+  return docId && belongs ? [{ label: doc.title, to: pathname }] : []
+}
+
+/** The current non-index nav item as a crumb, if any. */
+function useSection(items: NavItem[]): Crumb[] {
+  const { pathname } = useLocation()
+  const item = items.find((i) => !i.end && matchPath({ path: i.to, end: false }, pathname))
+  return item ? [{ label: item.title, to: item.to }] : []
+}
+
+function Crumbs({ crumbs }: { crumbs: Crumb[] }) {
   return (
     <Breadcrumb className="min-w-0">
       <BreadcrumbList className="flex-nowrap">
         {crumbs.map((crumb, i) => (
           <Fragment key={crumb.to}>
-            {i > 0 && <BreadcrumbSeparator />}
-            <BreadcrumbItem className="min-w-0">
+            {i > 0 && <BreadcrumbSeparator className="hidden sm:block" />}
+            <BreadcrumbItem className={i < crumbs.length - 1 ? 'hidden min-w-0 sm:inline-flex' : 'min-w-0'}>
               {i === crumbs.length - 1 ? (
                 <BreadcrumbPage className="truncate">{crumb.label}</BreadcrumbPage>
               ) : (
@@ -84,5 +118,17 @@ function AppBreadcrumb() {
         ))}
       </BreadcrumbList>
     </Breadcrumb>
+  )
+}
+
+function PageSkeleton() {
+  return (
+    <div className="space-y-6" aria-busy="true" aria-label="Loading">
+      <div className="space-y-2">
+        <Skeleton className="h-7 w-48" />
+        <Skeleton className="h-4 w-72" />
+      </div>
+      <Skeleton className="h-40 w-full" />
+    </div>
   )
 }

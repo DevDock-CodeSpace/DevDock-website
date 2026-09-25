@@ -4,13 +4,17 @@ DevDock is a private software-engineering teaching workspace for **one instructo
 
 ## Current status
 
-**Phase 1 done: frontend shell.** React Router, Tailwind v4, shadcn/ui, and TanStack Query are installed. The app has a responsive sidebar layout, light/dark/system theme, and placeholder pages driven by **mock data** (`src/features/courses/mock-data.ts`). TipTap, draw.io, and Jitsi are not installed yet. **Add each piece only when a task needs it**, and don't build ahead.
+**Phase 1 done: frontend shell.** React Router, Tailwind v4, shadcn/ui, and TanStack Query are installed. The app has a responsive sidebar layout, light/dark/system theme, and placeholder pages driven by mock data (replaced by real data in Phase 4). TipTap is installed (Phase 5b); draw.io and Jitsi are not installed yet. **Add each piece only when a task needs it**, and don't build ahead.
 
 **Phase 2 done: Supabase foundation.** `@supabase/supabase-js`, a typed browser client (`src/lib/supabase.ts`), the `supabase/` CLI project, and the first migration (`profiles` + RLS + a sign-up trigger), **applied to the hosted project** (ref `ejqrrxxiatvvdiyxtvid`, linked via `supabase link`).
 
-**Phase 3 done: Google sign-in** via Supabase Auth (PKCE). All app routes require a session, and the sidebar shows the signed-in user's profile. Sign-in verified end-to-end with a real Google account. The app now **requires** the Supabase env vars. Course content is still mock data.
+**Phase 3 done: Google sign-in** via Supabase Auth (PKCE). All app routes require a session, and the sidebar shows the signed-in user's profile. Sign-in verified end-to-end with a real Google account. The app now **requires** the Supabase env vars.
 
-Explicitly **not yet**: course/lesson/member/invitation tables and replacing mock data (Phase 4). Current status and next steps: `docs/STATUS.md`.
+**Phase 4 (in progress): Team → Workspace model is real.** A **team** (owner/admin/member; type learning/development/general) contains **workspaces** (lead/member; type course/project/general). Invite codes join a team, and workspace access is assigned separately. The UI has onboarding (create a team or join with a code), a team switcher, and real workspace, member, invite and settings pages. The mock data is gone.
+
+**Phase 5a done: Docs.** A `documents` table (team-wide or assigned to a workspace) with RLS, Team → Docs and Workspace → Docs lists.
+
+**Phase 5b done: rich docs editor (Dropbox Paper-style).** TipTap v3 (MIT extensions only) with highlight.js via lowlight, stored as TipTap JSON in `documents.body`; images in the private `doc-images` Storage bucket. Autosave. Other tools (Diagrams, Live, Learning, …) are still placeholder pages. Current status and next steps: `docs/STATUS.md`.
 
 ## Target stack
 
@@ -23,7 +27,7 @@ Explicitly **not yet**: course/lesson/member/invitation tables and replacing moc
 | Components         | shadcn/ui                       | Generated into `src/components/ui/`; uses `@/` alias |
 | Server state       | TanStack Query                  | All remote data goes through queries/mutations |
 | Backend            | Supabase (Postgres, Auth, Storage) | Row Level Security is the authorization layer |
-| Rich text / notes  | TipTap                          | |
+| Rich text / notes  | TipTap v3 (+ lowlight/highlight.js) | Dropbox Paper look; MIT extensions only (drag handle pulls in yjs as a peer dep). Lazy-loaded with the doc page |
 | Diagrams           | diagrams.net / draw.io (embed)  | Store diagram XML, not just images |
 | Live sessions      | Jitsi Meet (embed)              | |
 | Code               | GitHub links                    | Link to repos/PRs; no GitHub API integration unless asked |
@@ -61,9 +65,9 @@ Before calling a task done, run `npm run typecheck`, `npm run lint`, and `npm ru
 src/
   main.tsx           # providers: QueryClient → Theme → Tooltip → Router
   router.tsx         # all routes (createBrowserRouter, data mode)
-  layouts/           # AppLayout (sidebar + header + <Outlet/>), app-loader.ts (auth guard + cache priming)
-  routes/            # page components; routes/course/* for /courses/:courseId/*
-  features/<name>/   # feature-scoped components, types, api.ts, hooks (auth/, courses/)
+  layouts/           # AppLayout (team shell: sidebar + header + <Suspense><Outlet/>), app-loader.ts (auth guard)
+  routes/            # page components: team/* (under /t/:teamSlug) and workspace/* (under …/w/:workspaceId)
+  features/<name>/   # feature-scoped components, types, api.ts, hooks (auth/, teams/, workspaces/, docs/)
   components/ui/     # shadcn/ui generated components (don't hand-edit much)
   components/        # shared app components (AppSidebar, PageHeader, Theme*)
   hooks/             # shared hooks
@@ -76,16 +80,36 @@ supabase/
 
 ### Routing & data
 
-- Routes: `/login`, `/auth/callback` (public), plus the authenticated layout (route id `app`): `/app` (workspace home), `/courses/:courseId` (overview) and `lessons`, `live`, `resources`, `members`, `settings`. `/` redirects to `/app`.
-- Course sidebar items are defined once in `src/features/courses/nav.ts`; the sidebar and breadcrumb both read it.
-- Data pattern: `features/<name>/api.ts` exports `queryOptions`. The layout route's `loader` primes the cache with `queryClient.ensureQueryData`, and components read with `useSuspenseQuery` (e.g. `useCurrentCourse()`). To move to Supabase, replace the fetcher bodies in `api.ts` and keep the query keys.
+- **Routes.**
+  - Public: `/login`, `/auth/callback`.
+  - Authenticated (under route id `app`):
+    - `/app` redirects to the last-used team, or to `/onboarding` when the user has none.
+    - `/onboarding`
+    - `/t/:teamSlug` (the team's workspaces), plus `members` and `settings`.
+    - `/t/:teamSlug/w/:workspaceId` (overview), plus `members` and `settings`; every other feature tab is `:tab`, checked against the workspace type in `WorkspaceTabPage`.
+  - `/` redirects to `/app`.
+- **Access checks in loaders** (`features/teams/loaders.ts`): `teamLoader` 404s when the user isn't a team member; `workspaceLoader` 404s when the workspace isn't visible (RLS) or belongs to another team.
+- **Current context:** `useCurrentTeam()` and `useCurrentWorkspace()` (`features/teams/hooks.ts`) return the entity, the user's role, and `can`, a permissions object from `features/teams/permissions.ts` that mirrors RLS. **`can` is for showing and hiding UI only.** Every write is re-checked by RLS. Type labels and icons are in `teamTypes` and `workspaceTypes` in the same file.
+- **Navigation:** the **sidebar is the hierarchy**: team switcher, Home, the **team tools** (Docs, Diagrams, Live; `TEAM_TOOLS`), the team's workspaces grouped by **workspace** type (Courses, Projects, Workspaces; empty sections hidden; team type only decides which section comes first and the default type for "+ New", via `workspaceTypeOrder`/`defaultWorkspaceType`), one "+ New", team Members and Settings. **Workspace features are horizontal tabs** under the workspace title (`WorkspaceLayout`), **generated from the workspace's enabled tools** (`workspace_modules`; `getWorkspaceTabs(teamSlug, id, modules)` in `features/teams/nav.ts`): Overview, then the tools in `MODULE_ORDER`, then Members. Workspace *type* only picks default tools (`defaultModules`, which mirrors `public.default_workspace_modules`). Create workspaces with `rpc('create_workspace')` and change tools with `rpc('set_workspace_modules')`; both are atomic and run under RLS. Don't put workspace features in the sidebar.
+- **Team tools vs workspace tabs:** Docs, Diagrams and Live exist at both levels as views of the same data. Rows have `team_id` (required) + `workspace_id` (nullable: null = team-wide; composite FK `(workspace_id, team_id) → workspaces(id, team_id)` keeps it in the same team). The team page shows everything the caller can access; the workspace tab shows only that workspace's rows. Docs is built this way (`documents`, `TeamDocsPage`/`WorkspaceDocsPage`, one `DocPage` for both routes, `docLoader`); Diagrams and Live still use the placeholder `TeamToolPage`. Built workspace tools sit under `WorkspaceToolGate`, which 404s when the tool is off. Issues, Learning, Exercises, GitHub and Resources are workspace-only.
+- **Data pattern:** `features/<name>/api.ts` exports `queryOptions` and mutation functions.
+  - Loaders prime what the shell needs with `ensureQueryData`. Pages read with `useSuspenseQuery`; `AppLayout` has a Suspense boundary, so pages may also load secondary data that way.
+  - Errors go through `lib/errors.ts` (`toDataError`, `requireAffected`), because RLS makes forbidden UPDATE/DELETE return 0 rows, not an error. Show them with `toast.error(errorMessage(e))`.
+- **Query keys:** `['teams', …]`, `['workspaces', …]` and `['documents', …]`; invalidate by prefix after mutations.
+- **Docs editor** (`features/docs/editor/`, page body `features/docs/components/DocView.tsx`, lazy-loaded by `routes/DocPage.tsx`):
+  - Extensions are listed in `extensions.ts`, and the typography lives in `styles.ts` as Tailwind classes (no global CSS).
+  - `documents.body` (TipTap JSON) is the source of truth; `content` is a plain-text copy written with it.
+  - Images are the custom `docImage` node, which stores a Storage **path** (`<team>/<doc>/<uuid>.<ext>`), never a URL; the view signs it (`docImageUrlQuery`). Upload with `uploadDocImage`. `deleteDocument` removes the doc's image folder first.
+  - Collapsed headings are per-viewer plugin state (`CollapsibleHeadings.ts`), never saved.
+  - Don't add paid TipTap extensions.
+- **Leaving or deleting** the current team or workspace: navigate away *first*, then invalidate (see `useExitTeam`). Otherwise the page crashes when its data disappears, or `/app` bounces back through the stale cache.
 - Avoid `Date.now()` in render (oxlint `react/purity`); capture it with `useState(Date.now)`.
 
 ### UI
 
 - shadcn/ui uses the `radix-nova` style (`components.json`); add components with `npx shadcn@latest add <name>`. Class merging uses `cn()` from `@/lib/utils`, which re-exports shadcn's official `cn` package.
 - Theme: `.dark` class on `<html>`, set by `ThemeProvider` (localStorage key `devdock-theme`) and by an inline script in `index.html` that prevents a theme flash on load. Use the semantic color tokens (`bg-background`, `text-muted-foreground`, …), never raw grays.
-- Visual tone: developer workspace. Neutral palette, Geist Sans, and Geist Mono (`font-mono`) for codes, numbers, handles, and times.
+- **Visual tone:** a modern developer tool, as dense as Linear and as readable as Notion. Content aligns left next to the sidebar (max ~1200px), not in a centered column. Prefer lists, typography and hairline separators over cards; use `PageHeader`, `SettingsSection`/`DangerRow` and `PersonRow`. **DevDock blue is an accent only** (`text-brand`/`bg-brand`: active tab underline, active nav icon, lead/owner labels, focus ring). Geist Sans, with Geist Mono for codes, numbers and times.
 - **Brand:** the product is **DevDock**. Show the logo only through `LogoMark` / `LogoWordmark` in `src/components/Logo.tsx`; `LogoWordmark` switches to the light-text version in dark mode. Don't hand-edit files in `src/assets/brand/` or the favicons in `public/`; they're generated from `brand/source/` by `brand/build.py` (see `brand/README.md`).
 - `.oxlintrc.json` turns off two rules for generated shadcn files only. Don't widen that override to app code.
 
@@ -105,7 +129,7 @@ supabase/
 
 - **Supabase Auth with Google only** (no email/password, magic links or other providers unless asked). PKCE flow (`flowType: 'pkce'` in `src/lib/supabase.ts`); `redirectTo` is always `window.location.origin + '/auth/callback'`, never a hardcoded host.
 - **All auth calls live in `src/features/auth/api.ts`.** Components use the hooks in `features/auth/hooks.ts` (`useAuth`, `useCurrentProfile`, `useUserIdentity`, `useSignInWithGoogle`, `useSignOut`) and never import `supabase` directly.
-- **Route protection happens in loaders, not components.** Any new authenticated route goes *under* the `app` layout route, whose loader (`src/layouts/app-loader.ts`) calls `requireUser(request)` before anything else. Don't add `useEffect`-style redirect guards.
+- **Route protection happens in loaders, not components.** Any new authenticated route goes *under* the `app` route, whose loader (`src/layouts/app-loader.ts`) calls `requireUser(request)` before anything else. Child loaders that need the user call `requireUser` again (it's cheap; loaders run in parallel). Don't add `useEffect`-style redirect guards.
 - **Post-login destination:** `/login?next=` (validated by `safeNextPath`: same-site paths only). It's stored in sessionStorage across the Google round trip so the callback URL stays fixed.
 - **Identity changes** (sign-in/out in another tab, expired session) are handled once, in `watchAuthIdentity` (router.tsx): clear the query cache, then `router.revalidate()`. Never call Supabase APIs inside an `onAuthStateChange` callback (deadlock risk; defer with `setTimeout`).
 - **Profiles are created only by the DB trigger.** Don't add client-side profile inserts. If a profile is missing or fails to load, the UI falls back to Google metadata (`useUserIdentity`).
