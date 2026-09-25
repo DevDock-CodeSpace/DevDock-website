@@ -2,7 +2,6 @@ import {
   BookOpen,
   CircleDot,
   FileText,
-  FolderGit2,
   GitPullRequest,
   Home,
   LayoutDashboard,
@@ -108,7 +107,6 @@ export const workspaceTabDefs: Record<
   diagrams: { title: 'Diagrams', icon: Workflow, hint: 'Architecture and flow diagrams', soon: 'Diagrams assigned to this workspace will live here.' },
   exercises: { title: 'Exercises', icon: Shapes, hint: 'Practice and submissions', soon: 'Exercises and submissions will live here.' },
   github: { title: 'GitHub', icon: GitPullRequest, hint: 'Repos and pull requests', soon: 'Linked repositories and pull requests will show up here.' },
-  resources: { title: 'Resources', icon: FolderGit2, hint: 'Links and files', soon: 'Links, repositories, and files will live here.' },
   live: { title: 'Live', icon: Video, hint: 'Sessions (Jitsi)', soon: 'Live sessions for this workspace will start from here.' },
   members: { title: 'Members', icon: Users },
 }
@@ -121,15 +119,14 @@ export const MODULE_ORDER: WorkspaceModule[] = [
   'diagrams',
   'exercises',
   'github',
-  'resources',
   'live',
 ]
 
 /** Mirrors public.default_workspace_modules() in the database. Defaults only. */
 export const defaultModules: Record<WorkspaceType, WorkspaceModule[]> = {
   project: ['issues', 'docs', 'diagrams', 'github', 'live'],
-  course: ['learning', 'docs', 'diagrams', 'exercises', 'resources', 'live'],
-  general: ['docs', 'diagrams', 'resources', 'live'],
+  course: ['learning', 'docs', 'diagrams', 'exercises', 'live'],
+  general: ['docs', 'diagrams', 'live'],
 }
 
 export function sortModules(modules: readonly WorkspaceModule[]): WorkspaceModule[] {

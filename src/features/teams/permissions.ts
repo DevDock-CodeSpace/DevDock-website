@@ -57,7 +57,7 @@ export const workspaceTypes: Record<
   /** `noun` is what one is called in copy ("New course"), `plural` heads its sidebar section. */
   { label: string; noun: string; plural: string; hint: string; icon: LucideIcon }
 > = {
-  course: { label: 'Course', noun: 'course', plural: 'Courses', hint: 'Lessons, live classes, resources', icon: BookOpen },
+  course: { label: 'Course', noun: 'course', plural: 'Courses', hint: 'Lessons, live classes, docs', icon: BookOpen },
   project: { label: 'Project', noun: 'project', plural: 'Projects', hint: 'Code, docs, and planning', icon: FolderKanban },
   general: { label: 'General', noun: 'workspace', plural: 'Workspaces', hint: 'A shared space', icon: LayoutGrid },
 }

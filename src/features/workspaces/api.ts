@@ -6,7 +6,10 @@ import type { Database, Tables, TablesInsert } from '@/types/database.types'
 
 export type WorkspaceRole = Database['public']['Enums']['workspace_role']
 export type WorkspaceType = Database['public']['Enums']['workspace_type']
-export type WorkspaceModule = Database['public']['Enums']['workspace_module']
+/** Workspace tools. 'resources' is retired in the database (Docs replaced it). */
+export type WorkspaceModule = Exclude<Database['public']['Enums']['workspace_module'], 'resources'>
+const isActiveModule = (module: Database['public']['Enums']['workspace_module']): module is WorkspaceModule =>
+  module !== 'resources'
 export type Workspace = Pick<
   Tables<'workspaces'>,
   'id' | 'team_id' | 'title' | 'description' | 'type' | 'issue_key' | 'created_at' | 'updated_at'
@@ -40,7 +43,7 @@ export const teamWorkspacesQuery = (teamId: string) =>
       // Rosters are small (a class or project group), so fetching them beats a second query.
       return data.map(({ workspace_members, workspace_modules, ...workspace }) => ({
         ...workspace,
-        modules: workspace_modules.map((m) => m.module),
+        modules: workspace_modules.map((m) => m.module).filter(isActiveModule),
         memberCount: workspace_members.length,
         leads: workspace_members
           .filter((m) => m.role === 'lead')
@@ -78,7 +81,7 @@ export const workspaceQuery = (workspaceId: string) =>
       if (error) throw toDataError('load the workspace', error)
       if (!data) return null
       const { workspace_modules, ...workspace } = data
-      return { ...workspace, modules: workspace_modules.map((m) => m.module) }
+      return { ...workspace, modules: workspace_modules.map((m) => m.module).filter(isActiveModule) }
     },
   })
 
