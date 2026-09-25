@@ -58,7 +58,7 @@ export function AddWorkspaceMembersDialog() {
         <DialogHeader>
           <DialogTitle>Add people to {workspace.title}</DialogTitle>
           <DialogDescription>
-            Pick from people already in {team.name}. To bring in someone new, share the team invite code below.
+            Pick from people already in {team.name}. To bring in someone new, share the group invite code below.
           </DialogDescription>
         </DialogHeader>
 
@@ -78,7 +78,7 @@ export function AddWorkspaceMembersDialog() {
         )}
 
         {candidates.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">Everyone in this team is already in the workspace.</p>
+          <p className="py-6 text-center text-sm text-muted-foreground">Everyone in this group is already in the workspace.</p>
         ) : (
           <ul className="max-h-80 divide-y overflow-y-auto rounded-lg border">
             {candidates.map((person) => {

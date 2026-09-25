@@ -68,7 +68,7 @@ export function WorkspaceOverviewPage() {
           <dl className="grid grid-cols-[72px_minmax(0,1fr)] gap-y-1.5 text-sm">
             <dt className="text-muted-foreground">Type</dt>
             <dd>{workspaceTypes[workspace.type].label}</dd>
-            <dt className="text-muted-foreground">Team</dt>
+            <dt className="text-muted-foreground">Group</dt>
             <dd className="truncate">{team.name}</dd>
             <dt className="text-muted-foreground">Created</dt>
             <dd className="font-mono text-xs leading-5">{formatDate(workspace.created_at)}</dd>

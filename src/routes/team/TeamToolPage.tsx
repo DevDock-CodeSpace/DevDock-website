@@ -24,7 +24,7 @@ export function TeamToolPage({ tool }: { tool: TeamToolId }) {
     <>
       <PageHeader
         title={title}
-        description={`All ${items} in ${team.name} you can access: team-wide ones and those assigned to a workspace.`}
+        description={`All ${items} in ${team.name} you can access: group-wide ones and those assigned to a workspace.`}
       />
 
       <div className="max-w-3xl space-y-10">
@@ -38,7 +38,7 @@ export function TeamToolPage({ tool }: { tool: TeamToolId }) {
               <span className="ml-1 font-mono text-xs font-normal text-muted-foreground">coming soon</span>
             </p>
             <p className="text-sm text-muted-foreground">
-              {title} isn’t built yet. Once it is, this page lists every {item} in the team. A
+              {title} isn’t built yet. Once it is, this page lists every {item} in the group. A
               workspace’s {title} tab shows only the {items} assigned to it.
             </p>
           </div>
@@ -52,7 +52,7 @@ export function TeamToolPage({ tool }: { tool: TeamToolId }) {
           <ul className="divide-y border-y">
             <li className="flex items-center gap-3 px-1 py-2.5 text-sm">
               <Globe className="size-4 shrink-0 text-muted-foreground" />
-              <span className="font-medium">Team-wide</span>
+              <span className="font-medium">Group-wide</span>
               <span className="hidden truncate text-muted-foreground sm:inline">Not assigned to any workspace</span>
               <span className="ml-auto shrink-0 font-mono text-xs text-muted-foreground">0</span>
             </li>

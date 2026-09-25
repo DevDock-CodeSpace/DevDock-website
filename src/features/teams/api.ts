@@ -28,7 +28,7 @@ export const myTeamsQuery = (userId: string) =>
         .select('role, joined_at, team:teams(id, name, slug, type)')
         .eq('user_id', userId)
         .order('joined_at')
-      if (error) throw toDataError('load your teams', error)
+      if (error) throw toDataError('load your groups', error)
       return data.map((row) => ({ role: row.role, joinedAt: row.joined_at, team: row.team }))
     },
   })
@@ -42,7 +42,7 @@ export const teamMembersQuery = (teamId: string) =>
         .select('user_id, role, joined_at, profile:profiles(display_name, avatar_url)')
         .eq('team_id', teamId)
         .order('joined_at')
-      if (error) throw toDataError('load team members', error)
+      if (error) throw toDataError('load group members', error)
       return data
     },
   })
@@ -70,8 +70,8 @@ export async function createTeam(input: { name: string; slug: string; type: Team
     .select('id, name, slug, type')
     .single()
   if (error) {
-    throw toDataError('create the team', error, {
-      '23505': 'That team URL is already taken. Try another.',
+    throw toDataError('create the group', error, {
+      '23505': 'That group URL is already taken. Try another.',
       '23514': 'Use 3–48 lowercase letters, numbers, and single dashes for the URL.',
     })
   }
@@ -82,7 +82,7 @@ export async function createTeam(input: { name: string; slug: string; type: Team
 export async function joinTeam(inviteCode: string): Promise<string> {
   const { data, error } = await supabase.rpc('join_team', { invite_code: inviteCode })
   if (error) {
-    throw toDataError('join the team', error, {
+    throw toDataError('join the group', error, {
       P0001: 'That invite code is invalid, expired, or has no uses left.',
     })
   }
@@ -95,14 +95,14 @@ export async function updateTeam(teamId: string, input: { name: string; type: Te
     .update({ name: input.name.trim(), type: input.type })
     .eq('id', teamId)
     .select('id')
-  if (error) throw toDataError('save the team', error)
-  requireAffected(data, 'update team')
+  if (error) throw toDataError('save the group', error)
+  requireAffected(data, 'update group')
 }
 
 export async function deleteTeam(teamId: string) {
   const { data, error } = await supabase.from('teams').delete().eq('id', teamId).select('id')
-  if (error) throw toDataError('delete the team', error)
-  requireAffected(data, 'delete team')
+  if (error) throw toDataError('delete the group', error)
+  requireAffected(data, 'delete group')
 }
 
 export async function setTeamRole(teamId: string, userId: string, role: Exclude<TeamRole, 'owner'>) {
@@ -113,7 +113,7 @@ export async function setTeamRole(teamId: string, userId: string, role: Exclude<
     .eq('user_id', userId)
     .select('user_id')
   if (error) throw toDataError('change the role', error)
-  requireAffected(data, 'change team role')
+  requireAffected(data, 'change group role')
 }
 
 /** Remove someone, or leave (userId = yourself). Also removes them from the team's workspaces. */
@@ -125,7 +125,7 @@ export async function removeTeamMember(teamId: string, userId: string) {
     .eq('user_id', userId)
     .select('user_id')
   if (error) throw toDataError('remove the member', error)
-  requireAffected(data, 'remove team member')
+  requireAffected(data, 'remove group member')
 }
 
 export async function createInvite(

@@ -84,7 +84,7 @@ export function CreateWorkspaceDialog({ trigger }: { trigger?: ReactNode }) {
           <DialogHeader>
             <DialogTitle>New {noun}</DialogTitle>
             <DialogDescription>
-              Only team owners and admins see it until you add people to it.
+              Only group owners and admins see it until you add people to it.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-1.5">

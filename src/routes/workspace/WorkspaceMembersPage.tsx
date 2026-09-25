@@ -143,7 +143,7 @@ export function WorkspaceMembersPage() {
         description={
           removing?.user_id === user.id
             ? `You’ll lose access to ${workspace.title} unless someone adds you again.`
-            : `${removing?.profile?.display_name ?? 'This person'} will lose access to ${workspace.title}. They stay in the team.`
+            : `${removing?.profile?.display_name ?? 'This person'} will lose access to ${workspace.title}. They stay in the group.`
         }
         confirmLabel={removing?.user_id === user.id ? 'Leave' : 'Remove'}
         pending={remove.isPending}

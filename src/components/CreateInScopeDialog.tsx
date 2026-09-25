@@ -102,8 +102,8 @@ export function CreateInScopeDialog({
             <DialogTitle>New {noun}</DialogTitle>
             <DialogDescription>
               {workspaceId
-                ? 'Visible to everyone in this workspace and to team owners/admins.'
-                : `Team-wide ${noun}s are visible to the whole team. Workspace ${noun}s only to that workspace (and team owners/admins).`}
+                ? 'Visible to everyone in this workspace and to group owners/admins.'
+                : `Group-wide ${noun}s are visible to the whole group. Workspace ${noun}s only to that workspace (and group owners/admins).`}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-1.5">
@@ -131,7 +131,7 @@ export function CreateInScopeDialog({
                       return (
                         <SelectItem key={id} value={id}>
                           <Globe className="text-muted-foreground" />
-                          Team-wide
+                          Group-wide
                         </SelectItem>
                       )
                     }

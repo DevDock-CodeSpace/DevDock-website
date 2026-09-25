@@ -23,7 +23,7 @@ export function WorkspaceDiagramsPage() {
             to={diagramsPath(team.slug)}
             className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
           >
-            All team diagrams <ArrowRight className="size-3" />
+            All group diagrams <ArrowRight className="size-3" />
           </Link>
         </div>
         <CreateDiagramDialog workspaceId={workspace.id} />
