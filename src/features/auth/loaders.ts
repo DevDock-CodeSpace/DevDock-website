@@ -1,6 +1,7 @@
 import type { User } from '@supabase/supabase-js'
 import { redirect, type LoaderFunctionArgs } from 'react-router'
 import { getCurrentSession } from './api'
+import { captureCalendarToken, clearCalendarToken } from './google-calendar'
 import { isLoginErrorCode, type LoginErrorCode } from './errors'
 import { DEFAULT_AFTER_LOGIN, safeNextPath, takeNextPath } from './redirect'
 
@@ -54,6 +55,7 @@ export async function authCallbackLoader({ request }: LoaderFunctionArgs) {
   if (oauthError) {
     const description = url.searchParams.get('error_description') ?? hash.get('error_description')
     console.error('[auth] OAuth provider returned an error', oauthError, description)
+    clearCalendarToken()
     throw redirect(loginUrl({ next, error: oauthError === 'access_denied' ? 'cancelled' : 'oauth' }))
   }
 
@@ -67,5 +69,6 @@ export async function authCallbackLoader({ request }: LoaderFunctionArgs) {
     console.error('[auth] Callback reached without a session (code missing, expired, or already used)')
     throw redirect(loginUrl({ next, error: 'callback' }))
   }
+  captureCalendarToken(session)
   throw redirect(next)
 }
