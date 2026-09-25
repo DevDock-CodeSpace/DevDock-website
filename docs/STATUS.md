@@ -1,6 +1,6 @@
 # DevDock: project status
 
-_Last updated: 2026-09-25 (Phase 6b: cycles, filters, activity, shortcuts)_
+_Last updated: 2026-09-25 (Phase 5d: live sessions via JaaS + Google Calendar)_
 
 A handoff for anyone (human or AI) planning the next phase. For conventions, see [CLAUDE.md](../CLAUDE.md); for setup, see [README.md](../README.md).
 
@@ -8,7 +8,7 @@ A handoff for anyone (human or AI) planning the next phase. For conventions, see
 
 A private software-engineering teaching workspace for one instructor and a few students. It's not a public product: optimize for clarity, low maintenance and low hosting cost. Repo folder `DevDock-website`. Default branch `prod`.
 
-**Stack:** React 19 + TypeScript (strict) + Vite, React Router 7 (data mode), Tailwind v4, shadcn/ui, TanStack Query, and Supabase (Postgres, Auth, RLS). TipTap (docs) and React Flow (diagrams) are in. Planned: Jitsi Meet, GitHub links, Vercel hosting.
+**Stack:** React 19 + TypeScript (strict) + Vite, React Router 7 (data mode), Tailwind v4, shadcn/ui, TanStack Query, and Supabase (Postgres, Auth, RLS). TipTap (docs), React Flow (diagrams) and Jitsi via JaaS (live sessions) are in. Planned: GitHub links, Vercel hosting.
 
 ## Phases
 
@@ -34,6 +34,7 @@ A private software-engineering teaching workspace for one instructor and a few s
 | 6b: Issues, part 2 (cycles, tabs + filters, activity log, keyboard shortcuts) | 🟡 Migration applied to hosted project, types regenerated; RLS verified locally (52/52, plus 87/87 and 55/55 still pass); UI checked with mocked Supabase (99 browser checks incl. phase 1, 3 clean runs); **not yet tried with real accounts** | `feat/issues` |
 | 8: Learning (modules → lessons, progress) | 🟡 Migration applied to hosted project, types regenerated; RLS verified locally (50/50, all other suites still pass); UI checked with mocked Supabase (31 browser checks, 2 clean runs) | `feat/learning` |
 | 7: Doc folders (Dropbox-style, 3 levels) | 🟡 Migration applied to hosted project, types regenerated; RLS verified locally (36/36; docs 50/50, diagrams 55/55, issues 87/87 + 52/52 still pass); UI checked with mocked Supabase (27 browser checks, 2 clean runs) | `feat/doc-folders` |
+| 5d: Live sessions (Jitsi via JaaS, Google Calendar sync) | 🟡 Migration applied to hosted project, types regenerated; RLS verified locally (26/26); `jaas-token` Edge Function deployed (returns `not_configured` until JaaS secrets are set); UI checked with mocked Supabase/Google/Jitsi (37 browser checks); **not yet tried with real accounts or real JaaS keys** | `feat/live-sessions` (from `dev`) |
 
 ### Phase 1: frontend shell
 - Collapsible sidebar (slide-out panel on mobile) with Overview, Lessons, Live Class, Resources, Members and Settings; a breadcrumb header; and a light/dark/system theme.

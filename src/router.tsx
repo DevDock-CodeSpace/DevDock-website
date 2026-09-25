@@ -6,13 +6,14 @@ import { diagramLoader } from '@/features/diagrams/loaders'
 import { docLoader } from '@/features/docs/loaders'
 import { cycleLoader, issueLoader } from '@/features/issues/loaders'
 import { lessonLoader } from '@/features/learning/loaders'
-import { TEAM_TOOLS } from '@/features/teams/nav'
+import { liveSessionLoader } from '@/features/live/loaders'
 import { appIndexLoader, onboardingLoader, teamLoader, workspaceLoader } from '@/features/teams/loaders'
 import { AppLayout } from '@/layouts/AppLayout'
 import { APP_ROUTE_ID, appLoader } from '@/layouts/app-loader'
 import { queryClient } from '@/lib/query-client'
 import { DiagramPage } from '@/routes/DiagramPage'
 import { DocPage } from '@/routes/DocPage'
+import { LiveSessionPage } from '@/routes/LiveSessionPage'
 import { LoginPage } from '@/routes/LoginPage'
 import { NotFoundPage, RouteErrorPage } from '@/routes/NotFoundPage'
 import { OnboardingPage } from '@/routes/OnboardingPage'
@@ -20,9 +21,9 @@ import { PrivacyPage } from '@/routes/PrivacyPage'
 import { TeamDiagramsPage } from '@/routes/team/TeamDiagramsPage'
 import { TeamDocsPage } from '@/routes/team/TeamDocsPage'
 import { TeamIssuesPage } from '@/routes/team/TeamIssuesPage'
+import { TeamLivePage } from '@/routes/team/TeamLivePage'
 import { TeamMembersPage } from '@/routes/team/TeamMembersPage'
 import { TeamSettingsPage } from '@/routes/team/TeamSettingsPage'
-import { TeamToolPage } from '@/routes/team/TeamToolPage'
 import { TeamWorkspacesPage } from '@/routes/team/TeamWorkspacesPage'
 import { WorkspaceDiagramsPage } from '@/routes/workspace/WorkspaceDiagramsPage'
 import { WorkspaceDocsPage } from '@/routes/workspace/WorkspaceDocsPage'
@@ -32,6 +33,7 @@ import { IssuePage } from '@/routes/workspace/IssuePage'
 import { LearningProgressPage } from '@/routes/workspace/LearningProgressPage'
 import { LessonPage } from '@/routes/workspace/LessonPage'
 import { WorkspaceLearningPage } from '@/routes/workspace/WorkspaceLearningPage'
+import { WorkspaceLivePage } from '@/routes/workspace/WorkspaceLivePage'
 import { WorkspaceIssuesPage } from '@/routes/workspace/WorkspaceIssuesPage'
 import { WorkspaceLayout } from '@/routes/workspace/WorkspaceLayout'
 import { WorkspaceMembersPage } from '@/routes/workspace/WorkspaceMembersPage'
@@ -88,11 +90,9 @@ export const router = createBrowserRouter([
               { path: 'diagrams/:diagramId', loader: diagramLoader, element: <DiagramPage /> },
               // Development groups: issues from every project (the page checks the group type).
               { path: 'issues', element: <TeamIssuesPage /> },
-              // Team-wide views of tools not built yet (Live): placeholders.
-              ...TEAM_TOOLS.filter((tool) => tool !== 'docs' && tool !== 'diagrams').map((tool) => ({
-                path: tool,
-                element: <TeamToolPage tool={tool} />,
-              })),
+              // Group → Live: video sessions (Jitsi via JaaS) for the group and its workspaces.
+              { path: 'live', element: <TeamLivePage /> },
+              { path: 'live/:sessionId', loader: liveSessionLoader, element: <LiveSessionPage /> },
               {
                 // Visible to team owners/admins and workspace members (workspaceLoader + RLS).
                 path: 'w/:workspaceId',
@@ -141,7 +141,16 @@ export const router = createBrowserRouter([
                       { path: ':lessonId', loader: lessonLoader, element: <LessonPage /> },
                     ],
                   },
-                  // Feature tabs that don't exist yet (Live, …); checked against the enabled tools.
+                  {
+                    // Only this workspace's live sessions.
+                    path: 'live',
+                    element: <WorkspaceToolGate tool="live" />,
+                    children: [
+                      { index: true, element: <WorkspaceLivePage /> },
+                      { path: ':sessionId', loader: liveSessionLoader, element: <LiveSessionPage /> },
+                    ],
+                  },
+                  // Feature tabs that don't exist yet (Exercises, GitHub); checked against the enabled tools.
                   { path: ':tab', element: <WorkspaceTabPage /> },
                 ],
               },

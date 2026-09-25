@@ -3,6 +3,7 @@ import { queryOptions } from '@tanstack/react-query'
 import { supabase, supabasePublishableKey, supabaseUrl } from '@/lib/supabase'
 import type { Tables } from '@/types/database.types'
 import { AuthFlowError } from './errors'
+import { CALENDAR_SCOPE, clearCalendarToken, markCalendarConnecting } from './google-calendar'
 import { rememberNextPath } from './redirect'
 
 export type Profile = Tables<'profiles'>
@@ -46,8 +47,33 @@ export async function signInWithGoogle(next: string): Promise<void> {
   }
 }
 
+/**
+ * Signs in with Google again, this time also asking for Google Calendar
+ * (calendar.events), and comes back to `next`. The callback keeps the Google
+ * token for this tab (captureCalendarToken). Google shows the consent screen
+ * the first time only; `email` pre-selects the signed-in account.
+ */
+export async function connectGoogleCalendar(next: string, email: string | undefined): Promise<void> {
+  rememberNextPath(next)
+  markCalendarConnecting()
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: `${window.location.origin}${AUTH_CALLBACK_PATH}`,
+      scopes: CALENDAR_SCOPE,
+      queryParams: { include_granted_scopes: 'true', ...(email ? { login_hint: email } : {}) },
+    },
+  })
+  if (error) {
+    clearCalendarToken()
+    console.error('[auth] connectGoogleCalendar failed', error)
+    throw new AuthFlowError('oauth', { cause: error })
+  }
+}
+
 /** Signs out this browser only. Other devices keep their sessions. */
 export async function signOut(): Promise<void> {
+  clearCalendarToken()
   const { error } = await supabase.auth.signOut({ scope: 'local' })
   if (error) {
     console.error('[auth] signOut failed', error)

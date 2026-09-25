@@ -61,7 +61,7 @@ export function RoleGuide({ type, myRole }: { type: TeamType; myRole: TeamRole }
         'Invite people with invite codes, and remove members',
         `Create, edit and delete ${nouns}, and choose who’s in each and who leads it`,
         `See and manage every ${noun}, even ones they haven’t joined`,
-        'Write group-wide docs and diagrams, and change group settings',
+        'Write group-wide docs and diagrams, schedule group-wide live sessions, and change group settings',
       ],
     },
     {
@@ -84,6 +84,7 @@ export function RoleGuide({ type, myRole }: { type: TeamType; myRole: TeamRole }
       can: [
         `Change the ${noun}’s settings and tools, and add or remove its members`,
         'Write its docs and diagrams, and organize folders',
+        'Schedule its live sessions',
         'Delete issues, and manage labels and cycles',
         ...(type === 'learning' ? ['Build the course in Learning and see the class’s progress'] : []),
       ],
