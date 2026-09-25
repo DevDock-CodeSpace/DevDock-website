@@ -1,5 +1,5 @@
 import { CircleAlert, LoaderCircle } from 'lucide-react'
-import { useLoaderData } from 'react-router'
+import { Link, useLoaderData } from 'react-router'
 import { LogoMark, LogoWordmark } from '@/components/Logo'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { Button } from '@/components/ui/button'
@@ -59,6 +59,13 @@ export function LoginPage() {
           {redirecting ? <LoaderCircle className="animate-spin" /> : <GoogleIcon className="size-4" />}
           {redirecting ? 'Redirecting to Google…' : 'Continue with Google'}
         </Button>
+        <p className="mt-6 text-xs text-muted-foreground">
+          By continuing you agree to how DevDock handles your data; see the{' '}
+          <Link to="/privacy" className="underline underline-offset-4 hover:text-foreground">
+            privacy policy
+          </Link>
+          .
+        </p>
       </main>
     </div>
   )

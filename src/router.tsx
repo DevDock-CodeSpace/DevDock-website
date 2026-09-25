@@ -15,6 +15,7 @@ import { DocPage } from '@/routes/DocPage'
 import { LoginPage } from '@/routes/LoginPage'
 import { NotFoundPage, RouteErrorPage } from '@/routes/NotFoundPage'
 import { OnboardingPage } from '@/routes/OnboardingPage'
+import { PrivacyPage } from '@/routes/PrivacyPage'
 import { TeamDiagramsPage } from '@/routes/team/TeamDiagramsPage'
 import { TeamDocsPage } from '@/routes/team/TeamDocsPage'
 import { TeamMembersPage } from '@/routes/team/TeamMembersPage'
@@ -43,6 +44,8 @@ export const router = createBrowserRouter([
     hydrateFallbackElement: <AuthLoading />,
     errorElement: <RouteErrorPage />,
   },
+  // Public: no loader, so no session is needed (linked from Google's consent screen).
+  { path: '/privacy', element: <PrivacyPage />, errorElement: <RouteErrorPage /> },
   {
     path: '/auth/callback',
     loader: authCallbackLoader, // always redirects

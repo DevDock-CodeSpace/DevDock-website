@@ -93,7 +93,7 @@ supabase/
 ### Routing & data
 
 - **Routes.**
-  - Public: `/login`, `/auth/callback`.
+  - Public: `/login`, `/auth/callback`, `/privacy` (privacy policy for Google's consent screen; keep it matching what the app stores).
   - Authenticated (under route id `app`):
     - `/app` redirects to the last-used team, or to `/onboarding` when the user has none.
     - `/onboarding`
