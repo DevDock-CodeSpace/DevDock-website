@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { CalendarCheck, CalendarPlus, Clock, LoaderCircle, Pencil, Trash2, Video } from 'lucide-react'
-import { lazy, Suspense, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
@@ -13,13 +13,11 @@ import { livePath, liveSessionPath } from '@/features/teams/nav'
 import { errorMessage } from '@/lib/errors'
 import { timeAgo } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import { deleteLiveSession, fetchJaasToken, type JaasToken, type LiveSession } from '../api'
+import { deleteLiveSession, fetchJaasToken, type LiveSession } from '../api'
+import { useLiveCall } from '../call/context'
 import { useCalendarOps, useCalendarQueue, useCanWriteLive, useNow } from '../hooks'
 import { canJoin, durationMinutes, EARLY_JOIN_MS, formatDay, formatDuration, formatTime, formatTimeRange, sessionStatus } from '../time'
 import { ScheduleSessionDialog } from './ScheduleSessionDialog'
-
-// The Jitsi SDK is only downloaded when someone joins.
-const JitsiRoom = lazy(() => import('./JitsiRoom'))
 
 type LiveSessionViewProps = {
   session: LiveSession
@@ -37,17 +35,26 @@ export function LiveSessionView({ session, workspaceId }: LiveSessionViewProps) 
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const now = useNow()
-  const [jaas, setJaas] = useState<JaasToken | null>(null)
+  const { call, startCall, endCall, setAnchorEl } = useLiveCall()
   const [confirmCancel, setConfirmCancel] = useState(false)
 
   const status = sessionStatus(session, now)
   const joinable = canJoin(session, now, canWrite)
+  const active = call?.sessionId === session.id
   const listPath = livePath(team.slug, workspaceId)
   const eventUrl = `${window.location.origin}${liveSessionPath(team.slug, session.id, session.workspace_id ?? undefined)}`
 
   const join = useMutation({
     mutationFn: () => fetchJaasToken(session.id),
-    onSuccess: setJaas,
+    onSuccess: (jaas) =>
+      startCall({
+        sessionId: session.id,
+        jaas,
+        title: session.title,
+        displayName: identity.name,
+        email: identity.email ?? '',
+        returnTo: liveSessionPath(team.slug, session.id, workspaceId),
+      }),
     onError: (error) => toast.error(errorMessage(error)),
   })
 
@@ -77,7 +84,7 @@ export function LiveSessionView({ session, workspaceId }: LiveSessionViewProps) 
     onError: (error) => toast.error(errorMessage(error)),
   })
 
-  if (jaas) {
+  if (active) {
     return (
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-4">
@@ -86,19 +93,12 @@ export function LiveSessionView({ session, workspaceId }: LiveSessionViewProps) 
             <h1 className="truncate text-sm font-semibold">{session.title}</h1>
             <span className="hidden font-mono text-xs text-muted-foreground sm:inline">{formatTimeRange(session)}</span>
           </div>
-          <Button variant="outline" size="sm" onClick={() => setJaas(null)}>
+          <Button variant="outline" size="sm" onClick={endCall}>
             Leave call
           </Button>
         </div>
-        <Suspense fallback={<div className="h-[calc(100svh-11rem)] min-h-[480px] rounded-lg border bg-muted" />}>
-          <JitsiRoom
-            jaas={jaas}
-            subject={session.title}
-            displayName={identity.name}
-            email={identity.email ?? ''}
-            onLeave={() => setJaas(null)}
-          />
-        </Suspense>
+        {/* CallDock renders the call over this box, so it survives navigation. */}
+        <div ref={setAnchorEl} className="h-[calc(100svh-11rem)] min-h-[480px] rounded-lg border bg-muted" />
       </div>
     )
   }

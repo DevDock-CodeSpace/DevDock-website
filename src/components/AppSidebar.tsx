@@ -54,7 +54,8 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader>
+      {/* Match the app header (h-12 + border-b) so the team switcher lines up with the top bar. */}
+      <SidebarHeader className="h-12 justify-center border-b px-2 py-0 group-data-[collapsible=icon]:px-0">
         <TeamSwitcher />
       </SidebarHeader>
 
