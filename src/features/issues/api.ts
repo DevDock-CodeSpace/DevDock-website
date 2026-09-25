@@ -127,6 +127,29 @@ export const workspaceIssuesQuery = (workspaceId: string) =>
     },
   })
 
+/** An issue with its project and assignee, for the group-wide Issues page. */
+export type TeamIssue = Issue & {
+  workspace: { id: string; title: string; issue_key: string }
+  assignee: PersonProfile
+}
+
+/** Issues from every workspace in the group the caller can see (RLS). */
+export const teamIssuesQuery = (teamId: string) =>
+  queryOptions({
+    queryKey: ['issues', 'team', teamId],
+    queryFn: async (): Promise<TeamIssue[]> => {
+      const { data, error } = await supabase
+        .from('issues')
+        .select(
+          `${ISSUE_COLUMNS}, workspace:workspaces!issues_workspace_team_fkey(id, title, issue_key), assignee:profiles!issues_assignee_id_fkey(display_name, avatar_url)`,
+        )
+        .eq('team_id', teamId)
+        .order('updated_at', { ascending: false })
+      if (error) throw toDataError('load issues', error)
+      return data.map(({ workspace, assignee, ...row }) => ({ ...toIssue(row), workspace, assignee }))
+    },
+  })
+
 /** null when the issue doesn't exist or the caller can't see it. */
 export const issueQuery = (workspaceId: string, number: number) =>
   queryOptions({

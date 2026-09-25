@@ -17,7 +17,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useCurrentTeam } from '@/features/teams/hooks'
 import { defaultModules, workspacePath } from '@/features/teams/nav'
-import { defaultWorkspaceType, workspaceTypes } from '@/features/teams/permissions'
+import { allowedWorkspaceTypes, defaultWorkspaceType, workspaceTypes } from '@/features/teams/permissions'
 import { createWorkspace, type WorkspaceModule, type WorkspaceType } from '../api'
 import { ModulePicker } from './ModulePicker'
 import { WorkspaceTypeSelect } from './WorkspaceTypeSelect'
@@ -89,7 +89,7 @@ export function CreateWorkspaceDialog({ trigger }: { trigger?: ReactNode }) {
           </DialogHeader>
           <div className="space-y-1.5">
             <Label htmlFor="ws-type">Type</Label>
-            <WorkspaceTypeSelect id="ws-type" value={type} onChange={changeType} />
+            <WorkspaceTypeSelect id="ws-type" value={type} onChange={changeType} types={allowedWorkspaceTypes[team.type]} />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="ws-title">Title</Label>
@@ -110,7 +110,7 @@ export function CreateWorkspaceDialog({ trigger }: { trigger?: ReactNode }) {
               value={description}
               maxLength={5000}
               rows={3}
-              placeholder="What is this workspace for?"
+              placeholder={`What is this ${workspaceTypes[type].noun} for?`}
               onChange={(e) => setDescription(e.target.value)}
             />
           </div>

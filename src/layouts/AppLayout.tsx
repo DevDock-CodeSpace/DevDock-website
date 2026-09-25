@@ -15,6 +15,7 @@ import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 import { diagramQuery } from '@/features/diagrams/api'
+import { liveSessionQuery } from '@/features/live/api'
 import { documentQuery } from '@/features/docs/api'
 import { issueQuery } from '@/features/issues/api'
 import { lessonQuery } from '@/features/learning/api'
@@ -60,7 +61,7 @@ type Crumb = { label: string; to: string }
 
 function TeamBreadcrumb() {
   const { team } = useCurrentTeam()
-  const { tools, members, settings } = getTeamNav(team.slug)
+  const { tools, members, settings } = getTeamNav(team.slug, team.type)
   const section = useSection([...tools, members, settings])
   const item = useItemCrumb()
   return <Crumbs crumbs={[{ label: team.name, to: teamPath(team.slug) }, ...section, ...item]} />
@@ -88,15 +89,16 @@ function WorkspaceBreadcrumb() {
 }
 
 /**
- * On a doc, diagram or issue page, its title (issue: identifier) as the last
+ * On a doc, diagram, live session or issue page, its title (issue: identifier) as the last
  * crumb, but only where its loader would show it (same team/workspace).
  */
 function useItemCrumb(): Crumb[] {
-  const { docId, diagramId, issueNumber, cycleNumber, lessonId, workspaceId } = useParams()
+  const { docId, diagramId, sessionId, issueNumber, cycleNumber, lessonId, workspaceId } = useParams()
   const { pathname } = useLocation()
   const { team } = useCurrentTeam()
   const doc = useQuery({ ...documentQuery(docId ?? ''), enabled: docId !== undefined }).data
   const diagram = useQuery({ ...diagramQuery(diagramId ?? ''), enabled: diagramId !== undefined }).data
+  const session = useQuery({ ...liveSessionQuery(sessionId ?? ''), enabled: sessionId !== undefined }).data
   const issue = useQuery({
     ...issueQuery(workspaceId ?? '', Number(issueNumber)),
     enabled: issueNumber !== undefined && workspaceId !== undefined,
@@ -115,7 +117,7 @@ function useItemCrumb(): Crumb[] {
       ...(cycleNumber ? [{ label: `Cycle ${cycleNumber}`, to: pathname }] : []),
     ]
   }
-  const item = docId ? doc : diagramId ? diagram : undefined
+  const item = docId ? doc : diagramId ? diagram : sessionId ? session : undefined
   const belongs =
     item && item.team_id === team.id && (workspaceId === undefined || item.workspace_id === workspaceId)
   return belongs ? [{ label: item.title, to: pathname }] : []

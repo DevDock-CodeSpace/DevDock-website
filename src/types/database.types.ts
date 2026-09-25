@@ -616,6 +616,73 @@ export type Database = {
           },
         ]
       }
+      live_sessions: {
+        Row: {
+          calendar_event_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          ends_at: string
+          id: string
+          room_name: string
+          starts_at: string
+          team_id: string
+          title: string
+          updated_at: string
+          workspace_id: string | null
+        }
+        Insert: {
+          calendar_event_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          ends_at: string
+          id?: string
+          room_name?: string
+          starts_at: string
+          team_id: string
+          title: string
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Update: {
+          calendar_event_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          ends_at?: string
+          id?: string
+          room_name?: string
+          starts_at?: string
+          team_id?: string
+          title?: string
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_sessions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "live_sessions_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "live_sessions_workspace_team_fkey"
+            columns: ["workspace_id", "team_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id", "team_id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -819,6 +886,39 @@ export type Database = {
           },
         ]
       }
+      workspace_pins: {
+        Row: {
+          pinned_at: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          pinned_at?: string
+          user_id?: string
+          workspace_id: string
+        }
+        Update: {
+          pinned_at?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_pins_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspace_pins_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspaces: {
         Row: {
           created_at: string
@@ -868,6 +968,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_moderate_live_session: {
+        Args: { p_session_id: string }
+        Returns: boolean
+      }
       create_workspace: {
         Args: {
           p_description: string
@@ -883,6 +987,12 @@ export type Database = {
         Returns: Database["public"]["Enums"]["workspace_module"][]
       }
       join_team: { Args: { invite_code: string }; Returns: string }
+      live_session_invitees: {
+        Args: { p_session_id: string }
+        Returns: {
+          email: string
+        }[]
+      }
       move_open_issues: {
         Args: { p_from: string; p_to: string }
         Returns: number

@@ -12,6 +12,7 @@ import {
   Workflow,
   type LucideIcon,
 } from 'lucide-react'
+import type { TeamType } from '@/features/teams/api'
 import type { WorkspaceModule, WorkspaceType } from '@/features/workspaces/api'
 
 export type NavItem = {
@@ -69,22 +70,36 @@ export function isTeamTool(tool: string): tool is TeamToolId {
   return (TEAM_TOOLS as string[]).includes(tool)
 }
 
-/** Sidebar team links: Home + team tools on top, then the workspaces, then Members/Settings. */
-export function getTeamNav(slug: string): {
+/** Group-wide issues (development groups): every project's issues in one list. */
+export const teamIssuesPath = (slug: string) => `${teamPath(slug)}/issues`
+
+/**
+ * Sidebar team links: Home + team tools on top (plus Issues for development
+ * groups, below Live), then the workspaces, then Members/Settings.
+ */
+export function getTeamNav(
+  slug: string,
+  type?: TeamType,
+): {
   home: NavItem
-  tools: (NavItem & { id: TeamToolId })[]
+  tools: (NavItem & { id: TeamToolId | 'issues' })[]
   members: NavItem
   settings: NavItem
 } {
   const base = teamPath(slug)
   return {
     home: { title: 'Home', to: base, icon: Home, end: true },
-    tools: TEAM_TOOLS.map((id) => ({
-      id,
-      title: workspaceTabDefs[id].title,
-      icon: workspaceTabDefs[id].icon,
-      to: `${base}/${id}`,
-    })),
+    tools: [
+      ...TEAM_TOOLS.map((id) => ({
+        id,
+        title: workspaceTabDefs[id].title,
+        icon: workspaceTabDefs[id].icon,
+        to: `${base}/${id}`,
+      })),
+      ...(type === 'development'
+        ? [{ id: 'issues' as const, title: 'Issues', icon: workspaceTabDefs.issues.icon, to: teamIssuesPath(slug) }]
+        : []),
+    ],
     members: { title: 'Members', to: `${base}/members`, icon: Users },
     settings: { title: 'Settings', to: `${base}/settings`, icon: Settings },
   }
@@ -107,7 +122,7 @@ export const workspaceTabDefs: Record<
   diagrams: { title: 'Diagrams', icon: Workflow, hint: 'Architecture and flow diagrams', soon: 'Diagrams assigned to this workspace will live here.' },
   exercises: { title: 'Exercises', icon: Shapes, hint: 'Practice and submissions', soon: 'Exercises and submissions will live here.' },
   github: { title: 'GitHub', icon: GitPullRequest, hint: 'Repos and pull requests', soon: 'Linked repositories and pull requests will show up here.' },
-  live: { title: 'Live', icon: Video, hint: 'Sessions (Jitsi)', soon: 'Live sessions for this workspace will start from here.' },
+  live: { title: 'Live', icon: Video, hint: 'Video sessions (Jitsi)' },
   members: { title: 'Members', icon: Users },
 }
 
@@ -160,3 +175,10 @@ export const lessonPath = (teamSlug: string, workspaceId: string, lessonId: stri
   `${learningPath(teamSlug, workspaceId)}/${lessonId}`
 export const learningProgressPath = (teamSlug: string, workspaceId: string) =>
   `${learningPath(teamSlug, workspaceId)}/progress`
+
+/** Live sessions list, in the group view or inside a workspace. */
+export const livePath = (teamSlug: string, workspaceId?: string) =>
+  workspaceId ? `${workspacePath(teamSlug, workspaceId)}/live` : `${teamPath(teamSlug)}/live`
+/** One live session, opened from the group view or from inside its workspace. */
+export const liveSessionPath = (teamSlug: string, sessionId: string, workspaceId?: string) =>
+  `${livePath(teamSlug, workspaceId)}/${sessionId}`

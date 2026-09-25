@@ -1,6 +1,7 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
-import { Plus } from 'lucide-react'
-import { Link, matchPath, useLocation } from 'react-router'
+import { ChevronRight, Pin, Plus } from 'lucide-react'
+import { Link, matchPath, useLocation, useParams } from 'react-router'
+import { TruncatedText } from '@/components/TruncatedText'
 import {
   Sidebar,
   SidebarContent,
@@ -9,6 +10,7 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
@@ -17,26 +19,33 @@ import {
 import { UserMenu } from '@/features/auth/components/UserMenu'
 import { TeamSwitcher } from '@/features/teams/components/TeamSwitcher'
 import { useCurrentTeam } from '@/features/teams/hooks'
-import { getTeamNav, workspacePath, type NavItem } from '@/features/teams/nav'
+import { getTeamNav, teamPath, workspacePath, type NavItem } from '@/features/teams/nav'
 import { workspaceTypeOrder, workspaceTypes } from '@/features/teams/permissions'
 import { teamWorkspacesQuery } from '@/features/workspaces/api'
 import { CreateWorkspaceDialog } from '@/features/workspaces/components/CreateWorkspaceDialog'
+import { usePins, useRecentVisits } from '@/features/workspaces/hooks'
+import { pickSidebarItems } from '@/features/workspaces/recent'
 
 // Active item: accent background (from shadcn) + DevDock-blue icon.
 const activeIcon = 'data-active:[&_svg]:text-brand'
 
 /**
  * The sidebar is the hierarchy: team → its workspaces, grouped by workspace
- * type (Courses, Projects, Workspaces). The team tools on top (Docs, Diagrams,
+ * type (Courses, Projects, Spaces). The team tools on top (Docs, Diagrams,
  * Live) are team-wide views; inside a workspace the same tools are tabs that
  * show only that workspace's items. Workspace features are never sidebar items.
+ * Each type section shows at most 3: pinned first, then recently opened. The
+ * section title ("Courses · 5") links to the full list.
  */
 export function AppSidebar() {
   const { team, can } = useCurrentTeam()
   const workspaces = useSuspenseQuery(teamWorkspacesQuery(team.id)).data
   const { pathname } = useLocation()
+  const { workspaceId } = useParams()
   const { isMobile, setOpenMobile } = useSidebar()
-  const nav = getTeamNav(team.slug)
+  const { pins, isPinned, setPinned } = usePins()
+  const visits = useRecentVisits(team.id)
+  const nav = getTeamNav(team.slug, team.type)
   // One section per workspace type that has items; the team type only decides which comes first.
   const sections = workspaceTypeOrder(team.type)
     .map((type) => ({ type, items: workspaces.filter((w) => w.type === type) }))
@@ -59,32 +68,58 @@ export function AppSidebar() {
           </SidebarMenu>
         </SidebarGroup>
 
-        {sections.map(({ type, items }) => (
-          <SidebarGroup key={type} className="pb-0">
-            <SidebarGroupLabel>{workspaceTypes[type].plural}</SidebarGroupLabel>
-            <SidebarMenu>
-              {items.map((workspace) => {
-                const to = workspacePath(team.slug, workspace.id)
-                const Icon = workspaceTypes[workspace.type].icon
-                return (
-                  <SidebarMenuItem key={workspace.id}>
-                    <SidebarMenuButton
-                      asChild
-                      tooltip={workspace.title}
-                      className={activeIcon}
-                      isActive={matchPath({ path: to, end: false }, pathname) !== null}
-                    >
-                      <Link to={to} onClick={close}>
-                        <Icon />
-                        <span>{workspace.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                )
-              })}
-            </SidebarMenu>
-          </SidebarGroup>
-        ))}
+        {sections.map(({ type, items }) => {
+          const { shown } = pickSidebarItems(items, pins, visits, workspaceId)
+          const allHref = `${teamPath(team.slug)}?type=${type}`
+          return (
+            <SidebarGroup key={type} className="pb-0">
+              {/* The title opens the full list of this type. */}
+              <SidebarGroupLabel asChild>
+                <Link
+                  to={allHref}
+                  onClick={close}
+                  title={`All ${workspaceTypes[type].plural.toLowerCase()}`}
+                  className="group/label gap-1 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                >
+                  {workspaceTypes[type].plural}
+                  <span className="font-mono text-[10px] opacity-70">· {items.length}</span>
+                  <ChevronRight className="ml-auto opacity-0 transition-opacity group-hover/label:opacity-100" />
+                </Link>
+              </SidebarGroupLabel>
+              <SidebarMenu>
+                {shown.map((workspace) => {
+                  const to = workspacePath(team.slug, workspace.id)
+                  const Icon = workspaceTypes[workspace.type].icon
+                  const pinned = isPinned(workspace.id)
+                  return (
+                    <SidebarMenuItem key={workspace.id}>
+                      <SidebarMenuButton
+                        asChild
+                        tooltip={workspace.title}
+                        className={activeIcon}
+                        isActive={matchPath({ path: to, end: false }, pathname) !== null}
+                      >
+                        <Link to={to} onClick={close}>
+                          <Icon />
+                          <TruncatedText text={workspace.title} />
+                        </Link>
+                      </SidebarMenuButton>
+                      <SidebarMenuAction
+                        showOnHover={!pinned}
+                        aria-label={pinned ? `Unpin ${workspace.title}` : `Pin ${workspace.title}`}
+                        title={pinned ? 'Unpin' : 'Pin to the top'}
+                        onClick={() => setPinned(workspace.id, !pinned)}
+                        className={pinned ? 'text-muted-foreground' : undefined}
+                      >
+                        {pinned ? <Pin className="fill-current" /> : <Pin />}
+                      </SidebarMenuAction>
+                    </SidebarMenuItem>
+                  )
+                })}
+              </SidebarMenu>
+            </SidebarGroup>
+          )
+        })}
 
         {(can.canManageWorkspaces || workspaces.length === 0) && (
           <SidebarGroup className={sections.length > 0 ? 'pt-0' : undefined}>
