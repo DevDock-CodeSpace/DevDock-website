@@ -126,6 +126,10 @@ supabase/
   - Images are the custom `docImage` node, which stores a Storage **path** (`<team>/<doc>/<uuid>.<ext>`), never a URL; the view signs it (`docImageUrlQuery`). Upload with `uploadDocImage`. `deleteDocument` removes the doc's image folder first.
   - Collapsed headings are per-viewer plugin state (`CollapsibleHeadings.ts`), never saved.
   - Don't add paid TipTap extensions.
+- **Doc folders** (`doc_folders`, `features/docs/{folders.ts,components/DocBrowser.tsx}`):
+  - Folders are per scope (group-wide or one workspace), nest **at most 3 levels** (DB trigger sets `depth`), and use the documents access rules.
+  - The open folder is `?folder=<id>`; `documents.folder_id` must be in the doc's scope (trigger).
+  - Delete folders with `deleteFolder()`, which deletes the docs inside first so their Storage images go too; subfolders cascade.
 - **Diagram editor** (`features/diagrams/editor/`, page body `features/diagrams/components/DiagramView.tsx`, lazy-loaded by `routes/DiagramPage.tsx`):
   - `model.ts` is the saved format: node types `shape`/`icon`/`container`, edge type `connector`. `serialize()` saves only content (no selection or measurements), and `parse()` validates stored JSON. Colors are stored as keys (`colors.ts` maps them to Tailwind classes, so diagrams work in both themes). Icon keys in `icons.ts` are saved, so never rename one.
   - Layers: React Flow runs with `zIndexMode="manual"`. Containers sit below connectors, and connectors below shapes. `normalizeOrder()` keeps parents before children and sets the z-indexes, so call it after any reorder or reparent.

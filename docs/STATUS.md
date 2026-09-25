@@ -32,6 +32,7 @@ A private software-engineering teaching workspace for one instructor and a few s
 | 5c: Diagrams (Lucidchart-style editor, React Flow) | 🟡 Migration applied to hosted project, types regenerated; RLS verified locally (55/55); editor checked with mocked Supabase (40 browser checks); **not yet tried with real accounts** | `feat/diagrams` (from `feat/docs`) |
 | 6a: Issues, part 1 (Linear-style: issues, sub-issues, status/priority/assignee/labels, List + Board, comments) | 🟡 Migration applied to hosted project, types regenerated; RLS verified locally (87/87); UI checked with mocked Supabase (49 browser checks, 4 clean runs); **not yet tried with real accounts** | `feat/issues` (from `feat/diagrams`) |
 | 6b: Issues, part 2 (cycles, tabs + filters, activity log, keyboard shortcuts) | 🟡 Migration applied to hosted project, types regenerated; RLS verified locally (52/52, plus 87/87 and 55/55 still pass); UI checked with mocked Supabase (99 browser checks incl. phase 1, 3 clean runs); **not yet tried with real accounts** | `feat/issues` |
+| 7: Doc folders (Dropbox-style, 3 levels) | 🟡 Migration applied to hosted project, types regenerated; RLS verified locally (36/36; docs 50/50, diagrams 55/55, issues 87/87 + 52/52 still pass); UI checked with mocked Supabase (27 browser checks, 2 clean runs) | `feat/doc-folders` |
 
 ### Phase 1: frontend shell
 - Collapsible sidebar (slide-out panel on mobile) with Overview, Lessons, Live Class, Resources, Members and Settings; a breadcrumb header; and a light/dark/system theme.
@@ -517,6 +518,26 @@ Migration `20260925001632_add_workspace_invites.sql`: tested locally (28 checks)
     - Two real issues were found and fixed in testing. Menus animating closed swallowed the next key; the check now only counts `data-state="open"` overlays. The menu's search box kept focus after a choice; it's now released at once.
 - **Mocked-Supabase Playwright:** `scratchpad/issues-test.mjs` now runs 99 checks (the Phase 6a ones plus Phase 6b tabs, filters, shortcuts, cycles for lead and member, and activity), 3 clean runs in a row. Diagrams' 40 still pass.
 - **Not built:** automatic cycle rollover (it's a manual action), issue relations (blocks / related / duplicate), notifications, live updates, and a team-wide "My issues" across workspaces.
+
+### Phase 7: Doc folders
+- **Migration** `20260925083932_doc_folders.sql`:
+  - **`doc_folders`:** `team_id`, `workspace_id` (null = group-wide), `parent_id` (cascade), `name`, and `depth` (1–3).
+    - The `prepare_doc_folder` trigger (security definer) sets `depth` from the parent and requires the parent to be in the same scope; a 4th level is refused.
+    - Sibling names are unique, case-insensitive.
+    - It uses the same access rules as documents: readers see folders, writers create, rename and delete them. `parent_id` can't be changed, so there's no folder moving.
+  - **`documents.folder_id`:** set to null if its folder disappears, as a safety net. The `check_document_folder` trigger keeps a doc's folder in the doc's own scope.
+- **Local RLS tests: 36/36**: depth limit, trigger-set depth, sibling names, cross-scope parent/doc refused, reader/writer/outsider visibility, moving docs, subfolder cascade, the safety net, and workspace-delete cascade. Docs, Diagrams and Issues suites still pass.
+- **UI** (`DocBrowser`, on Group → Docs for group-wide docs and on each workspace's Docs tab):
+  - A breadcrumb path (`Docs › Week 1 › Lectures`), folders first with item counts, then docs.
+  - For writers:
+    - New folder (disabled at depth 3), and New doc in the current folder (scope fixed).
+    - Rename/Delete for folders; the delete confirmation lists what goes. Docs inside are deleted properly, with their images.
+    - Move to… (a folder tree picker), or drag a doc onto a folder or a breadcrumb.
+  - The open folder is in the URL.
+  - The doc page shows its folder path, and Back returns to the folder.
+  - Group → Docs lists workspace docs underneath, under "In workspaces".
+- **Browser tests** (`scratchpad/folders-test.mjs`, 27 checks): browsing, the URL, breadcrumbs, 3-level creation and the depth cap, new doc in a folder, the doc page path, Move to…, drag to a folder or breadcrumb, rename, delete with contents, member read-only, and the workspace tab. This also caught and fixed a duplicate React key.
+- **Open question for the product owner:** Resources vs Docs. Recommendation: drop the Resources tab and later add "file" and "link" items inside Docs folders.
 
 ## Current configuration (hosted)
 - **Supabase URL Configuration:** Site URL `http://localhost:5173`; Redirect URLs `http://localhost:5173/**`.

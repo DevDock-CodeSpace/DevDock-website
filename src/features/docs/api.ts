@@ -3,7 +3,7 @@ import type { PersonProfile } from '@/features/teams/api'
 import type { WorkspaceType } from '@/features/workspaces/api'
 import { DataError, requireAffected, toDataError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
-import type { Json } from '@/types/database.types'
+import type { Json, TablesInsert } from '@/types/database.types'
 
 // Documents: workspace_id null = team-wide, otherwise assigned to that workspace.
 // RLS decides who sees what; these queries just ask for "everything I can see".
@@ -12,6 +12,8 @@ export type DocSummary = {
   id: string
   team_id: string
   workspace_id: string | null
+  /** null = top level of its scope. */
+  folder_id: string | null
   title: string
   created_at: string
   updated_at: string
@@ -24,7 +26,21 @@ export type Doc = DocSummary & { content: string; body: Json | null }
 
 // Content is left out of lists; it can be large.
 const SUMMARY =
-  'id, team_id, workspace_id, title, created_at, updated_at, author:profiles!documents_created_by_fkey(display_name, avatar_url), workspace:workspaces!documents_workspace_team_fkey(id, title, type)'
+  'id, team_id, workspace_id, folder_id, title, created_at, updated_at, author:profiles!documents_created_by_fkey(display_name, avatar_url), workspace:workspaces!documents_workspace_team_fkey(id, title, type)'
+
+/** A docs folder, group-wide (workspace_id null) or in one workspace; depth 1–3. */
+export type DocFolder = {
+  id: string
+  team_id: string
+  workspace_id: string | null
+  parent_id: string | null
+  name: string
+  depth: number
+  updated_at: string
+}
+
+/** Folders can nest this deep (enforced by the database). */
+export const MAX_FOLDER_DEPTH = 3
 
 const IMAGE_BUCKET = 'doc-images'
 
@@ -62,6 +78,21 @@ export const workspaceDocsQuery = (workspaceId: string) =>
     },
   })
 
+const FOLDER_COLUMNS = 'id, team_id, workspace_id, parent_id, name, depth, updated_at'
+
+/** Folders of one scope: group-wide (workspaceId null) or one workspace's. */
+export const foldersQuery = (teamId: string, workspaceId: string | null) =>
+  queryOptions({
+    queryKey: ['documents', 'folders', teamId, workspaceId ?? 'team'],
+    queryFn: async (): Promise<DocFolder[]> => {
+      let query = supabase.from('doc_folders').select(FOLDER_COLUMNS).eq('team_id', teamId)
+      query = workspaceId ? query.eq('workspace_id', workspaceId) : query.is('workspace_id', null)
+      const { data, error } = await query.order('name')
+      if (error) throw toDataError('load folders', error)
+      return data
+    },
+  })
+
 /** null when the doc doesn't exist or the caller can't read it. */
 export const documentQuery = (docId: string) =>
   queryOptions({
@@ -84,10 +115,17 @@ export async function createDocument(input: {
   teamId: string
   workspaceId: string | null
   title: string
+  /** Create it inside this folder (same scope). */
+  folderId?: string | null
 }): Promise<{ id: string }> {
   const { data, error } = await supabase
     .from('documents')
-    .insert({ team_id: input.teamId, workspace_id: input.workspaceId, title: input.title.trim() })
+    .insert({
+      team_id: input.teamId,
+      workspace_id: input.workspaceId,
+      title: input.title.trim(),
+      folder_id: input.folderId ?? null,
+    })
     .select('id')
     .single()
   if (error) throw toDataError('create the doc', error, writeErrors)
@@ -122,6 +160,54 @@ export async function deleteDocument(teamId: string, docId: string) {
   const { data, error } = await supabase.from('documents').delete().eq('id', docId).select('id')
   if (error) throw toDataError('delete the doc', error, writeErrors)
   requireAffected(data, 'delete doc')
+}
+
+/** Moves a doc into a folder of its scope, or to the top level (null). */
+export async function moveDocument(docId: string, folderId: string | null) {
+  const { data, error } = await supabase.from('documents').update({ folder_id: folderId }).eq('id', docId).select('id')
+  if (error) throw toDataError('move the doc', error, writeErrors)
+  requireAffected(data, 'move doc')
+}
+
+const folderErrors = {
+  ...writeErrors,
+  '23505': 'There’s already a folder with that name here.',
+  '23514': 'Folders can only be nested 3 levels deep.',
+}
+
+/** depth, created_by and updated_at are set by the database. */
+export async function createFolder(input: {
+  teamId: string
+  workspaceId: string | null
+  parentId: string | null
+  name: string
+}): Promise<DocFolder> {
+  const row = { team_id: input.teamId, workspace_id: input.workspaceId, parent_id: input.parentId, name: input.name.trim() }
+  // Generated types can't see the trigger that sets `depth`.
+  const { data, error } = await supabase
+    .from('doc_folders')
+    .insert(row as TablesInsert<'doc_folders'>)
+    .select(FOLDER_COLUMNS)
+    .single()
+  if (error) throw toDataError('create the folder', error, folderErrors)
+  return data
+}
+
+export async function renameFolder(folderId: string, name: string) {
+  const { data, error } = await supabase.from('doc_folders').update({ name: name.trim() }).eq('id', folderId).select('id')
+  if (error) throw toDataError('rename the folder', error, folderErrors)
+  requireAffected(data, 'rename folder')
+}
+
+/**
+ * Deletes a folder and everything in it: each doc inside is deleted properly
+ * first (its Storage images too), then the folder, whose subfolders cascade.
+ */
+export async function deleteFolder(teamId: string, folderId: string, docIdsInside: string[]) {
+  for (const docId of docIdsInside) await deleteDocument(teamId, docId)
+  const { data, error } = await supabase.from('doc_folders').delete().eq('id', folderId).select('id')
+  if (error) throw toDataError('delete the folder', error, writeErrors)
+  requireAffected(data, 'delete folder')
 }
 
 // ----------------------------------------------------------------- images

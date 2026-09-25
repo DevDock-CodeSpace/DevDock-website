@@ -6,10 +6,13 @@ import { timeAgo } from '@/lib/format'
 import type { DocSummary } from '../api'
 import { DocScope } from './DocScope'
 
+/** What a row needs (docs and diagrams both fit). */
+type ListItem = Omit<DocSummary, 'folder_id'>
+
 type DocListProps = {
-  docs: DocSummary[]
+  docs: ListItem[]
   /** Where each row links to. */
-  href: (doc: DocSummary) => string
+  href: (doc: ListItem) => string
   /** Team view: show which workspace (or Team-wide) each doc belongs to. */
   showScope?: boolean
   empty: ReactNode
