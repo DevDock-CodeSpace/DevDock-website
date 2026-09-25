@@ -1,6 +1,6 @@
 # DevDock: project status
 
-_Last updated: 2026-09-25 (Phase 5c: diagrams)_
+_Last updated: 2026-09-25 (Phase 6b: cycles, filters, activity, shortcuts)_
 
 A handoff for anyone (human or AI) planning the next phase. For conventions, see [CLAUDE.md](../CLAUDE.md); for setup, see [README.md](../README.md).
 
@@ -30,6 +30,8 @@ A private software-engineering teaching workspace for one instructor and a few s
 | 5a: Docs (documents table, RLS, list/create/edit/delete) | ✅ Committed (`4bed00d`); RLS verified locally (50/50); not yet clicked through with real accounts | `feat/docs` |
 | 5b: Rich docs editor (Dropbox Paper-style, TipTap) + doc images | 🟡 Migration applied to hosted project, types regenerated; body/image RLS verified locally (24/24); editor checked with mocked Supabase; **not yet tried with real accounts / real Storage** | `feat/docs` |
 | 5c: Diagrams (Lucidchart-style editor, React Flow) | 🟡 Migration applied to hosted project, types regenerated; RLS verified locally (55/55); editor checked with mocked Supabase (40 browser checks); **not yet tried with real accounts** | `feat/diagrams` (from `feat/docs`) |
+| 6a: Issues, part 1 (Linear-style: issues, sub-issues, status/priority/assignee/labels, List + Board, comments) | 🟡 Migration applied to hosted project, types regenerated; RLS verified locally (87/87); UI checked with mocked Supabase (49 browser checks, 4 clean runs); **not yet tried with real accounts** | `feat/issues` (from `feat/diagrams`) |
+| 6b: Issues, part 2 (cycles, tabs + filters, activity log, keyboard shortcuts) | 🟡 Migration applied to hosted project, types regenerated; RLS verified locally (52/52, plus 87/87 and 55/55 still pass); UI checked with mocked Supabase (99 browser checks incl. phase 1, 3 clean runs); **not yet tried with real accounts** | `feat/issues` |
 
 ### Phase 1: frontend shell
 - Collapsible sidebar (slide-out panel on mobile) with Overview, Lessons, Live Class, Resources, Members and Settings; a breadcrumb header; and a light/dark/system theme.
@@ -436,6 +438,85 @@ Migration `20260925001632_add_workspace_invites.sql`: tested locally (28 checks)
   - **Read-only** viewers get the same canvas (pan and zoom) with no panels or editing. On phones the side panels are hidden.
 - **Mocked-Supabase Playwright** (`scratchpad/diagram-test.mjs`, light and dark, 40 checks, no page errors): rendering; click/drag add; label edit plus undo/redo; connecting; connector styling; fill; copy/paste/duplicate/delete; container duplicate/undo; drag into a container sets `parentId`; autosave payload (title, styles, no per-viewer state, parents first); Enter-to-edit; align; full screen; search; reload round-trip; read-only (no panel, no edits, no writes, no New button); create → delete; a cross-workspace URL 404s. At 390 px the page has no horizontal overflow.
 - **Not built:** export (PNG/SVG), templates, shape rotation, and connectors that route around shapes.
+
+### Phase 6a: Issues (Linear-style), part 1
+- **Scope agreed with the user:** Linear's functionality in two phases. Everyone in a workspace creates and edits issues, as in Linear. Leads and team owners/admins delete issues and manage labels and the key.
+  - Phase 6a (this one): issues, sub-issues, status, priority, assignee, labels, estimate, due date, List and Board views, the issue page with comments.
+  - Phase 6b: cycles, filters/"My issues", activity log, keyboard shortcuts.
+- **Migration** `20260925052728_create_issues.sql` (applied to the hosted project; types regenerated):
+  - **Issue key:** `workspaces.issue_key` (2–6 characters: `A–Z` then `A–Z0–9`), backfilled from titles ("Capstone API" → `CA`, "Payments" → `PAY`, otherwise `ISS`). New workspaces get one from a trigger. Managers can change it (`grant update (issue_key)`).
+  - **`issues`:**
+    - Columns: `number` (unique per workspace), `title`, `description` (TipTap JSON), `status` (enum backlog/todo/in_progress/in_review/done/canceled, default todo), `priority` (0–4, Linear's scale), `assignee_id`, `parent_id`, `estimate`, `due_date`, and `completed_at` (set and cleared automatically).
+    - Triggers: `number_new_issue` (security definer) sets `team_id` and the next number from `private.issue_counters`; a refused insert rolls the number back. `check_issue` requires the assignee to be a workspace member and the parent to be in the same workspace with no loops.
+    - Deleting a parent keeps its sub-issues as top-level issues.
+  - **Labels:** `issue_labels` (unique case-insensitive name per workspace; 9 colors) and `issue_label_links`, whose composite FKs keep an issue and its labels in one workspace. `rpc('set_issue_labels')` (security invoker) replaces an issue's labels atomically.
+  - **`issue_comments`:** plain text, 1–10,000 characters. Authors edit their own; authors or managers delete.
+  - **RLS:** read/create/edit/label/comment use `can_view_workspace`; delete issues and manage labels use `can_manage_workspace`. Column grants stop clients from setting `number`, `team_id`, `created_by` or `workspace_id`.
+  - **Bug found by the local tests and fixed before applying:** the workspace-insert trigger calls `private.issue_key_from_title`, so `authenticated` needs execute on it. Without that grant, creating a workspace would have failed.
+- **Local RLS tests: 87/87 pass** (`scratchpad/issues-test.sql`, fresh local Postgres with every migration):
+  - Issue keys (backfill, helper, rename rules).
+  - Numbering: sequential, per workspace, and no gaps from refused inserts.
+  - Creating, reading and editing by owner, admin, lead, member, plain team member, outsider and anon.
+  - Column grants; assignee, parent and loop checks; `completed_at`.
+  - Labels (manager-only; RPC; cross-workspace refused) and comments (author/manager rules).
+  - Deleting: a parent (sub-issues kept; links and comments removed) and a workspace (cascade). Diagrams RLS still passes 55/55.
+- **Frontend** (`features/issues/*`, `routes/workspace/{WorkspaceIssuesPage,IssuePage}.tsx`):
+  - **List:** grouped by status in Linear's order, collapsible, sorted by priority. Rows show priority, ID, status, title, sub-issue progress (`1/2`), labels, due date (red when overdue), assignee and created date. Priority, status and assignee are inline menus; "+" on a group creates in that status.
+  - **Board:** `?view=board` gives a column per status. Drag a card to change its status; cards have their own menus. It scrolls sideways inside the page (the layout's `SidebarInset` is now `min-w-0`).
+  - **New issue** modal: title, description, then Status, Priority, Assignee and Labels chips. ⌘↵ creates; the toast has a "View" link.
+  - **Menus:** Linear-style (`Picker`): type to filter, ↑/↓, Enter. Managers can create a label by typing a new name.
+  - **Issue page** (lazy-loaded):
+    - An editable title, and the description in the Docs editor (no images; autosaves).
+    - Sub-issues with a progress bar and "Add sub-issue", comments (⌘↵, edit/delete).
+    - Properties panel: status, priority, assignee, labels, estimate (1–13 points), due date (native picker, readable date), and parent (excludes itself and its sub-issues).
+    - Breadcrumb `Issues › parent › CAP-3`; delete for managers.
+  - **Edits are optimistic:** the list, board and issue page update at once and roll back with a toast if the save fails.
+  - **Workspace settings → Issues:** edit the key (with an ID preview), and add, rename, recolor or delete labels.
+  - Shared: `components/ui/popover` (shadcn, no new dependency), date helpers `formatShortDate`/`localDateISO`, and `formatDate` no longer shifts date-only values across time zones. The docs editor's images and "+ Image" are now optional (used by issue descriptions).
+- **Mocked-Supabase Playwright** (`scratchpad/issues-test.mjs`, 49 checks, 4 clean runs, light and dark):
+  - List groups and ordering; creating with every chip; a label created from the picker; the description stored as a TipTap doc.
+  - Inline status and assignee menus; collapsing groups; board drag; the page doesn't overflow sideways.
+  - Issue-page edits (title, description autosave, estimate, labels, due date, parent options), sub-issue creation and progress, comments, delete, unknown number 404s.
+  - Member restrictions; a failed save rolling back; settings (key, labels); the issues tab when the tool is off. Diagrams' 40 checks still pass.
+- Phase 6b below added cycles, filters/"My issues", the activity log and keyboard shortcuts.
+
+### Phase 6b: Issues, part 2 (cycles, filters, activity, shortcuts)
+- **Migration** `20260925060642_issues_cycles_and_activity.sql` (applied to the hosted project; types regenerated):
+  - **`issue_cycles`:** columns `number` (per workspace), optional `name`, and `starts_on`/`ends_on` dates.
+    - The `prepare_issue_cycle` trigger (security definer) numbers cycles under an advisory lock and refuses overlapping dates with error `23P01`. Reversed dates are left to the check constraint, so users see a clear message; the local tests caught that the date-range builder would otherwise throw a generic error first.
+    - Only managers can write cycles; workspace viewers can read them.
+  - **`issues.cycle_id`:** deleting a cycle keeps its issues. `check_issue` (replaced) also requires the cycle to be in the issue's workspace. Members can set `cycle_id` (column grant).
+  - **`rpc('move_open_issues', p_from, p_to)`** (security invoker): moves a cycle's unfinished issues to another cycle, or out of cycles when `p_to` is null. Returns how many moved.
+  - **`issue_activity`:**
+    - Written only by the `log_issue_activity` trigger (after insert/update on issues, one row per changed field: title, status, priority, assignee, parent, cycle, estimate, due date; description edits aren't logged) and by `log_issue_label_activity` (label added/removed, stored by name).
+    - Label removals caused by deleting the issue or the label aren't logged.
+    - Clients get `select` only.
+- **Local RLS tests: 52/52 pass** (`scratchpad/issues2-test.sql`):
+  - Cycles: numbering, overlap on edit and at a shared boundary day, reversed dates, column grants, per-workspace numbering, visibility, manager-only writes.
+  - A cycle from another workspace is refused.
+  - Activity: rows per field with the actor, nothing on no-op or description edits, no client writes/edits/deletes, labels by name, no entry when a label is deleted.
+  - Moving open issues: done issues stay; cross-workspace refused; a no-op for outsiders.
+  - Cascades: deleting a cycle (issues kept), an issue (its activity removed), and a workspace with labelled issues.
+  - The Phase 6a (87/87) and Diagrams (55/55) suites still pass.
+- **Frontend:**
+  - **Issues sub-navigation:** All issues · Active · Backlog · My issues | Cycles (`IssuesNav`). Tabs, filters and List/Board are URL state.
+  - **Filters:** a Filter menu (`F`) with a checkbox submenu per property: status, priority, assignee (me, none, members), labels, cycle (current, none, cycles).
+    - Each active filter shows as a chip ("Priority is any of Urgent, High") that you can edit with search or remove with ×; there's also a Clear button.
+    - Filters are kept in React state and mirrored to the URL, so quick successive picks don't lose each other (a real bug found in testing).
+  - **Cycles page:** Current / Upcoming / Past sections with dates, "N days left", and a progress bar (done / scope). Managers can create (the new cycle starts the day after the last one ends; 1/2/3-week presets), edit or delete a cycle.
+  - **A cycle's page:** Scope / Started / Completed and progress; its issues as a List or Board with filters; previous/next arrows.
+    - Managers can move open issues to the next cycle or out of cycles, and edit or delete the cycle.
+    - Issues created there start in that cycle.
+  - **Cycle everywhere:** a Cycle property on the issue page, a chip in "New issue", and a cycle number on list rows.
+  - **Activity feed** on the issue page: history lines ("Sam Chen changed status from Todo to In Progress", with icons; assignee, parent and cycle ids resolved to names) interleaved with comments.
+  - **Keyboard shortcuts** (`useShortcuts`, `?` shows them all):
+    - Lists: `C` new issue, `J`/`K` or ↓/↑ to move the focus (hover focuses too, as in Linear), `Enter` to open.
+    - Acting on the focused row or the open issue: `S`/`P`/`A`/`L`/`⇧C` open the status, priority, assignee, labels and cycle menus; `I` assigns to me.
+    - Issue page: `Esc` goes back to the list.
+    - Shortcuts are ignored while typing or while a menu or dialog is open.
+    - Two real issues were found and fixed in testing. Menus animating closed swallowed the next key; the check now only counts `data-state="open"` overlays. The menu's search box kept focus after a choice; it's now released at once.
+- **Mocked-Supabase Playwright:** `scratchpad/issues-test.mjs` now runs 99 checks (the Phase 6a ones plus Phase 6b tabs, filters, shortcuts, cycles for lead and member, and activity), 3 clean runs in a row. Diagrams' 40 still pass.
+- **Not built:** automatic cycle rollover (it's a manual action), issue relations (blocks / related / duplicate), notifications, live updates, and a team-wide "My issues" across workspaces.
 
 ## Current configuration (hosted)
 - **Supabase URL Configuration:** Site URL `http://localhost:5173`; Redirect URLs `http://localhost:5173/**`.

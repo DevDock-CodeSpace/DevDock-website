@@ -9,7 +9,7 @@ export type WorkspaceType = Database['public']['Enums']['workspace_type']
 export type WorkspaceModule = Database['public']['Enums']['workspace_module']
 export type Workspace = Pick<
   Tables<'workspaces'>,
-  'id' | 'team_id' | 'title' | 'description' | 'type' | 'created_at' | 'updated_at'
+  'id' | 'team_id' | 'title' | 'description' | 'type' | 'issue_key' | 'created_at' | 'updated_at'
 > & {
   /** Enabled tools; drives the workspace tabs. */
   modules: WorkspaceModule[]
@@ -72,7 +72,7 @@ export const workspaceQuery = (workspaceId: string) =>
     queryFn: async (): Promise<Workspace | null> => {
       const { data, error } = await supabase
         .from('workspaces')
-        .select('id, team_id, title, description, type, created_at, updated_at, workspace_modules(module)')
+        .select('id, team_id, title, description, type, issue_key, created_at, updated_at, workspace_modules(module)')
         .eq('id', workspaceId)
         .maybeSingle()
       if (error) throw toDataError('load the workspace', error)
@@ -130,6 +130,21 @@ export async function updateWorkspace(workspaceId: string, input: WorkspaceInput
     .select('id')
   if (error) throw toDataError('save the workspace', error)
   requireAffected(data, 'update workspace')
+}
+
+/** The prefix of issue identifiers (CAP in CAP-12). Workspace managers only (RLS). */
+export async function updateIssueKey(workspaceId: string, key: string) {
+  const { data, error } = await supabase
+    .from('workspaces')
+    .update({ issue_key: key.trim().toUpperCase() })
+    .eq('id', workspaceId)
+    .select('id')
+  if (error) {
+    throw toDataError('save the issue key', error, {
+      '23514': 'Use 2–6 letters or digits, starting with a letter (e.g. CAP).',
+    })
+  }
+  requireAffected(data, 'update issue key')
 }
 
 export async function deleteWorkspace(workspaceId: string) {

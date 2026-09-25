@@ -40,6 +40,16 @@ export const diagramsPath = (teamSlug: string, workspaceId?: string) =>
 export const diagramPath = (teamSlug: string, diagramId: string, workspaceId?: string) =>
   `${diagramsPath(teamSlug, workspaceId)}/${diagramId}`
 
+/** Issues are workspace-only (no team-wide view). */
+export const issuesPath = (teamSlug: string, workspaceId: string) => `${workspacePath(teamSlug, workspaceId)}/issues`
+/** A workspace's cycles, and one cycle by its number. */
+export const cyclesPath = (teamSlug: string, workspaceId: string) => `${issuesPath(teamSlug, workspaceId)}/cycles`
+export const cyclePath = (teamSlug: string, workspaceId: string, number: number) =>
+  `${cyclesPath(teamSlug, workspaceId)}/${number}`
+/** One issue, by its number in the workspace (CAP-12 → 12). */
+export const issuePath = (teamSlug: string, workspaceId: string, number: number) =>
+  `${issuesPath(teamSlug, workspaceId)}/${number}`
+
 // ------------------------------------------------------------ team tools
 // Team-wide views of the same data a workspace tab shows. Future rows carry
 // team_id (required) + workspace_id (optional): null = team-wide, X = assigned
@@ -93,7 +103,7 @@ export const workspaceTabDefs: Record<
 > = {
   overview: { title: 'Overview', icon: LayoutDashboard },
   learning: { title: 'Learning', icon: BookOpen, hint: 'Lessons and paths', soon: 'Lessons and learning paths will live here.' },
-  issues: { title: 'Issues', icon: CircleDot, hint: 'Tasks and bugs', soon: 'Issues and tasks for this workspace will live here.' },
+  issues: { title: 'Issues', icon: CircleDot, hint: 'Linear-style tasks and bugs' },
   docs: { title: 'Docs', icon: FileText, hint: 'Pages and notes', soon: 'Docs assigned to this workspace will live here.' },
   diagrams: { title: 'Diagrams', icon: Workflow, hint: 'Architecture and flow diagrams', soon: 'Diagrams assigned to this workspace will live here.' },
   exercises: { title: 'Exercises', icon: Shapes, hint: 'Practice and submissions', soon: 'Exercises and submissions will live here.' },
