@@ -7,7 +7,7 @@ import { AvatarStack } from '@/components/PersonRow'
 import { useAuth } from '@/features/auth/hooks'
 import { useCurrentTeam } from '@/features/teams/hooks'
 import { teamPath, workspacePath } from '@/features/teams/nav'
-import { workspaceRoleLabel, workspaceTypeOrder, workspaceTypes } from '@/features/teams/permissions'
+import { allowedWorkspaceTypes, workspaceRoleLabel, workspaceTypeOrder, workspaceTypes } from '@/features/teams/permissions'
 import { myWorkspaceRolesQuery, teamWorkspacesQuery, type WorkspaceType } from '@/features/workspaces/api'
 import { CreateWorkspaceDialog } from '@/features/workspaces/components/CreateWorkspaceDialog'
 import { usePins } from '@/features/workspaces/hooks'
@@ -44,7 +44,7 @@ export function TeamWorkspacesPage() {
         title={team.name}
         description={
           can.canManageWorkspaces
-            ? 'All courses, projects and workspaces in this group.'
+            ? `All ${allowedWorkspaceTypes[team.type].map((t) => workspaceTypes[t].plural.toLowerCase()).join(', ').replace(/, ([^,]*)$/, ' and $1')} in this group.`
             : 'What you’ve been added to in this group.'
         }
       >
@@ -73,7 +73,7 @@ export function TeamWorkspacesPage() {
       {workspaces.length === 0 ? (
         <p className="border-y py-10 text-center text-sm text-muted-foreground">
           {can.canManageWorkspaces
-            ? 'Nothing here yet. Create a course, project or workspace, then add people from this group to it.'
+            ? `Nothing here yet. Create a ${allowedWorkspaceTypes[team.type].map((t) => workspaceTypes[t].noun).join(', ').replace(/, ([^,]*)$/, ' or $1')}, then add people from this group to it.`
             : 'You haven’t been added to anything in this group yet. Ask a group owner or admin.'}
         </p>
       ) : (

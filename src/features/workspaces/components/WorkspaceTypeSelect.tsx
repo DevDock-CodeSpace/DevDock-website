@@ -7,11 +7,14 @@ export function WorkspaceTypeSelect({
   value,
   onChange,
   disabled,
+  types = Object.keys(workspaceTypes) as WorkspaceType[],
 }: {
   id?: string
   value: WorkspaceType
   onChange: (value: WorkspaceType) => void
   disabled?: boolean
+  /** The types this group can contain (allowedWorkspaceTypes). */
+  types?: WorkspaceType[]
 }) {
   return (
     <Select value={value} onValueChange={(v) => onChange(v as WorkspaceType)} disabled={disabled}>
@@ -19,7 +22,7 @@ export function WorkspaceTypeSelect({
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        {(Object.keys(workspaceTypes) as WorkspaceType[]).map((type) => {
+        {types.map((type) => {
           const { label, hint, icon: Icon } = workspaceTypes[type]
           return (
             <SelectItem key={type} value={type}>

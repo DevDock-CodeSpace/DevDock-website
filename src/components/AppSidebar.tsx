@@ -1,5 +1,5 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
-import { ArrowRight, Pin, Plus } from 'lucide-react'
+import { ChevronRight, Pin, Plus } from 'lucide-react'
 import { Link, matchPath, useLocation, useParams } from 'react-router'
 import { TruncatedText } from '@/components/TruncatedText'
 import {
@@ -31,11 +31,11 @@ const activeIcon = 'data-active:[&_svg]:text-brand'
 
 /**
  * The sidebar is the hierarchy: team → its workspaces, grouped by workspace
- * type (Courses, Projects, Workspaces). The team tools on top (Docs, Diagrams,
+ * type (Courses, Projects, Spaces). The team tools on top (Docs, Diagrams,
  * Live) are team-wide views; inside a workspace the same tools are tabs that
  * show only that workspace's items. Workspace features are never sidebar items.
- * Each type section shows at most 3: pinned first, then recently opened, with
- * "All courses · N" linking to the full list.
+ * Each type section shows at most 3: pinned first, then recently opened. The
+ * section title ("Courses · 5") links to the full list.
  */
 export function AppSidebar() {
   const { team, can } = useCurrentTeam()
@@ -45,7 +45,7 @@ export function AppSidebar() {
   const { isMobile, setOpenMobile } = useSidebar()
   const { pins, isPinned, setPinned } = usePins()
   const visits = useRecentVisits(team.id)
-  const nav = getTeamNav(team.slug)
+  const nav = getTeamNav(team.slug, team.type)
   // One section per workspace type that has items; the team type only decides which comes first.
   const sections = workspaceTypeOrder(team.type)
     .map((type) => ({ type, items: workspaces.filter((w) => w.type === type) }))
@@ -69,10 +69,23 @@ export function AppSidebar() {
         </SidebarGroup>
 
         {sections.map(({ type, items }) => {
-          const { shown, hidden } = pickSidebarItems(items, pins, visits, workspaceId)
+          const { shown } = pickSidebarItems(items, pins, visits, workspaceId)
+          const allHref = `${teamPath(team.slug)}?type=${type}`
           return (
             <SidebarGroup key={type} className="pb-0">
-              <SidebarGroupLabel>{workspaceTypes[type].plural}</SidebarGroupLabel>
+              {/* The title opens the full list of this type. */}
+              <SidebarGroupLabel asChild>
+                <Link
+                  to={allHref}
+                  onClick={close}
+                  title={`All ${workspaceTypes[type].plural.toLowerCase()}`}
+                  className="group/label gap-1 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                >
+                  {workspaceTypes[type].plural}
+                  <span className="font-mono text-[10px] opacity-70">· {items.length}</span>
+                  <ChevronRight className="ml-auto opacity-0 transition-opacity group-hover/label:opacity-100" />
+                </Link>
+              </SidebarGroupLabel>
               <SidebarMenu>
                 {shown.map((workspace) => {
                   const to = workspacePath(team.slug, workspace.id)
@@ -103,18 +116,6 @@ export function AppSidebar() {
                     </SidebarMenuItem>
                   )
                 })}
-                {hidden > 0 && (
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild size="sm" className="text-muted-foreground">
-                      <Link to={`${teamPath(team.slug)}?type=${type}`} onClick={close}>
-                        <ArrowRight />
-                        <span>
-                          All {workspaceTypes[type].plural.toLowerCase()} · {items.length}
-                        </span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                )}
               </SidebarMenu>
             </SidebarGroup>
           )
