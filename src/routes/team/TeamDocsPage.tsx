@@ -15,7 +15,7 @@ export function TeamDocsPage() {
     <>
       <PageHeader
         title="Docs"
-        description={`Team-wide docs in ${team.name}, plus docs from the workspaces you can access.`}
+        description={`Group-wide docs in ${team.name}, plus docs from the workspaces you can access.`}
       >
         <CreateDocDialog />
       </PageHeader>
@@ -29,8 +29,8 @@ export function TeamDocsPage() {
         href={(doc) => docPath(team.slug, doc.id)}
         empty={
           can.isAdmin
-            ? 'No docs yet. Create a team-wide doc, or one for a workspace.'
-            : 'No docs yet. Team owners/admins write team-wide docs; workspace leads write docs for their workspace.'
+            ? 'No docs yet. Create a group-wide doc, or one for a workspace.'
+            : 'No docs yet. Group owners/admins write group-wide docs; workspace leads write docs for their workspace.'
         }
       />
     </>

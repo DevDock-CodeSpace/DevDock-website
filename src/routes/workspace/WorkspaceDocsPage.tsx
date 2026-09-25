@@ -23,7 +23,7 @@ export function WorkspaceDocsPage() {
             to={docsPath(team.slug)}
             className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
           >
-            All team docs <ArrowRight className="size-3" />
+            All group docs <ArrowRight className="size-3" />
           </Link>
         </div>
         <CreateDocDialog workspaceId={workspace.id} />

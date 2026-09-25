@@ -5,7 +5,7 @@ type PostgrestLikeError = { code?: string; message?: string }
 
 const byCode: Record<string, string> = {
   '42501': 'You don’t have permission to do that.',
-  '23503': 'That person isn’t a member of this team.',
+  '23503': 'That person isn’t a member of this group.',
   '23505': 'That already exists.',
   '23514': 'That value isn’t allowed.',
 }

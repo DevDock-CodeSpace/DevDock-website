@@ -261,7 +261,7 @@ export async function deleteIssue(issueId: string) {
 }
 
 const labelErrors = {
-  '42501': 'Only workspace leads and team owners/admins can manage labels.',
+  '42501': 'Only workspace leads and group owners/admins can manage labels.',
   '23505': 'A label with that name already exists.',
 }
 
@@ -292,7 +292,7 @@ export async function deleteLabel(labelId: string) {
 }
 
 const cycleErrors = {
-  '42501': 'Only workspace leads and team owners/admins can manage cycles.',
+  '42501': 'Only workspace leads and group owners/admins can manage cycles.',
   '23P01': 'Those dates overlap another cycle.',
   '23514': 'The end date must be on or after the start date.',
 }

@@ -4,6 +4,8 @@ DevDock is a private software-engineering teaching workspace for **one instructo
 
 ## Current status
 
+> **Naming:** the UI calls a team a **group** ("Group settings", "Group-wide", "Create or join a group"). Code, routes (`/t/:teamSlug`), query keys and the database still say **team**. Keep new user-facing text on "group"; don't rename code for it.
+
 **Phase 1 done: frontend shell.** React Router, Tailwind v4, shadcn/ui, and TanStack Query are installed. The app has a responsive sidebar layout, light/dark/system theme, and placeholder pages driven by mock data (replaced by real data in Phase 4). TipTap (Phase 5b) and React Flow (Phase 5c) are installed; Jitsi is not installed yet. **Add each piece only when a task needs it**, and don't build ahead.
 
 **Phase 2 done: Supabase foundation.** `@supabase/supabase-js`, a typed browser client (`src/lib/supabase.ts`), the `supabase/` CLI project, and the first migration (`profiles` + RLS + a sign-up trigger), **applied to the hosted project** (ref `ejqrrxxiatvvdiyxtvid`, linked via `supabase link`).

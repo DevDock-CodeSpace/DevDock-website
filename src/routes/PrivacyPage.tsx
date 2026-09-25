@@ -35,7 +35,7 @@ export function PrivacyPage() {
           <ul>
             <li>your name,</li>
             <li>your email address,</li>
-            <li>a link to your Google profile photo, shown as your avatar to people in your team.</li>
+            <li>a link to your Google profile photo, shown as your avatar to people in your group.</li>
           </ul>
           <p>
             DevDock never sees your Google password and has no access to your Gmail, Drive, Calendar or anything else in
@@ -44,22 +44,22 @@ export function PrivacyPage() {
         </Section>
 
         <Section title="What you create in DevDock">
-          <p>DevDock stores the things you and your team create, so you can use them:</p>
+          <p>DevDock stores the things you and your group create, so you can use them:</p>
           <ul>
-            <li>teams, workspaces and who belongs to them, with their roles;</li>
+            <li>groups, workspaces and who belongs to them, with their roles;</li>
             <li>docs (including images you add to them) and diagrams;</li>
             <li>issues, comments, labels and cycles, and a history of changes made to issues.</li>
           </ul>
           <p>
-            This content is only visible to people in your team or workspace, according to their role (for example,
-            workspace content is visible to that workspace’s members and the team’s owners and admins).
+            This content is only visible to people in your group or workspace, according to their role (for example,
+            workspace content is visible to that workspace’s members and the group’s owners and admins).
           </p>
         </Section>
 
         <Section title="In your browser">
           <p>
             DevDock keeps your sign-in session and a few preferences in your browser: light or dark theme, the last
-            team you opened, and whether some panels are open. There are no ads, no analytics and no tracking.
+            group you opened, and whether some panels are open. There are no ads, no analytics and no tracking.
           </p>
         </Section>
 
@@ -83,9 +83,9 @@ export function PrivacyPage() {
 
         <Section title="Keeping and deleting data">
           <p>
-            Your data is kept while you use DevDock. Team owners and workspace leads can delete content, and leaving a
-            team removes your access to it. To have your account and data deleted, ask the instructor who runs your
-            DevDock team.
+            Your data is kept while you use DevDock. Group owners and workspace leads can delete content, and leaving a
+            group removes your access to it. To have your account and data deleted, ask the instructor who runs your
+            DevDock group.
           </p>
         </Section>
 

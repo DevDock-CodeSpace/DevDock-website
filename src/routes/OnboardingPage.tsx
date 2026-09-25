@@ -36,18 +36,18 @@ export function OnboardingPage() {
         {!isFirstTeam && (
           <Button variant="ghost" size="sm" asChild className="-ml-2 mb-4">
             <Link to="/app">
-              <ArrowLeft /> Back to your team
+              <ArrowLeft /> Back to your group
             </Link>
           </Button>
         )}
 
         <h1 className="text-2xl font-semibold tracking-tight">
-          {isFirstTeam ? 'Welcome to DevDock' : 'Create or join a team'}
+          {isFirstTeam ? 'Welcome to DevDock' : 'Create or join a group'}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {isFirstTeam
-            ? 'Start your own team, or join one with an invite code from a teammate or instructor.'
-            : 'You can belong to several teams, with a different role in each.'}
+            ? 'Start your own group, or join one with an invite code from a group member or instructor.'
+            : 'You can belong to several groups, with a different role in each.'}
         </p>
 
         <div className="mt-8 grid gap-4 md:grid-cols-2">
@@ -87,7 +87,7 @@ function CreateTeamCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Create a team</CardTitle>
+        <CardTitle>Create a group</CardTitle>
         <CardDescription>For your class, cohort, or project group. You’ll be its owner.</CardDescription>
       </CardHeader>
       <CardContent>
@@ -155,7 +155,7 @@ function CreateTeamCard() {
           )}
           <Button type="submit" className="w-full" disabled={!name.trim() || !slugValid || create.isPending}>
             {create.isPending && <LoaderCircle className="animate-spin" />}
-            Create team
+            Create group
           </Button>
         </form>
       </CardContent>
@@ -212,7 +212,7 @@ function JoinTeamCard() {
           )}
           <Button type="submit" variant="outline" className="w-full" disabled={!code.trim() || join.isPending}>
             {join.isPending && <LoaderCircle className="animate-spin" />}
-            Join team
+            Join group
           </Button>
         </form>
       </CardContent>

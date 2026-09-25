@@ -28,8 +28,8 @@ export function TeamWorkspacesPage() {
         title={team.name}
         description={
           can.canManageWorkspaces
-            ? 'All courses, projects and workspaces in this team.'
-            : 'What you’ve been added to in this team.'
+            ? 'All courses, projects and workspaces in this group.'
+            : 'What you’ve been added to in this group.'
         }
       >
         {can.canManageWorkspaces && <CreateWorkspaceDialog />}
@@ -43,8 +43,8 @@ export function TeamWorkspacesPage() {
       {workspaces.length === 0 ? (
         <p className="border-y py-10 text-center text-sm text-muted-foreground">
           {can.canManageWorkspaces
-            ? 'Nothing here yet. Create a course, project or workspace, then add people from this team to it.'
-            : 'You haven’t been added to anything in this team yet. Ask a team owner or admin.'}
+            ? 'Nothing here yet. Create a course, project or workspace, then add people from this group to it.'
+            : 'You haven’t been added to anything in this group yet. Ask a group owner or admin.'}
         </p>
       ) : (
         <div className="border-y">

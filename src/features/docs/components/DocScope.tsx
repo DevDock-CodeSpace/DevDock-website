@@ -8,7 +8,7 @@ export function DocScope({ doc }: { doc: Pick<DocSummary, 'workspace'> }) {
     return (
       <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <Globe className="size-3.5 shrink-0" />
-        Team-wide
+        Group-wide
       </span>
     )
   }

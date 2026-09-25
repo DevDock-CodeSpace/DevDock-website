@@ -52,7 +52,7 @@ export function TeamInviteCode() {
 
       {!can.canInvite ? (
         <p className="text-sm text-muted-foreground">
-          Ask a team owner or admin for an invite code. Once they join {team.name}, they’ll appear in the list above.
+          Ask a group owner or admin for an invite code. Once they join {team.name}, they’ll appear in the list above.
         </p>
       ) : invites.isPending ? (
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -79,7 +79,7 @@ export function TeamInviteCode() {
       ) : (
         <>
           <p className="text-sm text-muted-foreground">
-            Create a team invite code. People who use it join {team.name} as members, then appear in the list above.
+            Create a group invite code. People who use it join {team.name} as members, then appear in the list above.
           </p>
           <Button type="button" variant="outline" size="sm" disabled={create.isPending} onClick={() => create.mutate()}>
             {create.isPending ? <LoaderCircle className="animate-spin" /> : <Plus />} Create invite code

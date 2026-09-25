@@ -20,7 +20,7 @@ export function TeamSettingsPage() {
 
   return (
     <>
-      <PageHeader title="Team settings" description={`${team.name} · your role: ${teamRoleLabel[role]}`} />
+      <PageHeader title="Group settings" description={`${team.name} · your role: ${teamRoleLabel[role]}`} />
       <div>
         <GeneralSection key={team.id} />
         {(can.canLeave || can.canDelete) && <DangerSection />}
@@ -55,7 +55,7 @@ function GeneralSection() {
       title="General"
       description={
         can.canEditTeam
-          ? `The type picks the default for new workspaces (${workspaceTypes[defaultWorkspaceType[type]].noun}) and which sidebar section comes first. Any team can hold courses, projects and workspaces.`
+          ? `The type picks the default for new workspaces (${workspaceTypes[defaultWorkspaceType[type]].noun}) and which sidebar section comes first. Any group can hold courses, projects and workspaces.`
           : 'Only owners and admins can change these.'
       }
     >
@@ -134,8 +134,8 @@ function DangerSection() {
     <SettingsSection title="Danger zone" tone="danger" description="These can’t be undone from here.">
       {can.canLeave && (
         <DangerRow
-          title="Leave team"
-          description="You’ll lose access to this team and all of its spaces. You’ll need a new invite to come back."
+          title="Leave group"
+          description="You’ll lose access to this group and all of its spaces. You’ll need a new invite to come back."
           action={
             <Button variant="outline" size="sm" onClick={() => setConfirm('leave')}>
               Leave
@@ -145,8 +145,8 @@ function DangerSection() {
       )}
       {can.canDelete && (
         <DangerRow
-          title="Delete team"
-          description="Permanently deletes the team, its spaces, memberships, and invite codes."
+          title="Delete group"
+          description="Permanently deletes the group, its spaces, memberships, and invite codes."
           action={
             <Button variant="destructive" size="sm" onClick={() => setConfirm('delete')}>
               Delete
@@ -173,13 +173,13 @@ function DangerSection() {
           }
         }}
         title={`Delete ${team.name}?`}
-        description="Everyone loses access immediately. Type the team name to confirm."
+        description="Everyone loses access immediately. Type the group name to confirm."
         confirmLabel="Delete forever"
         pending={remove.isPending}
         confirmDisabled={typed !== team.name}
         onConfirm={() => remove.mutate()}
       >
-        <Input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={team.name} aria-label="Team name" />
+        <Input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={team.name} aria-label="Group name" />
       </ConfirmDialog>
     </SettingsSection>
   )

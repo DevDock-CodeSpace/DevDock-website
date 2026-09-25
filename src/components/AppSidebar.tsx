@@ -91,7 +91,7 @@ export function AppSidebar() {
             <SidebarMenu>
               {workspaces.length === 0 && !can.canManageWorkspaces && (
                 <li className="px-2 py-1 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
-                  You haven’t been added to anything in this team yet.
+                  You haven’t been added to anything in this group yet.
                 </li>
               )}
               {can.canManageWorkspaces && (
@@ -111,7 +111,7 @@ export function AppSidebar() {
         )}
 
         <SidebarGroup>
-          <SidebarGroupLabel>Team</SidebarGroupLabel>
+          <SidebarGroupLabel>Group</SidebarGroupLabel>
           <SidebarMenu>
             <NavLinkItem item={nav.members} onNavigate={close} />
             <NavLinkItem item={nav.settings} onNavigate={close} />
