@@ -21,6 +21,7 @@ import {
   type WorkspaceType,
 } from '@/features/workspaces/api'
 import { IssueSettingsSection } from '@/features/issues/components/IssueSettingsSection'
+import { allowedWorkspaceTypes } from '@/features/teams/permissions'
 import { ModulePicker } from '@/features/workspaces/components/ModulePicker'
 import { WorkspaceTypeSelect } from '@/features/workspaces/components/WorkspaceTypeSelect'
 import { errorMessage } from '@/lib/errors'
@@ -81,7 +82,13 @@ function DetailsSection() {
       <form onSubmit={submit} className="space-y-4">
         <div className="space-y-1.5">
           <Label htmlFor="ws-type">Type</Label>
-          <WorkspaceTypeSelect id="ws-type" value={type} onChange={setType} />
+          <WorkspaceTypeSelect
+            id="ws-type"
+            value={type}
+            onChange={setType}
+            // Only types this group can contain (plus the current one, if it predates the rule).
+            types={[...new Set([...allowedWorkspaceTypes[team.type], workspace.type])]}
+          />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="ws-title">Title</Label>

@@ -95,7 +95,11 @@ export async function updateTeam(teamId: string, input: { name: string; type: Te
     .update({ name: input.name.trim(), type: input.type })
     .eq('id', teamId)
     .select('id')
-  if (error) throw toDataError('save the group', error)
+  if (error) {
+    throw toDataError('save the group', error, {
+      '23514': 'This group has courses. Change them to projects or spaces before making it a development group.',
+    })
+  }
   requireAffected(data, 'update group')
 }
 

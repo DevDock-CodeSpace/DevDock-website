@@ -19,6 +19,7 @@ import { OnboardingPage } from '@/routes/OnboardingPage'
 import { PrivacyPage } from '@/routes/PrivacyPage'
 import { TeamDiagramsPage } from '@/routes/team/TeamDiagramsPage'
 import { TeamDocsPage } from '@/routes/team/TeamDocsPage'
+import { TeamIssuesPage } from '@/routes/team/TeamIssuesPage'
 import { TeamMembersPage } from '@/routes/team/TeamMembersPage'
 import { TeamSettingsPage } from '@/routes/team/TeamSettingsPage'
 import { TeamToolPage } from '@/routes/team/TeamToolPage'
@@ -85,6 +86,8 @@ export const router = createBrowserRouter([
               { path: 'docs/:docId', loader: docLoader, element: <DocPage /> },
               { path: 'diagrams', element: <TeamDiagramsPage /> },
               { path: 'diagrams/:diagramId', loader: diagramLoader, element: <DiagramPage /> },
+              // Development groups: issues from every project (the page checks the group type).
+              { path: 'issues', element: <TeamIssuesPage /> },
               // Team-wide views of tools not built yet (Live): placeholders.
               ...TEAM_TOOLS.filter((tool) => tool !== 'docs' && tool !== 'diagrams').map((tool) => ({
                 path: tool,

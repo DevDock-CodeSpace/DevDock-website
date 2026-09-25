@@ -55,7 +55,11 @@ function GeneralSection() {
       title="General"
       description={
         can.canEditTeam
-          ? `The type picks the default for new workspaces (${workspaceTypes[defaultWorkspaceType[type]].noun}) and which sidebar section comes first. Any group can hold courses, projects and workspaces.`
+          ? type === 'development'
+            ? 'Development groups have projects and spaces (no courses), and an Issues page across all projects.'
+            : type === 'learning'
+              ? `Learning groups have courses, plus projects and spaces for student work. New items default to a ${workspaceTypes[defaultWorkspaceType[type]].noun}.`
+              : 'General groups can have courses, projects and spaces.'
           : 'Only owners and admins can change these.'
       }
     >

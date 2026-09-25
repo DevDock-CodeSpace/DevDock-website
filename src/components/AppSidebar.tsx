@@ -31,7 +31,7 @@ const activeIcon = 'data-active:[&_svg]:text-brand'
 
 /**
  * The sidebar is the hierarchy: team → its workspaces, grouped by workspace
- * type (Courses, Projects, Workspaces). The team tools on top (Docs, Diagrams,
+ * type (Courses, Projects, Spaces). The team tools on top (Docs, Diagrams,
  * Live) are team-wide views; inside a workspace the same tools are tabs that
  * show only that workspace's items. Workspace features are never sidebar items.
  * Each type section shows at most 3: pinned first, then recently opened. The
@@ -45,7 +45,7 @@ export function AppSidebar() {
   const { isMobile, setOpenMobile } = useSidebar()
   const { pins, isPinned, setPinned } = usePins()
   const visits = useRecentVisits(team.id)
-  const nav = getTeamNav(team.slug)
+  const nav = getTeamNav(team.slug, team.type)
   // One section per workspace type that has items; the team type only decides which comes first.
   const sections = workspaceTypeOrder(team.type)
     .map((type) => ({ type, items: workspaces.filter((w) => w.type === type) }))

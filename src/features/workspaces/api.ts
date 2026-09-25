@@ -115,7 +115,7 @@ export async function createWorkspace(
     p_type: input.type,
     p_modules: input.modules,
   })
-  if (error) throw toDataError('create the workspace', error)
+  if (error) throw toDataError('create it', error, { '23514': 'Development groups can have projects and spaces, not courses.' })
   return { id: data }
 }
 
@@ -131,7 +131,7 @@ export async function updateWorkspace(workspaceId: string, input: WorkspaceInput
     .update({ title: input.title.trim(), description: input.description.trim() || null, type: input.type })
     .eq('id', workspaceId)
     .select('id')
-  if (error) throw toDataError('save the workspace', error)
+  if (error) throw toDataError('save it', error, { '23514': 'Development groups can have projects and spaces, not courses.' })
   requireAffected(data, 'update workspace')
 }
 

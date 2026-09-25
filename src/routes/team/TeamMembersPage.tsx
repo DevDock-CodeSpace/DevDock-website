@@ -61,7 +61,7 @@ export function TeamMembersPage() {
     <>
       <PageHeader
         title="Group members"
-        description={`${members.length} ${members.length === 1 ? 'person' : 'people'} in ${team.name}. Access to each course, project or workspace is assigned separately.`}
+        description={`${members.length} ${members.length === 1 ? 'person' : 'people'} in ${team.name}. Access to each course, project or space is assigned separately.`}
       />
 
       <ul className="-mt-6 divide-y border-b">

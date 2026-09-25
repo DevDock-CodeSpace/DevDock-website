@@ -59,16 +59,27 @@ export const workspaceTypes: Record<
 > = {
   course: { label: 'Course', noun: 'course', plural: 'Courses', hint: 'Lessons, live classes, docs', icon: BookOpen },
   project: { label: 'Project', noun: 'project', plural: 'Projects', hint: 'Code, docs, and planning', icon: FolderKanban },
-  general: { label: 'General', noun: 'workspace', plural: 'Workspaces', hint: 'A shared space', icon: LayoutGrid },
+  // The 'general' type is called a "space" in the UI (study groups, clubs, anything else).
+  general: { label: 'Space', noun: 'space', plural: 'Spaces', hint: 'Study groups, discussions, anything else', icon: LayoutGrid },
+}
+
+/**
+ * What a group can contain, by group type (mirrors private.check_workspace_type):
+ * development groups have no courses.
+ */
+export const allowedWorkspaceTypes: Record<TeamType, WorkspaceType[]> = {
+  learning: ['course', 'project', 'general'],
+  development: ['project', 'general'],
+  general: ['course', 'project', 'general'],
 }
 
 /**
  * Sidebar section order: the team type's own workspace type first, then the
- * rest. Team type never restricts what a team can contain.
+ * rest (only types the group can contain).
  */
 export function workspaceTypeOrder(teamType: TeamType): WorkspaceType[] {
   const first = defaultWorkspaceType[teamType]
-  return [first, ...(['course', 'project', 'general'] as const).filter((t) => t !== first)]
+  return [first, ...allowedWorkspaceTypes[teamType].filter((t) => t !== first)]
 }
 
 /** Sensible default workspace type for a team of this type. */
