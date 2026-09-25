@@ -10,7 +10,9 @@ DevDock is a private software-engineering teaching workspace for **one instructo
 
 **Phase 3 done: Google sign-in** via Supabase Auth (PKCE). All app routes require a session, and the sidebar shows the signed-in user's profile. Sign-in verified end-to-end with a real Google account. The app now **requires** the Supabase env vars.
 
-**Phase 4 (in progress): Team → Workspace model is real.** A **team** (owner/admin/member; type learning/development/general) contains **workspaces** (lead/member; type course/project/general). Invite codes join a team, and workspace access is assigned separately. The UI has onboarding (create a team or join with a code), a team switcher, and real workspace, member, invite and settings pages. The mock data is gone. Lessons, Live Session and Resources are placeholder pages (no tables yet); Lessons shows only for course workspaces. Current status and next steps: `docs/STATUS.md`.
+**Phase 4 (in progress): Team → Workspace model is real.** A **team** (owner/admin/member; type learning/development/general) contains **workspaces** (lead/member; type course/project/general). Invite codes join a team, and workspace access is assigned separately. The UI has onboarding (create a team or join with a code), a team switcher, and real workspace, member, invite and settings pages. The mock data is gone.
+
+**Phase 5a done: Docs.** A `documents` table (team-wide or assigned to a workspace) with RLS, Team → Docs and Workspace → Docs lists, and a plain-textarea editor (no TipTap yet). Other tools (Diagrams, Live, Learning, …) are still placeholder pages. Current status and next steps: `docs/STATUS.md`.
 
 ## Target stack
 
@@ -63,7 +65,7 @@ src/
   router.tsx         # all routes (createBrowserRouter, data mode)
   layouts/           # AppLayout (team shell: sidebar + header + <Suspense><Outlet/>), app-loader.ts (auth guard)
   routes/            # page components: team/* (under /t/:teamSlug) and workspace/* (under …/w/:workspaceId)
-  features/<name>/   # feature-scoped components, types, api.ts, hooks (auth/, teams/, workspaces/)
+  features/<name>/   # feature-scoped components, types, api.ts, hooks (auth/, teams/, workspaces/, docs/)
   components/ui/     # shadcn/ui generated components (don't hand-edit much)
   components/        # shared app components (AppSidebar, PageHeader, Theme*)
   hooks/             # shared hooks
@@ -87,11 +89,11 @@ supabase/
 - **Access checks in loaders** (`features/teams/loaders.ts`): `teamLoader` 404s when the user isn't a team member; `workspaceLoader` 404s when the workspace isn't visible (RLS) or belongs to another team.
 - **Current context:** `useCurrentTeam()` and `useCurrentWorkspace()` (`features/teams/hooks.ts`) return the entity, the user's role, and `can`, a permissions object from `features/teams/permissions.ts` that mirrors RLS. **`can` is for showing and hiding UI only.** Every write is re-checked by RLS. Type labels and icons are in `teamTypes` and `workspaceTypes` in the same file.
 - **Navigation:** the **sidebar is the hierarchy**: team switcher, Home, the **team tools** (Docs, Diagrams, Live; `TEAM_TOOLS`), the team's workspaces grouped by **workspace** type (Courses, Projects, Workspaces; empty sections hidden; team type only decides which section comes first and the default type for "+ New", via `workspaceTypeOrder`/`defaultWorkspaceType`), one "+ New", team Members and Settings. **Workspace features are horizontal tabs** under the workspace title (`WorkspaceLayout`), **generated from the workspace's enabled tools** (`workspace_modules`; `getWorkspaceTabs(teamSlug, id, modules)` in `features/teams/nav.ts`): Overview, then the tools in `MODULE_ORDER`, then Members. Workspace *type* only picks default tools (`defaultModules`, which mirrors `public.default_workspace_modules`). Create workspaces with `rpc('create_workspace')` and change tools with `rpc('set_workspace_modules')`; both are atomic and run under RLS. Don't put workspace features in the sidebar.
-- **Team tools vs workspace tabs:** Docs, Diagrams and Live exist at both levels as views of the same data. Future rows have `team_id` (required) + `workspace_id` (nullable: null = team-wide). The team page (`TeamToolPage`) shows everything the caller can access; the workspace tab shows only that workspace's rows. Issues, Learning, Exercises, GitHub and Resources are workspace-only.
+- **Team tools vs workspace tabs:** Docs, Diagrams and Live exist at both levels as views of the same data. Rows have `team_id` (required) + `workspace_id` (nullable: null = team-wide; composite FK `(workspace_id, team_id) → workspaces(id, team_id)` keeps it in the same team). The team page shows everything the caller can access; the workspace tab shows only that workspace's rows. Docs is built this way (`documents`, `TeamDocsPage`/`WorkspaceDocsPage`, one `DocPage` for both routes, `docLoader`); Diagrams and Live still use the placeholder `TeamToolPage`. Built workspace tools sit under `WorkspaceToolGate`, which 404s when the tool is off. Issues, Learning, Exercises, GitHub and Resources are workspace-only.
 - **Data pattern:** `features/<name>/api.ts` exports `queryOptions` and mutation functions.
   - Loaders prime what the shell needs with `ensureQueryData`. Pages read with `useSuspenseQuery`; `AppLayout` has a Suspense boundary, so pages may also load secondary data that way.
   - Errors go through `lib/errors.ts` (`toDataError`, `requireAffected`), because RLS makes forbidden UPDATE/DELETE return 0 rows, not an error. Show them with `toast.error(errorMessage(e))`.
-- **Query keys:** `['teams', …]` and `['workspaces', …]`; invalidate by prefix after mutations.
+- **Query keys:** `['teams', …]`, `['workspaces', …]` and `['documents', …]`; invalidate by prefix after mutations.
 - **Leaving or deleting** the current team or workspace: navigate away *first*, then invalidate (see `useExitTeam`). Otherwise the page crashes when its data disappears, or `/app` bounces back through the stale cache.
 - Avoid `Date.now()` in render (oxlint `react/purity`); capture it with `useState(Date.now)`.
 

@@ -171,7 +171,7 @@ function DangerSection() {
     <SettingsSection title="Danger zone" tone="danger" description="Irreversible actions.">
       <DangerRow
         title="Delete this workspace"
-        description="Removes it and everyone’s access to it. People stay in the team."
+        description="Removes it, its docs, and everyone’s access to it. People stay in the team. Team-wide docs aren’t affected."
         action={
           <Button variant="destructive" size="sm" onClick={() => setConfirming(true)}>
             Delete

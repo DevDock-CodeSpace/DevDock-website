@@ -26,6 +26,13 @@ export type NavItem = {
 export const teamPath = (slug: string) => `/t/${slug}`
 export const workspacePath = (teamSlug: string, workspaceId: string) => `/t/${teamSlug}/w/${workspaceId}`
 
+/** Docs list, in the team view or inside a workspace. */
+export const docsPath = (teamSlug: string, workspaceId?: string) =>
+  workspaceId ? `${workspacePath(teamSlug, workspaceId)}/docs` : `${teamPath(teamSlug)}/docs`
+/** One doc, opened from the team view or from inside its workspace. */
+export const docPath = (teamSlug: string, docId: string, workspaceId?: string) =>
+  `${docsPath(teamSlug, workspaceId)}/${docId}`
+
 // ------------------------------------------------------------ team tools
 // Team-wide views of the same data a workspace tab shows. Future rows carry
 // team_id (required) + workspace_id (optional): null = team-wide, X = assigned

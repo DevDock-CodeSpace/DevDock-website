@@ -1,6 +1,7 @@
 import { Link, useParams } from 'react-router'
 import { useCurrentTeam, useCurrentWorkspace } from '@/features/teams/hooks'
 import { hasWorkspaceTab, isTeamTool, teamPath, teamToolDefs, workspaceTabDefs } from '@/features/teams/nav'
+import { ToolNotEnabled } from '@/features/workspaces/components/ToolNotEnabled'
 
 /** Enabled tools whose features don't exist yet (Docs, Live, …). Tools not enabled here → not found. */
 export function WorkspaceTabPage() {
@@ -9,12 +10,7 @@ export function WorkspaceTabPage() {
   const { workspace } = useCurrentWorkspace()
 
   if (!hasWorkspaceTab(workspace.modules, tab) || !workspaceTabDefs[tab].soon) {
-    return (
-      <div className="py-16 text-center">
-        <p className="font-mono text-sm text-muted-foreground">404</p>
-        <p className="mt-1 font-medium">This tool isn’t enabled in this workspace.</p>
-      </div>
-    )
+    return <ToolNotEnabled />
   }
 
   const { title, icon: Icon, soon } = workspaceTabDefs[tab]

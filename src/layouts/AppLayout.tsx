@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query'
 import { Fragment, Suspense } from 'react'
 import { Link, matchPath, Outlet, useLocation, useParams } from 'react-router'
 import { AppSidebar } from '@/components/AppSidebar'
@@ -13,6 +14,7 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
+import { documentQuery } from '@/features/docs/api'
 import { useCurrentTeam, useCurrentWorkspace } from '@/features/teams/hooks'
 import { getTeamNav, getWorkspaceTabs, teamPath, workspacePath, type NavItem } from '@/features/teams/nav'
 
@@ -54,7 +56,8 @@ function TeamBreadcrumb() {
   const { team } = useCurrentTeam()
   const { tools, members, settings } = getTeamNav(team.slug)
   const section = useSection([...tools, members, settings])
-  return <Crumbs crumbs={[{ label: team.name, to: teamPath(team.slug) }, ...section]} />
+  const doc = useDocCrumb()
+  return <Crumbs crumbs={[{ label: team.name, to: teamPath(team.slug) }, ...section, ...doc]} />
 }
 
 function WorkspaceBreadcrumb() {
@@ -65,15 +68,27 @@ function WorkspaceBreadcrumb() {
     ...getWorkspaceTabs(team.slug, workspace.id, workspace.modules),
     { title: 'Settings', to: `${base}/settings`, icon: getTeamNav(team.slug).settings.icon },
   ])
+  const doc = useDocCrumb()
   return (
     <Crumbs
       crumbs={[
         { label: team.name, to: teamPath(team.slug) },
         { label: workspace.title, to: workspacePath(team.slug, workspace.id) },
         ...section,
+        ...doc,
       ]}
     />
   )
+}
+
+/** On a doc page, its title as the last crumb, but only where docLoader would show it (same team/workspace). */
+function useDocCrumb(): Crumb[] {
+  const { docId, workspaceId } = useParams()
+  const { pathname } = useLocation()
+  const { team } = useCurrentTeam()
+  const doc = useQuery({ ...documentQuery(docId ?? ''), enabled: docId !== undefined }).data
+  const belongs = doc && doc.team_id === team.id && (workspaceId === undefined || doc.workspace_id === workspaceId)
+  return docId && belongs ? [{ label: doc.title, to: pathname }] : []
 }
 
 /** The current non-index nav item as a crumb, if any. */
