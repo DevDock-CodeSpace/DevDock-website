@@ -15,11 +15,17 @@ const lowlight = createLowlight(common)
 
 type Options = {
   editable: boolean
-  /** Upload dropped/pasted image files and insert them (at `pos` when dropped). */
-  onImageFiles: (editor: Editor, files: File[], pos?: number) => void
+  /** Upload dropped/pasted image files and insert them (at `pos` when dropped). Omit to disallow images. */
+  onImageFiles?: (editor: Editor, files: File[], pos?: number) => void
+  /** Empty-editor placeholder. */
+  placeholder?: string
 }
 
-export function docExtensions({ editable, onImageFiles }: Options) {
+export function docExtensions({
+  editable,
+  onImageFiles,
+  placeholder = 'Start writing, or press + to add headings, code, images…',
+}: Options) {
   return [
     StarterKit.configure({
       codeBlock: false, // replaced by CodeBlockLowlight
@@ -43,15 +49,19 @@ export function docExtensions({ editable, onImageFiles }: Options) {
           Placeholder.configure({
             placeholder: ({ editor, node }) => {
               if (node.type.name === 'heading') return `Heading ${node.attrs.level as number}`
-              return editor.isEmpty ? 'Start writing, or press + to add headings, code, images…' : ''
+              return editor.isEmpty ? placeholder : ''
             },
             showOnlyCurrent: true,
           }),
-          FileHandler.configure({
-            allowedMimeTypes: IMAGE_TYPES,
-            onPaste: (editor, files) => onImageFiles(editor, files),
-            onDrop: (editor, files, pos) => onImageFiles(editor, files, pos),
-          }),
+          ...(onImageFiles
+            ? [
+                FileHandler.configure({
+                  allowedMimeTypes: IMAGE_TYPES,
+                  onPaste: (editor, files) => onImageFiles(editor, files),
+                  onDrop: (editor, files, pos) => onImageFiles(editor, files, pos),
+                }),
+              ]
+            : []),
         ]
       : []),
   ]

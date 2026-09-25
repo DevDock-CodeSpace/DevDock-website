@@ -127,6 +127,202 @@ export type Database = {
           },
         ]
       }
+      issue_comments: {
+        Row: {
+          author_id: string | null
+          body: string
+          created_at: string
+          id: string
+          issue_id: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          author_id?: string | null
+          body: string
+          created_at?: string
+          id?: string
+          issue_id: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          author_id?: string | null
+          body?: string
+          created_at?: string
+          id?: string
+          issue_id?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "issue_comments_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "issue_comments_issue_fkey"
+            columns: ["issue_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "issues"
+            referencedColumns: ["id", "workspace_id"]
+          },
+        ]
+      }
+      issue_label_links: {
+        Row: {
+          issue_id: string
+          label_id: string
+          workspace_id: string
+        }
+        Insert: {
+          issue_id: string
+          label_id: string
+          workspace_id: string
+        }
+        Update: {
+          issue_id?: string
+          label_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "issue_label_links_issue_fkey"
+            columns: ["issue_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "issues"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "issue_label_links_label_fkey"
+            columns: ["label_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "issue_labels"
+            referencedColumns: ["id", "workspace_id"]
+          },
+        ]
+      }
+      issue_labels: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          name: string
+          workspace_id: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          id?: string
+          name: string
+          workspace_id: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          name?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "issue_labels_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      issues: {
+        Row: {
+          assignee_id: string | null
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          description: Json | null
+          due_date: string | null
+          estimate: number | null
+          id: string
+          number: number
+          parent_id: string | null
+          priority: number
+          status: Database["public"]["Enums"]["issue_status"]
+          team_id: string
+          title: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          assignee_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: Json | null
+          due_date?: string | null
+          estimate?: number | null
+          id?: string
+          number: number
+          parent_id?: string | null
+          priority?: number
+          status?: Database["public"]["Enums"]["issue_status"]
+          team_id: string
+          title: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          assignee_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: Json | null
+          due_date?: string | null
+          estimate?: number | null
+          id?: string
+          number?: number
+          parent_id?: string | null
+          priority?: number
+          status?: Database["public"]["Enums"]["issue_status"]
+          team_id?: string
+          title?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "issues_assignee_id_fkey"
+            columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "issues_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "issues_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "issues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "issues_workspace_team_fkey"
+            columns: ["workspace_id", "team_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id", "team_id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -336,6 +532,7 @@ export type Database = {
           created_by: string | null
           description: string | null
           id: string
+          issue_key: string
           team_id: string
           title: string
           type: Database["public"]["Enums"]["workspace_type"]
@@ -346,6 +543,7 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           id?: string
+          issue_key: string
           team_id: string
           title: string
           type?: Database["public"]["Enums"]["workspace_type"]
@@ -356,6 +554,7 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           id?: string
+          issue_key?: string
           team_id?: string
           title?: string
           type?: Database["public"]["Enums"]["workspace_type"]
@@ -391,6 +590,10 @@ export type Database = {
         Returns: Database["public"]["Enums"]["workspace_module"][]
       }
       join_team: { Args: { invite_code: string }; Returns: string }
+      set_issue_labels: {
+        Args: { p_issue_id: string; p_label_ids: string[] }
+        Returns: undefined
+      }
       set_workspace_modules: {
         Args: {
           p_modules: Database["public"]["Enums"]["workspace_module"][]
@@ -400,6 +603,13 @@ export type Database = {
       }
     }
     Enums: {
+      issue_status:
+        | "backlog"
+        | "todo"
+        | "in_progress"
+        | "in_review"
+        | "done"
+        | "canceled"
       team_role: "owner" | "admin" | "member"
       team_type: "development" | "learning" | "general"
       workspace_module:
@@ -540,6 +750,14 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      issue_status: [
+        "backlog",
+        "todo",
+        "in_progress",
+        "in_review",
+        "done",
+        "canceled",
+      ],
       team_role: ["owner", "admin", "member"],
       team_type: ["development", "learning", "general"],
       workspace_module: [

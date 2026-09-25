@@ -4,6 +4,7 @@ import { authCallbackLoader, loginLoader } from '@/features/auth/loaders'
 import { watchAuthIdentity } from '@/features/auth/session'
 import { diagramLoader } from '@/features/diagrams/loaders'
 import { docLoader } from '@/features/docs/loaders'
+import { issueLoader } from '@/features/issues/loaders'
 import { TEAM_TOOLS } from '@/features/teams/nav'
 import { appIndexLoader, onboardingLoader, teamLoader, workspaceLoader } from '@/features/teams/loaders'
 import { AppLayout } from '@/layouts/AppLayout'
@@ -22,6 +23,8 @@ import { TeamToolPage } from '@/routes/team/TeamToolPage'
 import { TeamWorkspacesPage } from '@/routes/team/TeamWorkspacesPage'
 import { WorkspaceDiagramsPage } from '@/routes/workspace/WorkspaceDiagramsPage'
 import { WorkspaceDocsPage } from '@/routes/workspace/WorkspaceDocsPage'
+import { IssuePage } from '@/routes/workspace/IssuePage'
+import { WorkspaceIssuesPage } from '@/routes/workspace/WorkspaceIssuesPage'
 import { WorkspaceLayout } from '@/routes/workspace/WorkspaceLayout'
 import { WorkspaceMembersPage } from '@/routes/workspace/WorkspaceMembersPage'
 import { WorkspaceOverviewPage } from '@/routes/workspace/WorkspaceOverviewPage'
@@ -103,6 +106,15 @@ export const router = createBrowserRouter([
                     children: [
                       { index: true, element: <WorkspaceDiagramsPage /> },
                       { path: ':diagramId', loader: diagramLoader, element: <DiagramPage /> },
+                    ],
+                  },
+                  {
+                    // Linear-style issues (workspace-only).
+                    path: 'issues',
+                    element: <WorkspaceToolGate tool="issues" />,
+                    children: [
+                      { index: true, element: <WorkspaceIssuesPage /> },
+                      { path: ':issueNumber', loader: issueLoader, element: <IssuePage /> },
                     ],
                   },
                   // Feature tabs that don't exist yet (Live, …); checked against the enabled tools.

@@ -16,8 +16,11 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 import { diagramQuery } from '@/features/diagrams/api'
 import { documentQuery } from '@/features/docs/api'
+import { issueQuery } from '@/features/issues/api'
+import { issueIdentifier } from '@/features/issues/meta'
 import { useCurrentTeam, useCurrentWorkspace } from '@/features/teams/hooks'
 import { getTeamNav, getWorkspaceTabs, teamPath, workspacePath, type NavItem } from '@/features/teams/nav'
+import { workspaceQuery } from '@/features/workspaces/api'
 
 // The shadcn sidebar writes its open/collapsed state to this cookie but doesn't read it back.
 const sidebarStartsOpen = () => !document.cookie.includes('sidebar_state=false')
@@ -28,7 +31,8 @@ export function AppLayout() {
   return (
     <SidebarProvider defaultOpen={sidebarStartsOpen()}>
       <AppSidebar />
-      <SidebarInset>
+      {/* min-w-0: wide content (the issue board) scrolls inside the page instead of widening it. */}
+      <SidebarInset className="min-w-0">
         <header className="sticky top-0 z-10 flex h-12 shrink-0 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur md:px-6">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4 data-vertical:self-center" />
@@ -83,15 +87,23 @@ function WorkspaceBreadcrumb() {
 }
 
 /**
- * On a doc or diagram page, its title as the last crumb, but only where its
- * loader would show it (same team/workspace).
+ * On a doc, diagram or issue page, its title (issue: identifier) as the last
+ * crumb, but only where its loader would show it (same team/workspace).
  */
 function useItemCrumb(): Crumb[] {
-  const { docId, diagramId, workspaceId } = useParams()
+  const { docId, diagramId, issueNumber, workspaceId } = useParams()
   const { pathname } = useLocation()
   const { team } = useCurrentTeam()
   const doc = useQuery({ ...documentQuery(docId ?? ''), enabled: docId !== undefined }).data
   const diagram = useQuery({ ...diagramQuery(diagramId ?? ''), enabled: diagramId !== undefined }).data
+  const issue = useQuery({
+    ...issueQuery(workspaceId ?? '', Number(issueNumber)),
+    enabled: issueNumber !== undefined && workspaceId !== undefined,
+  }).data
+  const workspace = useQuery({ ...workspaceQuery(workspaceId ?? ''), enabled: workspaceId !== undefined }).data
+  if (issueNumber && issue && workspace) {
+    return [{ label: issueIdentifier(workspace.issue_key, issue.number), to: pathname }]
+  }
   const item = docId ? doc : diagramId ? diagram : undefined
   const belongs =
     item && item.team_id === team.id && (workspaceId === undefined || item.workspace_id === workspaceId)

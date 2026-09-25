@@ -36,7 +36,8 @@ const items: Item[] = [
  * A plain popover (not a Radix menu) so the editor keeps focus and the
  * floating menu stays anchored to the line.
  */
-export function InsertMenu({ editor, onPickImage }: { editor: Editor; onPickImage: () => void }) {
+/** `onPickImage` omitted = no Image item (e.g. issue descriptions). */
+export function InsertMenu({ editor, onPickImage }: { editor: Editor; onPickImage?: () => void }) {
   const [open, setOpen] = useState(false)
 
   // Moving the cursor elsewhere closes the menu (the "+" follows the empty line).
@@ -89,14 +90,18 @@ export function InsertMenu({ editor, onPickImage }: { editor: Editor; onPickImag
             {items.map((item) => (
               <MenuItem key={item.label} item={item} onChoose={() => choose(item.run)} />
             ))}
-            <div className="my-1 h-px bg-border" />
-            <MenuItem
-              item={{ label: 'Image', hint: 'paste / drop', icon: ImagePlus, run: onPickImage }}
-              onChoose={() => {
-                setOpen(false)
-                onPickImage()
-              }}
-            />
+            {onPickImage && (
+              <>
+                <div className="my-1 h-px bg-border" />
+                <MenuItem
+                  item={{ label: 'Image', hint: 'paste / drop', icon: ImagePlus, run: onPickImage }}
+                  onChoose={() => {
+                    setOpen(false)
+                    onPickImage()
+                  }}
+                />
+              </>
+            )}
           </div>
         )}
       </div>
