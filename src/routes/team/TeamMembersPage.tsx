@@ -59,7 +59,7 @@ export function TeamMembersPage() {
   return (
     <>
       <PageHeader
-        title="Team members"
+        title="Group members"
         description={`${members.length} ${members.length === 1 ? 'person' : 'people'} in ${team.name}. Access to each course, project or workspace is assigned separately.`}
       />
 
@@ -100,7 +100,7 @@ export function TeamMembersPage() {
                       {canChangeRole && canRemove && <DropdownMenuSeparator />}
                       {canRemove && (
                         <DropdownMenuItem variant="destructive" onSelect={() => setRemoving(member)}>
-                          Remove from team
+                          Remove from group
                         </DropdownMenuItem>
                       )}
                     </DropdownMenuContent>

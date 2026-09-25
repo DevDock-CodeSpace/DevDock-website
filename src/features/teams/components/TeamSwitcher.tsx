@@ -41,7 +41,7 @@ export function TeamSwitcher() {
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent side={isMobile ? 'bottom' : 'right'} align="start" sideOffset={4} className="min-w-60">
-            <DropdownMenuLabel className="text-xs text-muted-foreground">Teams</DropdownMenuLabel>
+            <DropdownMenuLabel className="text-xs text-muted-foreground">Groups</DropdownMenuLabel>
             {memberships.map((m) => {
               const Icon = teamTypes[m.team.type].icon
               return (
@@ -62,7 +62,7 @@ export function TeamSwitcher() {
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
               <Link to="/onboarding">
-                <Plus /> Create or join a team
+                <Plus /> Create or join a group
               </Link>
             </DropdownMenuItem>
           </DropdownMenuContent>

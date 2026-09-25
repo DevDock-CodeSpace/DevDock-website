@@ -28,7 +28,7 @@ export async function teamLoader({ request, params }: LoaderFunctionArgs) {
   const user = await requireUser(request)
   const memberships = await queryClient.ensureQueryData(myTeamsQuery(user.id))
   const membership = memberships.find((m) => m.team.slug === params.teamSlug)
-  if (!membership) throw data('Team not found, or you’re not a member.', { status: 404 })
+  if (!membership) throw data('Group not found, or you’re not a member.', { status: 404 })
 
   rememberTeam(membership.team.slug)
   await Promise.all([

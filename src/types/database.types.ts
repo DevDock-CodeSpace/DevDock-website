@@ -69,12 +69,78 @@ export type Database = {
           },
         ]
       }
+      doc_folders: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          depth: number
+          id: string
+          name: string
+          parent_id: string | null
+          team_id: string
+          updated_at: string
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          depth: number
+          id?: string
+          name: string
+          parent_id?: string | null
+          team_id: string
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          depth?: number
+          id?: string
+          name?: string
+          parent_id?: string | null
+          team_id?: string
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "doc_folders_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "doc_folders_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "doc_folders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "doc_folders_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "doc_folders_workspace_team_fkey"
+            columns: ["workspace_id", "team_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id", "team_id"]
+          },
+        ]
+      }
       documents: {
         Row: {
           body: Json | null
           content: string
           created_at: string
           created_by: string | null
+          folder_id: string | null
           id: string
           team_id: string
           title: string
@@ -86,6 +152,7 @@ export type Database = {
           content?: string
           created_at?: string
           created_by?: string | null
+          folder_id?: string | null
           id?: string
           team_id: string
           title: string
@@ -97,6 +164,7 @@ export type Database = {
           content?: string
           created_at?: string
           created_by?: string | null
+          folder_id?: string | null
           id?: string
           team_id?: string
           title?: string
@@ -109,6 +177,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "doc_folders"
             referencedColumns: ["id"]
           },
           {

@@ -26,9 +26,9 @@ export function WorkspaceTabPage() {
         <p className="text-sm text-muted-foreground">{soon}</p>
         {isTeamTool(tab) && (
           <p className="text-sm text-muted-foreground">
-            This tab shows only {teamToolDefs[tab].items} assigned to {workspace.title}. For everything in the team, see{' '}
+            This tab shows only {teamToolDefs[tab].items} assigned to {workspace.title}. For everything in the group, see{' '}
             <Link to={`${teamPath(team.slug)}/${tab}`} className="underline underline-offset-4 hover:text-foreground">
-              Team {title}
+              Group {title}
             </Link>
             .
           </p>

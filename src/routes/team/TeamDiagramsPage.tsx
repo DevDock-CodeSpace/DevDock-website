@@ -16,7 +16,7 @@ export function TeamDiagramsPage() {
     <>
       <PageHeader
         title="Diagrams"
-        description={`Team-wide diagrams in ${team.name}, plus diagrams from the workspaces you can access.`}
+        description={`Group-wide diagrams in ${team.name}, plus diagrams from the workspaces you can access.`}
       >
         <CreateDiagramDialog />
       </PageHeader>
@@ -31,8 +31,8 @@ export function TeamDiagramsPage() {
         href={(diagram) => diagramPath(team.slug, diagram.id)}
         empty={
           can.isAdmin
-            ? 'No diagrams yet. Create a team-wide diagram, or one for a workspace.'
-            : 'No diagrams yet. Team owners/admins draw team-wide diagrams; workspace leads draw diagrams for their workspace.'
+            ? 'No diagrams yet. Create a group-wide diagram, or one for a workspace.'
+            : 'No diagrams yet. Group owners/admins draw group-wide diagrams; workspace leads draw diagrams for their workspace.'
         }
       />
     </>

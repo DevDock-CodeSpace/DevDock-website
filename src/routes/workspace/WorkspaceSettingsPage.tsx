@@ -31,7 +31,7 @@ export function WorkspaceSettingsPage() {
   if (!can.canEdit) {
     return (
       <p className="text-sm text-muted-foreground">
-        Only the workspace lead and team owners/admins can change workspace settings.
+        Only the workspace lead and group owners/admins can change workspace settings.
       </p>
     )
   }
@@ -173,7 +173,7 @@ function DangerSection() {
     <SettingsSection title="Danger zone" tone="danger" description="Irreversible actions.">
       <DangerRow
         title="Delete this workspace"
-        description="Removes it, its docs, and everyone’s access to it. People stay in the team. Team-wide docs aren’t affected."
+        description="Removes it, its docs, and everyone’s access to it. People stay in the group. Group-wide docs aren’t affected."
         action={
           <Button variant="destructive" size="sm" onClick={() => setConfirming(true)}>
             Delete

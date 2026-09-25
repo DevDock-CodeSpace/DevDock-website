@@ -4,6 +4,8 @@ DevDock is a private software-engineering teaching workspace for **one instructo
 
 ## Current status
 
+> **Naming:** the UI calls a team a **group** ("Group settings", "Group-wide", "Create or join a group"). Code, routes (`/t/:teamSlug`), query keys and the database still say **team**. Keep new user-facing text on "group"; don't rename code for it.
+
 **Phase 1 done: frontend shell.** React Router, Tailwind v4, shadcn/ui, and TanStack Query are installed. The app has a responsive sidebar layout, light/dark/system theme, and placeholder pages driven by mock data (replaced by real data in Phase 4). TipTap (Phase 5b) and React Flow (Phase 5c) are installed; Jitsi is not installed yet. **Add each piece only when a task needs it**, and don't build ahead.
 
 **Phase 2 done: Supabase foundation.** `@supabase/supabase-js`, a typed browser client (`src/lib/supabase.ts`), the `supabase/` CLI project, and the first migration (`profiles` + RLS + a sign-up trigger), **applied to the hosted project** (ref `ejqrrxxiatvvdiyxtvid`, linked via `supabase link`).
@@ -124,6 +126,10 @@ supabase/
   - Images are the custom `docImage` node, which stores a Storage **path** (`<team>/<doc>/<uuid>.<ext>`), never a URL; the view signs it (`docImageUrlQuery`). Upload with `uploadDocImage`. `deleteDocument` removes the doc's image folder first.
   - Collapsed headings are per-viewer plugin state (`CollapsibleHeadings.ts`), never saved.
   - Don't add paid TipTap extensions.
+- **Doc folders** (`doc_folders`, `features/docs/{folders.ts,components/DocBrowser.tsx}`):
+  - Folders are per scope (group-wide or one workspace), nest **at most 3 levels** (DB trigger sets `depth`), and use the documents access rules.
+  - The open folder is `?folder=<id>`; `documents.folder_id` must be in the doc's scope (trigger).
+  - Delete folders with `deleteFolder()`, which deletes the docs inside first so their Storage images go too; subfolders cascade.
 - **Diagram editor** (`features/diagrams/editor/`, page body `features/diagrams/components/DiagramView.tsx`, lazy-loaded by `routes/DiagramPage.tsx`):
   - `model.ts` is the saved format: node types `shape`/`icon`/`container`, edge type `connector`. `serialize()` saves only content (no selection or measurements), and `parse()` validates stored JSON. Colors are stored as keys (`colors.ts` maps them to Tailwind classes, so diagrams work in both themes). Icon keys in `icons.ts` are saved, so never rename one.
   - Layers: React Flow runs with `zIndexMode="manual"`. Containers sit below connectors, and connectors below shapes. `normalizeOrder()` keeps parents before children and sets the z-indexes, so call it after any reorder or reparent.
