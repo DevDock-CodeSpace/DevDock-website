@@ -494,6 +494,128 @@ export type Database = {
           },
         ]
       }
+      learning_modules: {
+        Row: {
+          created_at: string
+          id: string
+          position: number
+          title: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          position?: number
+          title: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          position?: number
+          title?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "learning_modules_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lesson_progress: {
+        Row: {
+          completed_at: string
+          lesson_id: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          completed_at?: string
+          lesson_id: string
+          user_id?: string
+          workspace_id: string
+        }
+        Update: {
+          completed_at?: string
+          lesson_id?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lesson_progress_lesson_fkey"
+            columns: ["lesson_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "lessons"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "lesson_progress_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lessons: {
+        Row: {
+          body: Json | null
+          created_at: string
+          created_by: string | null
+          id: string
+          module_id: string
+          position: number
+          title: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          body?: Json | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          module_id: string
+          position?: number
+          title: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          body?: Json | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          module_id?: string
+          position?: number
+          title?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lessons_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lessons_module_fkey"
+            columns: ["module_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "learning_modules"
+            referencedColumns: ["id", "workspace_id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -764,6 +886,14 @@ export type Database = {
       move_open_issues: {
         Args: { p_from: string; p_to: string }
         Returns: number
+      }
+      reorder_learning_modules: {
+        Args: { p_ids: string[]; p_workspace_id: string }
+        Returns: undefined
+      }
+      reorder_lessons: {
+        Args: { p_ids: string[]; p_module_id: string }
+        Returns: undefined
       }
       set_issue_labels: {
         Args: { p_issue_id: string; p_label_ids: string[] }

@@ -45,7 +45,7 @@ Live, Learning and the other tools are still placeholder pages. Current status a
 | Diagrams           | React Flow (`@xyflow/react`, MIT) | Own UI in DevDock's style (not an embed); stored as JSON in `diagrams.data`. Lazy-loaded with the diagram page |
 | Live sessions      | Jitsi Meet (embed)              | |
 | Code               | GitHub links                    | Link to repos/PRs; no GitHub API integration unless asked |
-| Hosting            | Vercel                          | Static SPA; `vercel.json` rewrites all paths to `index.html` |
+| Hosting            | Vercel                          | Static SPA; `vercel.json` rewrites every path except `/assets/*` to `index.html` (so a missing chunk is a real 404, not HTML) |
 
 ## Commands
 
@@ -105,7 +105,7 @@ supabase/
 - **Access checks in loaders** (`features/teams/loaders.ts`): `teamLoader` 404s when the user isn't a team member; `workspaceLoader` 404s when the workspace isn't visible (RLS) or belongs to another team.
 - **Current context:** `useCurrentTeam()` and `useCurrentWorkspace()` (`features/teams/hooks.ts`) return the entity, the user's role, and `can`, a permissions object from `features/teams/permissions.ts` that mirrors RLS. **`can` is for showing and hiding UI only.** Every write is re-checked by RLS. Type labels and icons are in `teamTypes` and `workspaceTypes` in the same file.
 - **Navigation:** the **sidebar is the hierarchy**: team switcher, Home, the **team tools** (Docs, Diagrams, Live; `TEAM_TOOLS`), the team's workspaces grouped by **workspace** type (Courses, Projects, Workspaces; empty sections hidden; team type only decides which section comes first and the default type for "+ New", via `workspaceTypeOrder`/`defaultWorkspaceType`), one "+ New", team Members and Settings. **Workspace features are horizontal tabs** under the workspace title (`WorkspaceLayout`), **generated from the workspace's enabled tools** (`workspace_modules`; `getWorkspaceTabs(teamSlug, id, modules)` in `features/teams/nav.ts`): Overview, then the tools in `MODULE_ORDER`, then Members. Workspace *type* only picks default tools (`defaultModules`, which mirrors `public.default_workspace_modules`). Create workspaces with `rpc('create_workspace')` and change tools with `rpc('set_workspace_modules')`; both are atomic and run under RLS. Don't put workspace features in the sidebar.
-- **Team tools vs workspace tabs:** Docs, Diagrams and Live exist at both levels as views of the same data. Rows have `team_id` (required) + `workspace_id` (nullable: null = team-wide; composite FK `(workspace_id, team_id) → workspaces(id, team_id)` keeps it in the same team). The team page shows everything the caller can access; the workspace tab shows only that workspace's rows. Docs and Diagrams are built this way (`documents`/`diagrams`, `Team…Page`/`Workspace…Page`, one `DocPage`/`DiagramPage` for both routes, `docLoader`/`diagramLoader`); Live still uses the placeholder `TeamToolPage`. The "New …" dialog is the shared `CreateInScopeDialog`. Built workspace tools sit under `WorkspaceToolGate`, which 404s when the tool is off. Issues, Learning, Exercises, GitHub and Resources are workspace-only.
+- **Team tools vs workspace tabs:** Docs, Diagrams and Live exist at both levels as views of the same data. Rows have `team_id` (required) + `workspace_id` (nullable: null = team-wide; composite FK `(workspace_id, team_id) → workspaces(id, team_id)` keeps it in the same team). The team page shows everything the caller can access; the workspace tab shows only that workspace's rows. Docs and Diagrams are built this way (`documents`/`diagrams`, `Team…Page`/`Workspace…Page`, one `DocPage`/`DiagramPage` for both routes, `docLoader`/`diagramLoader`); Live still uses the placeholder `TeamToolPage`. The "New …" dialog is the shared `CreateInScopeDialog`. Built workspace tools sit under `WorkspaceToolGate`, which 404s when the tool is off. Issues, Learning, Exercises and GitHub are workspace-only. **Resources was retired** (Docs with folders replaces it): the `'resources'` enum value remains in the database but is blocked by `workspace_modules_no_resources`, and `WorkspaceModule` excludes it.
 - **Issues** (`features/issues/`, routes `…/w/:id/issues` (`?view=board`) and `…/issues/:issueNumber`, `issueLoader`):
   - Rows are addressed by **number within the workspace**, not UUID. The identifier is `issueIdentifier(workspace.issue_key, number)`.
   - `number`, `team_id` and `created_by` are set by DB triggers (`private.issue_counters`). The assignee-is-a-member, same-workspace-parent and no-loop rules are enforced by the `check_issue` trigger.
@@ -126,6 +126,11 @@ supabase/
   - Images are the custom `docImage` node, which stores a Storage **path** (`<team>/<doc>/<uuid>.<ext>`), never a URL; the view signs it (`docImageUrlQuery`). Upload with `uploadDocImage`. `deleteDocument` removes the doc's image folder first.
   - Collapsed headings are per-viewer plugin state (`CollapsibleHeadings.ts`), never saved.
   - Don't add paid TipTap extensions.
+- **Learning** (`features/learning/`, routes `…/w/:id/learning`, `…/learning/progress`, `…/learning/:lessonId` with `lessonLoader`):
+  - Structure: `learning_modules` → `lessons` (TipTap `body`, same editor as Docs, no images) → `lesson_progress` (a lesson marked done by a user).
+  - Positions: new items go last (trigger), and moving a lesson to another module puts it last. Reorder with `rpc('reorder_learning_modules')` / `rpc('reorder_lessons')`.
+  - Access: managers edit the outline; everyone in the workspace reads it. You mark and unmark only your own progress; managers read everyone's (Class progress).
+  - `useLearning()` gives the outline in reading order, your done set and the next lesson.
 - **Doc folders** (`doc_folders`, `features/docs/{folders.ts,components/DocBrowser.tsx}`):
   - Folders are per scope (group-wide or one workspace), nest **at most 3 levels** (DB trigger sets `depth`), and use the documents access rules.
   - The open folder is `?folder=<id>`; `documents.folder_id` must be in the doc's scope (trigger).
@@ -135,6 +140,7 @@ supabase/
   - Layers: React Flow runs with `zIndexMode="manual"`. Containers sit below connectors, and connectors below shapes. `normalizeOrder()` keeps parents before children and sets the z-indexes, so call it after any reorder or reparent.
   - Undo is snapshot-based (`useHistory`). Call `snapshot()` *before* every change.
 - **Leaving or deleting** the current team or workspace: navigate away *first*, then invalidate (see `useExitTeam`). Otherwise the page crashes when its data disappears, or `/app` bounces back through the stale cache.
+- **Deploys and open tabs:** a tab opened before a deploy can't load the new build's lazy chunks. `lib/stale-build.ts` reloads once (`vite:preloadError`, plus `RouteErrorPage` as a fallback), guarded against loops. Route errors never show raw error text.
 - Avoid `Date.now()` in render (oxlint `react/purity`); capture it with `useState(Date.now)`.
 
 ### UI

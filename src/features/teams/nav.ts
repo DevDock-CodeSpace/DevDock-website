@@ -2,7 +2,6 @@ import {
   BookOpen,
   CircleDot,
   FileText,
-  FolderGit2,
   GitPullRequest,
   Home,
   LayoutDashboard,
@@ -102,13 +101,12 @@ export const workspaceTabDefs: Record<
   { title: string; icon: LucideIcon; hint?: string; soon?: string }
 > = {
   overview: { title: 'Overview', icon: LayoutDashboard },
-  learning: { title: 'Learning', icon: BookOpen, hint: 'Lessons and paths', soon: 'Lessons and learning paths will live here.' },
+  learning: { title: 'Learning', icon: BookOpen, hint: 'Modules, lessons and progress' },
   issues: { title: 'Issues', icon: CircleDot, hint: 'Linear-style tasks and bugs' },
   docs: { title: 'Docs', icon: FileText, hint: 'Pages and notes', soon: 'Docs assigned to this workspace will live here.' },
   diagrams: { title: 'Diagrams', icon: Workflow, hint: 'Architecture and flow diagrams', soon: 'Diagrams assigned to this workspace will live here.' },
   exercises: { title: 'Exercises', icon: Shapes, hint: 'Practice and submissions', soon: 'Exercises and submissions will live here.' },
   github: { title: 'GitHub', icon: GitPullRequest, hint: 'Repos and pull requests', soon: 'Linked repositories and pull requests will show up here.' },
-  resources: { title: 'Resources', icon: FolderGit2, hint: 'Links and files', soon: 'Links, repositories, and files will live here.' },
   live: { title: 'Live', icon: Video, hint: 'Sessions (Jitsi)', soon: 'Live sessions for this workspace will start from here.' },
   members: { title: 'Members', icon: Users },
 }
@@ -121,15 +119,14 @@ export const MODULE_ORDER: WorkspaceModule[] = [
   'diagrams',
   'exercises',
   'github',
-  'resources',
   'live',
 ]
 
 /** Mirrors public.default_workspace_modules() in the database. Defaults only. */
 export const defaultModules: Record<WorkspaceType, WorkspaceModule[]> = {
   project: ['issues', 'docs', 'diagrams', 'github', 'live'],
-  course: ['learning', 'docs', 'diagrams', 'exercises', 'resources', 'live'],
-  general: ['docs', 'diagrams', 'resources', 'live'],
+  course: ['learning', 'docs', 'diagrams', 'exercises', 'live'],
+  general: ['docs', 'diagrams', 'live'],
 }
 
 export function sortModules(modules: readonly WorkspaceModule[]): WorkspaceModule[] {
@@ -156,3 +153,10 @@ export function getWorkspaceTabs(
     end: id === 'overview',
   }))
 }
+
+/** A workspace's course outline, one lesson, and the managers' progress table. */
+export const learningPath = (teamSlug: string, workspaceId: string) => `${workspacePath(teamSlug, workspaceId)}/learning`
+export const lessonPath = (teamSlug: string, workspaceId: string, lessonId: string) =>
+  `${learningPath(teamSlug, workspaceId)}/${lessonId}`
+export const learningProgressPath = (teamSlug: string, workspaceId: string) =>
+  `${learningPath(teamSlug, workspaceId)}/progress`

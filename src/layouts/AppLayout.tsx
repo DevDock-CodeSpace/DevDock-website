@@ -17,6 +17,7 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/s
 import { diagramQuery } from '@/features/diagrams/api'
 import { documentQuery } from '@/features/docs/api'
 import { issueQuery } from '@/features/issues/api'
+import { lessonQuery } from '@/features/learning/api'
 import { issueIdentifier } from '@/features/issues/meta'
 import { useCurrentTeam, useCurrentWorkspace } from '@/features/teams/hooks'
 import { getTeamNav, getWorkspaceTabs, teamPath, workspacePath, type NavItem } from '@/features/teams/nav'
@@ -91,7 +92,7 @@ function WorkspaceBreadcrumb() {
  * crumb, but only where its loader would show it (same team/workspace).
  */
 function useItemCrumb(): Crumb[] {
-  const { docId, diagramId, issueNumber, cycleNumber, workspaceId } = useParams()
+  const { docId, diagramId, issueNumber, cycleNumber, lessonId, workspaceId } = useParams()
   const { pathname } = useLocation()
   const { team } = useCurrentTeam()
   const doc = useQuery({ ...documentQuery(docId ?? ''), enabled: docId !== undefined }).data
@@ -101,6 +102,9 @@ function useItemCrumb(): Crumb[] {
     enabled: issueNumber !== undefined && workspaceId !== undefined,
   }).data
   const workspace = useQuery({ ...workspaceQuery(workspaceId ?? ''), enabled: workspaceId !== undefined }).data
+  const lesson = useQuery({ ...lessonQuery(lessonId ?? ''), enabled: lessonId !== undefined }).data
+  if (lessonId && lesson && lesson.workspace_id === workspaceId) return [{ label: lesson.title, to: pathname }]
+  if (workspaceId && pathname.endsWith('/learning/progress')) return [{ label: 'Class progress', to: pathname }]
   if (issueNumber && issue && workspace) {
     return [{ label: issueIdentifier(workspace.issue_key, issue.number), to: pathname }]
   }

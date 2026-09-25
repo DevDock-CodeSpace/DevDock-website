@@ -12,14 +12,15 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
-/** Name a new folder, or rename one. `onSubmit` rejects with a user-facing error. */
-export function FolderNameDialog({
+/** Name something new (folder, module, lesson) or rename it. `onSubmit` rejects with a user-facing error. */
+export function NameDialog({
   open,
   onOpenChange,
   title,
   description,
   initialName = '',
   submitLabel,
+  placeholder = '',
   onSubmit,
 }: {
   open: boolean
@@ -28,6 +29,7 @@ export function FolderNameDialog({
   description: string
   initialName?: string
   submitLabel: string
+  placeholder?: string
   onSubmit: (name: string) => Promise<void>
 }) {
   const [name, setName] = useState(initialName)
@@ -58,12 +60,12 @@ export function FolderNameDialog({
             <DialogDescription>{description}</DialogDescription>
           </DialogHeader>
           <div className="space-y-1.5">
-            <Label htmlFor="folder-name">Name</Label>
+            <Label htmlFor="item-name">Name</Label>
             <Input
-              id="folder-name"
+              id="item-name"
               value={name}
               maxLength={100}
-              placeholder="Week 1"
+              placeholder={placeholder}
               autoFocus
               onChange={(e) => setName(e.target.value)}
             />
