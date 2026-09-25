@@ -1,78 +1,114 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
-import { ArrowRight, Users } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import { Link } from 'react-router'
-import { PageHeader } from '@/components/PageHeader'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { PersonAvatar } from '@/components/PersonRow'
 import { useCurrentTeam, useCurrentWorkspace } from '@/features/teams/hooks'
-import { getWorkspaceNav, workspacePath } from '@/features/teams/nav'
+import { getWorkspaceTabs, workspacePath, workspaceTabDefs } from '@/features/teams/nav'
 import { workspaceRoleLabel, workspaceTypes } from '@/features/teams/permissions'
 import { workspaceMembersQuery } from '@/features/workspaces/api'
+import { formatDate } from '@/lib/format'
 
-const UPCOMING = new Set(['Lessons', 'Live Session', 'Resources'])
+const PREVIEW = 6
 
+/** Flat overview: about + upcoming sections on the left, people + details on the right. */
 export function WorkspaceOverviewPage() {
   const { team } = useCurrentTeam()
-  const { workspace, workspaceRole } = useCurrentWorkspace()
+  const { workspace, can } = useCurrentWorkspace()
   const members = useSuspenseQuery(workspaceMembersQuery(workspace.id)).data
-  const leads = members.filter((m) => m.role === 'lead')
   const base = workspacePath(team.slug, workspace.id)
-  const { label: typeLabel, icon: TypeIcon } = workspaceTypes[workspace.type]
-  const upcoming = getWorkspaceNav(team.slug, workspace.id, workspace.type).filter((i) => UPCOMING.has(i.title))
+  const leads = members.filter((m) => m.role === 'lead')
+  // Leads first, then everyone else in join order.
+  const people = [...leads, ...members.filter((m) => m.role !== 'lead')]
+  // The not-yet-built feature tabs for this workspace type.
+  const sections = getWorkspaceTabs(team.slug, workspace.id, workspace.type).filter((tab) => workspaceTabDefs[tab.id].soon)
 
   return (
-    <>
-      <PageHeader title={workspace.title} description={workspace.description ?? undefined}>
-        <Badge variant="outline" className="gap-1 font-normal">
-          <TypeIcon className="size-3" />
-          {typeLabel}
-        </Badge>
-        <Badge variant={workspaceRole === 'lead' ? 'default' : workspaceRole ? 'secondary' : 'outline'}>
-          {workspaceRole ? workspaceRoleLabel[workspaceRole] : 'Team admin'}
-        </Badge>
-      </PageHeader>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardDescription>People</CardDescription>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="size-4 text-muted-foreground" />
-              {members.length} {members.length === 1 ? 'member' : 'members'}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
+    <div className="grid gap-10 xl:grid-cols-[minmax(0,1fr)_300px]">
+      <div className="min-w-0 space-y-10">
+        <section className="space-y-2">
+          <h2 className="text-sm font-semibold">About</h2>
+          {workspace.description ? (
+            <p className="max-w-prose whitespace-pre-wrap text-[15px] leading-relaxed">{workspace.description}</p>
+          ) : (
             <p className="text-sm text-muted-foreground">
-              {leads.length > 0
-                ? `Led by ${leads.map((l) => l.profile?.display_name ?? 'a member').join(', ')}`
-                : 'No lead assigned yet.'}
+              No description yet.
+              {can.canEdit && (
+                <>
+                  {' '}
+                  <Link to={`${base}/settings`} className="underline underline-offset-4 hover:text-foreground">
+                    Add one
+                  </Link>
+                </>
+              )}
             </p>
-            <Link to={`${base}/members`} className="inline-flex items-center gap-1 text-sm font-medium hover:underline">
-              View members <ArrowRight className="size-4" />
-            </Link>
-          </CardContent>
-        </Card>
+          )}
+        </section>
 
-        <Card>
-          <CardHeader>
-            <CardDescription>Coming next</CardDescription>
-            <CardTitle>Workspace content</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {upcoming.map((item) => (
-              <Link
-                key={item.to}
-                to={item.to}
-                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
-              >
-                <item.icon className="size-4" />
-                {item.title}
-                <span className="ml-auto font-mono text-xs">soon</span>
-              </Link>
-            ))}
-          </CardContent>
-        </Card>
+        <section className="space-y-2">
+          <h2 className="text-sm font-semibold">In this {workspaceTypes[workspace.type].label.toLowerCase()}</h2>
+          <ul className="divide-y border-y">
+            {sections.map((section) => {
+              return (
+                <li key={section.to}>
+                  <Link
+                    to={section.to}
+                    className="group flex items-center gap-3 px-1 py-2.5 text-sm hover:bg-muted/40"
+                  >
+                    <section.icon className="size-4 text-muted-foreground" />
+                    <span className="font-medium">{section.title}</span>
+                    <span className="hidden truncate text-muted-foreground sm:inline">{workspaceTabDefs[section.id].soon}</span>
+                    <span className="ml-auto shrink-0 font-mono text-xs text-muted-foreground">soon</span>
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
+        </section>
       </div>
-    </>
+
+      <aside className="space-y-10 xl:border-l xl:pl-8">
+        <section className="space-y-3">
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-sm font-semibold">People</h2>
+            <span className="font-mono text-xs text-muted-foreground">{members.length}</span>
+          </div>
+          {members.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nobody has been added yet.</p>
+          ) : (
+            <ul className="space-y-2">
+              {people.slice(0, PREVIEW).map((member) => (
+                <li key={member.user_id} className="flex items-center gap-2.5 text-sm">
+                  <PersonAvatar profile={member.profile} />
+                  <span className="min-w-0 flex-1 truncate">{member.profile?.display_name ?? 'Unnamed member'}</span>
+                  <span className={member.role === 'lead' ? 'text-xs font-medium text-brand' : 'text-xs text-muted-foreground'}>
+                    {workspaceRoleLabel[member.role]}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <Link
+            to={`${base}/members`}
+            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          >
+            {members.length > PREVIEW ? `All ${members.length} members` : 'Manage members'} <ArrowRight className="size-3.5" />
+          </Link>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold">Details</h2>
+          <dl className="grid grid-cols-[88px_minmax(0,1fr)] gap-y-2 text-sm">
+            <dt className="text-muted-foreground">Type</dt>
+            <dd>{workspaceTypes[workspace.type].label}</dd>
+            <dt className="text-muted-foreground">Team</dt>
+            <dd className="truncate">{team.name}</dd>
+            <dt className="text-muted-foreground">Created</dt>
+            <dd className="font-mono text-xs leading-5">{formatDate(workspace.created_at)}</dd>
+            <dt className="text-muted-foreground">Updated</dt>
+            <dd className="font-mono text-xs leading-5">{formatDate(workspace.updated_at)}</dd>
+          </dl>
+        </section>
+      </aside>
+    </div>
   )
 }

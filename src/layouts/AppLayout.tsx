@@ -14,7 +14,7 @@ import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 import { useCurrentTeam, useCurrentWorkspace } from '@/features/teams/hooks'
-import { getTeamNav, getWorkspaceNav, teamPath, workspacePath } from '@/features/teams/nav'
+import { getTeamNav, getWorkspaceTabs, teamPath, workspacePath, type NavItem } from '@/features/teams/nav'
 
 // The shadcn sidebar writes its open/collapsed state to this cookie but doesn't read it back.
 const sidebarStartsOpen = () => !document.cookie.includes('sidebar_state=false')
@@ -26,7 +26,7 @@ export function AppLayout() {
     <SidebarProvider defaultOpen={sidebarStartsOpen()}>
       <AppSidebar />
       <SidebarInset>
-        <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur">
+        <header className="sticky top-0 z-10 flex h-12 shrink-0 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur md:px-6">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4 data-vertical:self-center" />
           {workspaceId ? <WorkspaceBreadcrumb /> : <TeamBreadcrumb />}
@@ -34,8 +34,9 @@ export function AppLayout() {
             <ThemeToggle />
           </div>
         </header>
-        <div className="flex-1 px-4 py-6 md:px-8 md:py-8">
-          <div className="mx-auto w-full max-w-5xl">
+        {/* Left-aligned next to the sidebar, not a narrow centered column. */}
+        <div className="flex-1 px-4 py-6 md:px-8 md:py-8 lg:px-12">
+          <div className="w-full max-w-[1200px]">
             {/* Pages may load secondary data with useSuspenseQuery. */}
             <Suspense fallback={<PageSkeleton />}>
               <Outlet />
@@ -51,14 +52,19 @@ type Crumb = { label: string; to: string }
 
 function TeamBreadcrumb() {
   const { team } = useCurrentTeam()
-  const section = useSection(getTeamNav(team.slug))
+  const { members, settings } = getTeamNav(team.slug)
+  const section = useSection([members, settings])
   return <Crumbs crumbs={[{ label: team.name, to: teamPath(team.slug) }, ...section]} />
 }
 
 function WorkspaceBreadcrumb() {
   const { team } = useCurrentTeam()
   const { workspace } = useCurrentWorkspace()
-  const section = useSection(getWorkspaceNav(team.slug, workspace.id, workspace.type))
+  const base = workspacePath(team.slug, workspace.id)
+  const section = useSection([
+    ...getWorkspaceTabs(team.slug, workspace.id, workspace.type),
+    { title: 'Settings', to: `${base}/settings`, icon: getTeamNav(team.slug).settings.icon },
+  ])
   return (
     <Crumbs
       crumbs={[
@@ -71,7 +77,7 @@ function WorkspaceBreadcrumb() {
 }
 
 /** The current non-index nav item as a crumb, if any. */
-function useSection(items: ReturnType<typeof getTeamNav>): Crumb[] {
+function useSection(items: NavItem[]): Crumb[] {
   const { pathname } = useLocation()
   const item = items.find((i) => !i.end && matchPath({ path: i.to, end: false }, pathname))
   return item ? [{ label: item.title, to: item.to }] : []

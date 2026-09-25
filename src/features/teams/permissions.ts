@@ -64,3 +64,10 @@ export const defaultWorkspaceType: Record<TeamType, WorkspaceType> = {
   development: 'project',
   general: 'general',
 }
+
+/** What a team calls its workspaces, by team type. */
+export const workspaceNoun: Record<TeamType, { singular: string; plural: string }> = {
+  learning: { singular: 'Course', plural: 'Courses' },
+  development: { singular: 'Project', plural: 'Projects' },
+  general: { singular: 'Workspace', plural: 'Workspaces' },
+}

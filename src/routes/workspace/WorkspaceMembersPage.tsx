@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
-import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -72,19 +71,22 @@ export function WorkspaceMembersPage() {
 
   return (
     <>
-      <PageHeader
-        title="Members"
-        description={`${members.length} ${members.length === 1 ? 'person' : 'people'} in ${workspace.title}.`}
-      >
+      <div className="mb-3 flex items-center justify-between gap-4">
+        <div>
+          <h2 className="text-sm font-semibold">Members</h2>
+          <p className="text-sm text-muted-foreground">
+            {members.length} {members.length === 1 ? 'person' : 'people'}. Leads manage the workspace; members use it.
+          </p>
+        </div>
         {can.canAddMembers && <AddWorkspaceMembersDialog />}
-      </PageHeader>
+      </div>
 
       {members.length === 0 ? (
-        <p className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
+        <p className="border-y py-10 text-center text-sm text-muted-foreground">
           Nobody has been added to this workspace yet.
         </p>
       ) : (
-        <ul className="divide-y rounded-lg border bg-card">
+        <ul className="divide-y border-y">
           {members.map((member) => {
             const isYou = member.user_id === user.id
             const canChangeRole = can.canAssignLeads

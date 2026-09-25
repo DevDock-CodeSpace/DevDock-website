@@ -17,7 +17,7 @@ import { PersonRow } from '@/components/PersonRow'
 import { removeTeamMember, setTeamRole, teamMembersQuery, type TeamMember } from '@/features/teams/api'
 import { InvitesPanel } from '@/features/teams/components/InvitesPanel'
 import { useCurrentTeam } from '@/features/teams/hooks'
-import { teamRoleLabel } from '@/features/teams/permissions'
+import { teamRoleLabel, workspaceNoun } from '@/features/teams/permissions'
 import { errorMessage } from '@/lib/errors'
 
 const joinedFormat = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
@@ -59,11 +59,11 @@ export function TeamMembersPage() {
   return (
     <>
       <PageHeader
-        title="Members"
-        description={`${members.length} ${members.length === 1 ? 'person' : 'people'} in ${team.name}. Workspace access is assigned per workspace.`}
+        title="Team members"
+        description={`${members.length} ${members.length === 1 ? 'person' : 'people'} in ${team.name}. Access to ${workspaceNoun[team.type].plural.toLowerCase()} is assigned separately.`}
       />
 
-      <ul className="divide-y rounded-lg border bg-card">
+      <ul className="-mt-6 divide-y border-b">
         {members.map((member) => {
           const isYou = member.user_id === user.id
           const canChangeRole = can.canChangeRoles && !isYou && member.role !== 'owner'
@@ -75,7 +75,7 @@ export function TeamMembersPage() {
               isYou={isYou}
               role={teamRoleLabel[member.role]}
               highlight={member.role === 'owner'}
-              meta={`Joined ${joinedFormat.format(new Date(member.joined_at))}`}
+              meta={`joined ${joinedFormat.format(new Date(member.joined_at))}`}
               actions={
                 (canChangeRole || canRemove) && (
                   <DropdownMenu>

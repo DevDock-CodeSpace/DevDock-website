@@ -50,7 +50,7 @@ export function AddWorkspaceMembersDialog() {
       }}
     >
       <DialogTrigger asChild>
-        <Button>
+        <Button size="sm">
           <UserPlus /> Add people
         </Button>
       </DialogTrigger>

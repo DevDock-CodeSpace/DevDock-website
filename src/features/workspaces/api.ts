@@ -10,8 +10,9 @@ export type Workspace = Pick<
   Tables<'workspaces'>,
   'id' | 'team_id' | 'title' | 'description' | 'type' | 'created_at' | 'updated_at'
 >
-export type WorkspaceSummary = Pick<Tables<'workspaces'>, 'id' | 'title' | 'description' | 'type'> & {
+export type WorkspaceSummary = Pick<Tables<'workspaces'>, 'id' | 'title' | 'description' | 'type' | 'updated_at'> & {
   memberCount: number
+  leads: NonNullable<PersonProfile>[]
 }
 export type WorkspaceMember = { user_id: string; role: WorkspaceRole; joined_at: string; profile: PersonProfile }
 
@@ -24,13 +25,18 @@ export const teamWorkspacesQuery = (teamId: string) =>
     queryFn: async (): Promise<WorkspaceSummary[]> => {
       const { data, error } = await supabase
         .from('workspaces')
-        .select('id, title, description, type, workspace_members(count)')
+        .select('id, title, description, type, updated_at, workspace_members(role, profile:profiles(display_name, avatar_url))')
         .eq('team_id', teamId)
         .order('title')
       if (error) throw toDataError('load workspaces', error)
+      // Rosters are small (a class or project group), so fetching them beats a second query.
       return data.map(({ workspace_members, ...workspace }) => ({
         ...workspace,
-        memberCount: workspace_members[0]?.count ?? 0,
+        memberCount: workspace_members.length,
+        leads: workspace_members
+          .filter((m) => m.role === 'lead')
+          .map((m) => m.profile)
+          .filter((p): p is NonNullable<PersonProfile> => p !== null),
       }))
     },
   })

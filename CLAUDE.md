@@ -82,11 +82,11 @@ supabase/
     - `/app` redirects to the last-used team, or to `/onboarding` when the user has none.
     - `/onboarding`
     - `/t/:teamSlug` (the team's workspaces), plus `members` and `settings`.
-    - `/t/:teamSlug/w/:workspaceId` (overview), plus `lessons` (course type only in the nav), `live`, `resources`, `members` and `settings`.
+    - `/t/:teamSlug/w/:workspaceId` (overview), plus `members` and `settings`; every other feature tab is `:tab`, checked against the workspace type in `WorkspaceTabPage`.
   - `/` redirects to `/app`.
 - **Access checks in loaders** (`features/teams/loaders.ts`): `teamLoader` 404s when the user isn't a team member; `workspaceLoader` 404s when the workspace isn't visible (RLS) or belongs to another team.
 - **Current context:** `useCurrentTeam()` and `useCurrentWorkspace()` (`features/teams/hooks.ts`) return the entity, the user's role, and `can`, a permissions object from `features/teams/permissions.ts` that mirrors RLS. **`can` is for showing and hiding UI only.** Every write is re-checked by RLS. Type labels and icons are in `teamTypes` and `workspaceTypes` in the same file.
-- **Navigation:** sidebar and breadcrumb items come from `features/teams/nav.ts` (`teamPath`, `workspacePath`, `getTeamNav`, `getWorkspaceNav`).
+- **Navigation:** the **sidebar is the hierarchy**: team switcher, Home, the team's workspaces (labelled by team type: Courses, Projects or Workspaces; see `workspaceNoun`), "+ New", team Members and Settings. **Workspace features are horizontal tabs** under the workspace title (`WorkspaceLayout`); tab sets per workspace type are in `features/teams/nav.ts` (`getWorkspaceTabs`, `workspaceTabDefs`). Don't put workspace features in the sidebar.
 - **Data pattern:** `features/<name>/api.ts` exports `queryOptions` and mutation functions.
   - Loaders prime what the shell needs with `ensureQueryData`. Pages read with `useSuspenseQuery`; `AppLayout` has a Suspense boundary, so pages may also load secondary data that way.
   - Errors go through `lib/errors.ts` (`toDataError`, `requireAffected`), because RLS makes forbidden UPDATE/DELETE return 0 rows, not an error. Show them with `toast.error(errorMessage(e))`.
@@ -98,7 +98,7 @@ supabase/
 
 - shadcn/ui uses the `radix-nova` style (`components.json`); add components with `npx shadcn@latest add <name>`. Class merging uses `cn()` from `@/lib/utils`, which re-exports shadcn's official `cn` package.
 - Theme: `.dark` class on `<html>`, set by `ThemeProvider` (localStorage key `devdock-theme`) and by an inline script in `index.html` that prevents a theme flash on load. Use the semantic color tokens (`bg-background`, `text-muted-foreground`, …), never raw grays.
-- Visual tone: developer workspace. Neutral palette, Geist Sans, and Geist Mono (`font-mono`) for codes, numbers, handles, and times.
+- **Visual tone:** a modern developer tool, as dense as Linear and as readable as Notion. Content aligns left next to the sidebar (max ~1200px), not in a centered column. Prefer lists, typography and hairline separators over cards; use `PageHeader`, `SettingsSection`/`DangerRow` and `PersonRow`. **DevDock blue is an accent only** (`text-brand`/`bg-brand`: active tab underline, active nav icon, lead/owner labels, focus ring). Geist Sans, with Geist Mono for codes, numbers and times.
 - **Brand:** the product is **DevDock**. Show the logo only through `LogoMark` / `LogoWordmark` in `src/components/Logo.tsx`; `LogoWordmark` switches to the light-text version in dark mode. Don't hand-edit files in `src/assets/brand/` or the favicons in `public/`; they're generated from `brand/source/` by `brand/build.py` (see `brand/README.md`).
 - `.oxlintrc.json` turns off two rules for generated shadcn files only. Don't widen that override to app code.
 

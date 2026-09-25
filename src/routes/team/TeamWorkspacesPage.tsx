@@ -1,91 +1,112 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
-import { ArrowRight, LayoutGrid, Users } from 'lucide-react'
+import { useState } from 'react'
 import { Link } from 'react-router'
 import { PageHeader } from '@/components/PageHeader'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { AvatarStack } from '@/components/PersonRow'
 import { useAuth } from '@/features/auth/hooks'
 import { useCurrentTeam } from '@/features/teams/hooks'
 import { workspacePath } from '@/features/teams/nav'
-import { workspaceRoleLabel, workspaceTypes } from '@/features/teams/permissions'
+import { workspaceNoun, workspaceRoleLabel, workspaceTypes } from '@/features/teams/permissions'
 import { myWorkspaceRolesQuery, teamWorkspacesQuery } from '@/features/workspaces/api'
 import { CreateWorkspaceDialog } from '@/features/workspaces/components/CreateWorkspaceDialog'
+import { timeAgo } from '@/lib/format'
 
-/** Team home: the workspaces the user can see. */
+// name | type | leads | members | your role | updated
+const columns = 'md:grid-cols-[minmax(0,1fr)_96px_132px_72px_88px_104px]'
+
+/** Team home: a dense, scannable list of the workspaces the user can see. */
 export function TeamWorkspacesPage() {
   const { user } = useAuth()
   const { team, can } = useCurrentTeam()
   const workspaces = useSuspenseQuery(teamWorkspacesQuery(team.id)).data
   const myRoles = useSuspenseQuery(myWorkspaceRolesQuery(team.id, user.id)).data
+  const [now] = useState(Date.now)
+  const noun = workspaceNoun[team.type]
 
   return (
     <>
       <PageHeader
-        title="Workspaces"
+        title={team.name}
         description={
-          can.canManageWorkspaces ? 'Every workspace in this team.' : 'Workspaces you’ve been added to in this team.'
+          can.canManageWorkspaces
+            ? `All ${noun.plural.toLowerCase()} in this team.`
+            : `${noun.plural} you’ve been added to in this team.`
         }
       >
         {can.canManageWorkspaces && <CreateWorkspaceDialog />}
       </PageHeader>
 
+      <div className="mb-2 flex items-baseline justify-between">
+        <h2 className="text-sm font-semibold">{noun.plural}</h2>
+        <span className="font-mono text-xs text-muted-foreground">{workspaces.length}</span>
+      </div>
+
       {workspaces.length === 0 ? (
-        <EmptyState canCreate={can.canManageWorkspaces} />
+        <p className="border-y py-10 text-center text-sm text-muted-foreground">
+          {can.canManageWorkspaces
+            ? `No ${noun.plural.toLowerCase()} yet. Create one, then add people from this team to it.`
+            : `You haven’t been added to any ${noun.plural.toLowerCase()} yet. Ask a team owner or admin.`}
+        </p>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          {workspaces.map((workspace) => {
-            const myRole = myRoles[workspace.id]
-            const { label: typeLabel, icon: TypeIcon } = workspaceTypes[workspace.type]
-            return (
-              <Card key={workspace.id} className="transition-shadow hover:ring-foreground/25">
-                <CardHeader>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="outline" className="gap-1 font-normal">
-                      <TypeIcon className="size-3" />
-                      {typeLabel}
-                    </Badge>
-                    {myRole ? (
-                      <Badge variant={myRole === 'lead' ? 'default' : 'secondary'}>{workspaceRoleLabel[myRole]}</Badge>
-                    ) : (
-                      <Badge variant="outline">Team admin</Badge>
-                    )}
-                    <span className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
-                      <Users className="size-3" />
-                      {workspace.memberCount}
-                    </span>
-                  </div>
-                  <CardTitle className="pt-2 text-lg">{workspace.title}</CardTitle>
-                  {workspace.description && (
-                    <CardDescription className="line-clamp-2">{workspace.description}</CardDescription>
-                  )}
-                </CardHeader>
-                <CardFooter>
+        <div className="border-y">
+          <div
+            className={`hidden gap-4 border-b px-3 py-2 font-mono text-[11px] uppercase tracking-wide text-muted-foreground md:grid ${columns}`}
+          >
+            <span>Name</span>
+            <span>Type</span>
+            <span>Lead</span>
+            <span className="text-right">Members</span>
+            <span>You</span>
+            <span className="text-right">Updated</span>
+          </div>
+          <ul className="divide-y">
+            {workspaces.map((workspace) => {
+              const { label: typeLabel, icon: TypeIcon } = workspaceTypes[workspace.type]
+              const myRole = myRoles[workspace.id]
+              return (
+                <li key={workspace.id}>
                   <Link
                     to={workspacePath(team.slug, workspace.id)}
-                    className="inline-flex items-center gap-1 text-sm font-medium hover:underline"
+                    className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-3 py-2.5 transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none ${columns}`}
                   >
-                    Open workspace <ArrowRight className="size-4" />
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <TypeIcon className="size-4 shrink-0 text-muted-foreground" />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{workspace.title}</p>
+                        {workspace.description && (
+                          <p className="truncate text-xs text-muted-foreground">{workspace.description}</p>
+                        )}
+                      </div>
+                    </div>
+                    <span className="hidden text-sm text-muted-foreground md:block">{typeLabel}</span>
+                    <span className="hidden items-center gap-2 md:flex">
+                      {workspace.leads.length > 0 ? (
+                        <>
+                          <AvatarStack people={workspace.leads} max={2} />
+                          <span className="truncate text-xs text-muted-foreground">
+                            {workspace.leads[0].display_name?.split(' ')[0]}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </span>
+                    <span className="hidden text-right font-mono text-xs text-muted-foreground md:block">
+                      {workspace.memberCount}
+                    </span>
+                    <span className={`text-xs ${myRole === 'lead' ? 'font-medium text-brand' : 'text-muted-foreground'}`}>
+                      {myRole ? workspaceRoleLabel[myRole] : 'Admin'}
+                    </span>
+                    <span className="hidden text-right font-mono text-xs text-muted-foreground md:block">
+                      {timeAgo(workspace.updated_at, now)}
+                    </span>
                   </Link>
-                </CardFooter>
-              </Card>
-            )
-          })}
+                </li>
+              )
+            })}
+          </ul>
         </div>
       )}
     </>
-  )
-}
-
-function EmptyState({ canCreate }: { canCreate: boolean }) {
-  return (
-    <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed px-6 py-16 text-center">
-      <LayoutGrid className="size-8 text-muted-foreground" />
-      <p className="font-medium">No workspaces yet</p>
-      <p className="max-w-sm text-sm text-muted-foreground">
-        {canCreate
-          ? 'Create the first workspace (a course, a project, or anything else), then add people from this team to it.'
-          : 'You haven’t been added to any workspaces in this team. Ask an owner or admin to add you.'}
-      </p>
-    </div>
   )
 }

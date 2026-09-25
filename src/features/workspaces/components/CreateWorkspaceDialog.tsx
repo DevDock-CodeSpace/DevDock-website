@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { LoaderCircle, Plus } from 'lucide-react'
-import { useState, type FormEvent } from 'react'
+import { useState, type FormEvent, type ReactNode } from 'react'
 import { useNavigate } from 'react-router'
 import { Button } from '@/components/ui/button'
 import {
@@ -17,12 +17,14 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useCurrentTeam } from '@/features/teams/hooks'
 import { workspacePath } from '@/features/teams/nav'
-import { defaultWorkspaceType } from '@/features/teams/permissions'
+import { defaultWorkspaceType, workspaceNoun } from '@/features/teams/permissions'
 import { createWorkspace, type WorkspaceType } from '../api'
 import { WorkspaceTypeSelect } from './WorkspaceTypeSelect'
 
-export function CreateWorkspaceDialog() {
+/** `trigger` lets the sidebar open it with its own menu item. */
+export function CreateWorkspaceDialog({ trigger }: { trigger?: ReactNode }) {
   const { team } = useCurrentTeam()
+  const noun = workspaceNoun[team.type].singular
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
@@ -58,14 +60,16 @@ export function CreateWorkspaceDialog() {
       }}
     >
       <DialogTrigger asChild>
-        <Button>
-          <Plus /> New workspace
-        </Button>
+        {trigger ?? (
+          <Button size="sm">
+            <Plus /> New {noun.toLowerCase()}
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent>
         <form onSubmit={submit} className="space-y-4">
           <DialogHeader>
-            <DialogTitle>New workspace</DialogTitle>
+            <DialogTitle>New {noun.toLowerCase()}</DialogTitle>
             <DialogDescription>
               Only team owners and admins see it until you add people to it.
             </DialogDescription>
@@ -105,7 +109,7 @@ export function CreateWorkspaceDialog() {
           <DialogFooter>
             <Button type="submit" disabled={!title.trim() || create.isPending}>
               {create.isPending && <LoaderCircle className="animate-spin" />}
-              Create workspace
+              Create {noun.toLowerCase()}
             </Button>
           </DialogFooter>
         </form>

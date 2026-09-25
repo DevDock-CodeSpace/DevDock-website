@@ -1,4 +1,3 @@
-import { BookOpen, FolderGit2, Video } from 'lucide-react'
 import { createBrowserRouter, Outlet, redirect } from 'react-router'
 import { AuthLoading } from '@/features/auth/components/AuthLoading'
 import { authCallbackLoader, loginLoader } from '@/features/auth/loaders'
@@ -13,10 +12,11 @@ import { OnboardingPage } from '@/routes/OnboardingPage'
 import { TeamMembersPage } from '@/routes/team/TeamMembersPage'
 import { TeamSettingsPage } from '@/routes/team/TeamSettingsPage'
 import { TeamWorkspacesPage } from '@/routes/team/TeamWorkspacesPage'
-import { ComingSoonPage } from '@/routes/workspace/ComingSoonPage'
+import { WorkspaceLayout } from '@/routes/workspace/WorkspaceLayout'
 import { WorkspaceMembersPage } from '@/routes/workspace/WorkspaceMembersPage'
 import { WorkspaceOverviewPage } from '@/routes/workspace/WorkspaceOverviewPage'
 import { WorkspaceSettingsPage } from '@/routes/workspace/WorkspaceSettingsPage'
+import { WorkspaceTabPage } from '@/routes/workspace/WorkspaceTabPage'
 
 export const router = createBrowserRouter([
   { path: '/', loader: () => redirect('/app') },
@@ -61,40 +61,13 @@ export const router = createBrowserRouter([
                 // Visible to team owners/admins and workspace members (workspaceLoader + RLS).
                 path: 'w/:workspaceId',
                 loader: workspaceLoader,
+                element: <WorkspaceLayout />,
                 children: [
                   { index: true, element: <WorkspaceOverviewPage /> },
-                  {
-                    path: 'lessons',
-                    element: (
-                      <ComingSoonPage
-                        title="Lessons"
-                        icon={BookOpen}
-                        description="Lessons will live here once the lesson editor ships."
-                      />
-                    ),
-                  },
-                  {
-                    path: 'live',
-                    element: (
-                      <ComingSoonPage
-                        title="Live Session"
-                        icon={Video}
-                        description="Scheduled sessions and the live room (Jitsi) are coming in a later phase."
-                      />
-                    ),
-                  },
-                  {
-                    path: 'resources',
-                    element: (
-                      <ComingSoonPage
-                        title="Resources"
-                        icon={FolderGit2}
-                        description="Links, repositories, and diagrams shared with the workspace are coming soon."
-                      />
-                    ),
-                  },
                   { path: 'members', element: <WorkspaceMembersPage /> },
                   { path: 'settings', element: <WorkspaceSettingsPage /> },
+                  // Feature tabs that don't exist yet (Docs, Live, …); validated per workspace type.
+                  { path: ':tab', element: <WorkspaceTabPage /> },
                 ],
               },
             ],

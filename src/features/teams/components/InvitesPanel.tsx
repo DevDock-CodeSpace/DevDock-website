@@ -38,10 +38,10 @@ export function InvitesPanel() {
   })
 
   return (
-    <section className="mt-12">
+    <section className="mt-10">
       <div className="mb-3 flex items-end justify-between gap-4">
         <div>
-          <h2 className="font-medium">Invite codes</h2>
+          <h2 className="text-sm font-semibold">Invite codes</h2>
           <p className="text-sm text-muted-foreground">
             Anyone with a valid code can join as a <strong className="font-medium">member</strong>. Share it privately.
           </p>
@@ -50,11 +50,11 @@ export function InvitesPanel() {
       </div>
 
       {invites.length === 0 ? (
-        <div className="flex items-center gap-3 rounded-lg border border-dashed px-4 py-6 text-sm text-muted-foreground">
+        <div className="flex items-center gap-3 border-y px-3 py-6 text-sm text-muted-foreground">
           <Ticket className="size-4" /> No invite codes yet.
         </div>
       ) : (
-        <ul className="divide-y rounded-lg border bg-card">
+        <ul className="divide-y border-y">
           {invites.map((invite) => (
             <InviteRow
               key={invite.id}
@@ -95,8 +95,8 @@ function InviteRow({
   }
 
   return (
-    <li className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
-      <code className={`font-mono text-base tracking-wider ${active ? '' : 'text-muted-foreground line-through'}`}>
+    <li className="flex flex-wrap items-center gap-x-4 gap-y-2 px-3 py-2.5 hover:bg-muted/40">
+      <code className={`font-mono text-sm tracking-wider ${active ? '' : 'text-muted-foreground line-through'}`}>
         {invite.code}
       </code>
       {!active && <Badge variant="outline">{expired ? 'Expired' : 'Used up'}</Badge>}
