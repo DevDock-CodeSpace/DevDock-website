@@ -126,6 +126,11 @@ supabase/
   - Images are the custom `docImage` node, which stores a Storage **path** (`<team>/<doc>/<uuid>.<ext>`), never a URL; the view signs it (`docImageUrlQuery`). Upload with `uploadDocImage`. `deleteDocument` removes the doc's image folder first.
   - Collapsed headings are per-viewer plugin state (`CollapsibleHeadings.ts`), never saved.
   - Don't add paid TipTap extensions.
+- **Learning** (`features/learning/`, routes `…/w/:id/learning`, `…/learning/progress`, `…/learning/:lessonId` with `lessonLoader`):
+  - Structure: `learning_modules` → `lessons` (TipTap `body`, same editor as Docs, no images) → `lesson_progress` (a lesson marked done by a user).
+  - Positions: new items go last (trigger), and moving a lesson to another module puts it last. Reorder with `rpc('reorder_learning_modules')` / `rpc('reorder_lessons')`.
+  - Access: managers edit the outline; everyone in the workspace reads it. You mark and unmark only your own progress; managers read everyone's (Class progress).
+  - `useLearning()` gives the outline in reading order, your done set and the next lesson.
 - **Doc folders** (`doc_folders`, `features/docs/{folders.ts,components/DocBrowser.tsx}`):
   - Folders are per scope (group-wide or one workspace), nest **at most 3 levels** (DB trigger sets `depth`), and use the documents access rules.
   - The open folder is `?folder=<id>`; `documents.folder_id` must be in the doc's scope (trigger).

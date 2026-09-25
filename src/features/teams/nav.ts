@@ -101,7 +101,7 @@ export const workspaceTabDefs: Record<
   { title: string; icon: LucideIcon; hint?: string; soon?: string }
 > = {
   overview: { title: 'Overview', icon: LayoutDashboard },
-  learning: { title: 'Learning', icon: BookOpen, hint: 'Lessons and paths', soon: 'Lessons and learning paths will live here.' },
+  learning: { title: 'Learning', icon: BookOpen, hint: 'Modules, lessons and progress' },
   issues: { title: 'Issues', icon: CircleDot, hint: 'Linear-style tasks and bugs' },
   docs: { title: 'Docs', icon: FileText, hint: 'Pages and notes', soon: 'Docs assigned to this workspace will live here.' },
   diagrams: { title: 'Diagrams', icon: Workflow, hint: 'Architecture and flow diagrams', soon: 'Diagrams assigned to this workspace will live here.' },
@@ -153,3 +153,10 @@ export function getWorkspaceTabs(
     end: id === 'overview',
   }))
 }
+
+/** A workspace's course outline, one lesson, and the managers' progress table. */
+export const learningPath = (teamSlug: string, workspaceId: string) => `${workspacePath(teamSlug, workspaceId)}/learning`
+export const lessonPath = (teamSlug: string, workspaceId: string, lessonId: string) =>
+  `${learningPath(teamSlug, workspaceId)}/${lessonId}`
+export const learningProgressPath = (teamSlug: string, workspaceId: string) =>
+  `${learningPath(teamSlug, workspaceId)}/progress`

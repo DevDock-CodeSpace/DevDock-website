@@ -4,6 +4,7 @@ import { useState, type DragEvent, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
+import { NameDialog } from '@/components/NameDialog'
 import { PersonAvatar } from '@/components/PersonRow'
 import { Button } from '@/components/ui/button'
 import {
@@ -27,7 +28,6 @@ import {
 } from '../api'
 import { folderPath, folderSubtree } from '../folders'
 import { CreateDocDialog } from './CreateDocDialog'
-import { FolderNameDialog } from './FolderNameDialog'
 import { MoveDocDialog } from './MoveDocDialog'
 
 /** dataTransfer type for dragging a doc onto a folder or breadcrumb. */
@@ -255,7 +255,7 @@ export function DocBrowser({ teamId, workspaceId, docs, folders, canWrite, docHr
         <p className="mt-2 text-xs text-muted-foreground">Tip: drag a doc onto a folder, or onto the path above, to move it.</p>
       )}
 
-      <FolderNameDialog
+      <NameDialog
         key={naming ? (naming.mode === 'rename' ? `rename-${naming.folder.id}` : 'create') : 'name-closed'}
         open={naming !== null}
         onOpenChange={(o) => !o && setNaming(null)}
@@ -267,6 +267,7 @@ export function DocBrowser({ teamId, workspaceId, docs, folders, canWrite, docHr
         }
         initialName={naming?.mode === 'rename' ? naming.folder.name : ''}
         submitLabel={naming?.mode === 'rename' ? 'Rename' : 'Create folder'}
+        placeholder="Week 1"
         onSubmit={async (name) => {
           if (naming?.mode === 'rename') await renameFolder(naming.folder.id, name)
           else await createFolder({ teamId, workspaceId, parentId: current?.id ?? null, name })
