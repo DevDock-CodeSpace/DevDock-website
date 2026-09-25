@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuth } from '@/features/auth/hooks'
 import { deleteTeam, removeTeamMember, updateTeam, type TeamType } from '@/features/teams/api'
 import { useCurrentTeam, useExitTeam } from '@/features/teams/hooks'
-import { teamRoleLabel, teamTypes, workspaceNoun } from '@/features/teams/permissions'
+import { defaultWorkspaceType, teamRoleLabel, teamTypes, workspaceTypes } from '@/features/teams/permissions'
 import { errorMessage } from '@/lib/errors'
 
 export function TeamSettingsPage() {
@@ -55,7 +55,7 @@ function GeneralSection() {
       title="General"
       description={
         can.canEditTeam
-          ? `The type decides what the team calls its spaces (${workspaceNoun[type].plural}).`
+          ? `The type picks the default for new workspaces (${workspaceTypes[defaultWorkspaceType[type]].noun}) and which sidebar section comes first. Any team can hold courses, projects and workspaces.`
           : 'Only owners and admins can change these.'
       }
     >

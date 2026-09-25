@@ -18,7 +18,7 @@ import { UserMenu } from '@/features/auth/components/UserMenu'
 import { TeamSwitcher } from '@/features/teams/components/TeamSwitcher'
 import { useCurrentTeam } from '@/features/teams/hooks'
 import { getTeamNav, workspacePath, type NavItem } from '@/features/teams/nav'
-import { workspaceNoun, workspaceTypes } from '@/features/teams/permissions'
+import { workspaceTypeOrder, workspaceTypes } from '@/features/teams/permissions'
 import { teamWorkspacesQuery } from '@/features/workspaces/api'
 import { CreateWorkspaceDialog } from '@/features/workspaces/components/CreateWorkspaceDialog'
 
@@ -26,8 +26,10 @@ import { CreateWorkspaceDialog } from '@/features/workspaces/components/CreateWo
 const activeIcon = 'data-active:[&_svg]:text-brand'
 
 /**
- * The sidebar is the hierarchy: team → its workspaces. Workspace features
- * (docs, live, …) are tabs under the workspace title, not sidebar items.
+ * The sidebar is the hierarchy: team → its workspaces, grouped by workspace
+ * type (Courses, Projects, Workspaces). The team tools on top (Docs, Diagrams,
+ * Live) are team-wide views; inside a workspace the same tools are tabs that
+ * show only that workspace's items. Workspace features are never sidebar items.
  */
 export function AppSidebar() {
   const { team, can } = useCurrentTeam()
@@ -35,7 +37,10 @@ export function AppSidebar() {
   const { pathname } = useLocation()
   const { isMobile, setOpenMobile } = useSidebar()
   const nav = getTeamNav(team.slug)
-  const noun = workspaceNoun[team.type]
+  // One section per workspace type that has items; the team type only decides which comes first.
+  const sections = workspaceTypeOrder(team.type)
+    .map((type) => ({ type, items: workspaces.filter((w) => w.type === type) }))
+    .filter((section) => section.items.length > 0)
   const close = () => isMobile && setOpenMobile(false)
 
   return (
@@ -48,50 +53,62 @@ export function AppSidebar() {
         <SidebarGroup className="pb-0">
           <SidebarMenu>
             <NavLinkItem item={nav.home} onNavigate={close} />
+            {nav.tools.map((item) => (
+              <NavLinkItem key={item.id} item={item} onNavigate={close} />
+            ))}
           </SidebarMenu>
         </SidebarGroup>
 
-        <SidebarGroup>
-          <SidebarGroupLabel>{noun.plural}</SidebarGroupLabel>
-          <SidebarMenu>
-            {workspaces.map((workspace) => {
-              const to = workspacePath(team.slug, workspace.id)
-              const Icon = workspaceTypes[workspace.type].icon
-              return (
-                <SidebarMenuItem key={workspace.id}>
-                  <SidebarMenuButton
-                    asChild
-                    tooltip={workspace.title}
-                    className={activeIcon}
-                    isActive={matchPath({ path: to, end: false }, pathname) !== null}
-                  >
-                    <Link to={to} onClick={close}>
-                      <Icon />
-                      <span>{workspace.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )
-            })}
-            {workspaces.length === 0 && !can.canManageWorkspaces && (
-              <li className="px-2 py-1 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
-                You haven’t been added to any {noun.plural.toLowerCase()} yet.
-              </li>
-            )}
-            {can.canManageWorkspaces && (
-              <SidebarMenuItem>
-                <CreateWorkspaceDialog
-                  trigger={
-                    <SidebarMenuButton tooltip={`New ${noun.singular.toLowerCase()}`} className="text-muted-foreground">
-                      <Plus />
-                      <span>New {noun.singular.toLowerCase()}</span>
+        {sections.map(({ type, items }) => (
+          <SidebarGroup key={type} className="pb-0">
+            <SidebarGroupLabel>{workspaceTypes[type].plural}</SidebarGroupLabel>
+            <SidebarMenu>
+              {items.map((workspace) => {
+                const to = workspacePath(team.slug, workspace.id)
+                const Icon = workspaceTypes[workspace.type].icon
+                return (
+                  <SidebarMenuItem key={workspace.id}>
+                    <SidebarMenuButton
+                      asChild
+                      tooltip={workspace.title}
+                      className={activeIcon}
+                      isActive={matchPath({ path: to, end: false }, pathname) !== null}
+                    >
+                      <Link to={to} onClick={close}>
+                        <Icon />
+                        <span>{workspace.title}</span>
+                      </Link>
                     </SidebarMenuButton>
-                  }
-                />
-              </SidebarMenuItem>
-            )}
-          </SidebarMenu>
-        </SidebarGroup>
+                  </SidebarMenuItem>
+                )
+              })}
+            </SidebarMenu>
+          </SidebarGroup>
+        ))}
+
+        {(can.canManageWorkspaces || workspaces.length === 0) && (
+          <SidebarGroup className={sections.length > 0 ? 'pt-0' : undefined}>
+            <SidebarMenu>
+              {workspaces.length === 0 && !can.canManageWorkspaces && (
+                <li className="px-2 py-1 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
+                  You haven’t been added to anything in this team yet.
+                </li>
+              )}
+              {can.canManageWorkspaces && (
+                <SidebarMenuItem>
+                  <CreateWorkspaceDialog
+                    trigger={
+                      <SidebarMenuButton tooltip="New" className="text-muted-foreground">
+                        <Plus />
+                        <span>New</span>
+                      </SidebarMenuButton>
+                    }
+                  />
+                </SidebarMenuItem>
+              )}
+            </SidebarMenu>
+          </SidebarGroup>
+        )}
 
         <SidebarGroup>
           <SidebarGroupLabel>Team</SidebarGroupLabel>

@@ -2,6 +2,7 @@ import { createBrowserRouter, Outlet, redirect } from 'react-router'
 import { AuthLoading } from '@/features/auth/components/AuthLoading'
 import { authCallbackLoader, loginLoader } from '@/features/auth/loaders'
 import { watchAuthIdentity } from '@/features/auth/session'
+import { TEAM_TOOLS } from '@/features/teams/nav'
 import { appIndexLoader, onboardingLoader, teamLoader, workspaceLoader } from '@/features/teams/loaders'
 import { AppLayout } from '@/layouts/AppLayout'
 import { APP_ROUTE_ID, appLoader } from '@/layouts/app-loader'
@@ -11,6 +12,7 @@ import { NotFoundPage, RouteErrorPage } from '@/routes/NotFoundPage'
 import { OnboardingPage } from '@/routes/OnboardingPage'
 import { TeamMembersPage } from '@/routes/team/TeamMembersPage'
 import { TeamSettingsPage } from '@/routes/team/TeamSettingsPage'
+import { TeamToolPage } from '@/routes/team/TeamToolPage'
 import { TeamWorkspacesPage } from '@/routes/team/TeamWorkspacesPage'
 import { WorkspaceLayout } from '@/routes/workspace/WorkspaceLayout'
 import { WorkspaceMembersPage } from '@/routes/workspace/WorkspaceMembersPage'
@@ -57,6 +59,8 @@ export const router = createBrowserRouter([
               { index: true, element: <TeamWorkspacesPage /> },
               { path: 'members', element: <TeamMembersPage /> },
               { path: 'settings', element: <TeamSettingsPage /> },
+              // Team-wide views of Docs, Diagrams, Live (placeholders for now).
+              ...TEAM_TOOLS.map((tool) => ({ path: tool, element: <TeamToolPage tool={tool} /> })),
               {
                 // Visible to team owners/admins and workspace members (workspaceLoader + RLS).
                 path: 'w/:workspaceId',

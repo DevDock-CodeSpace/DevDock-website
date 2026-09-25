@@ -191,6 +191,32 @@ export type Database = {
           },
         ]
       }
+      workspace_modules: {
+        Row: {
+          created_at: string
+          module: Database["public"]["Enums"]["workspace_module"]
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          module: Database["public"]["Enums"]["workspace_module"]
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          module?: Database["public"]["Enums"]["workspace_module"]
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_modules_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspaces: {
         Row: {
           created_at: string
@@ -237,11 +263,41 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_workspace: {
+        Args: {
+          p_description: string
+          p_modules: Database["public"]["Enums"]["workspace_module"][]
+          p_team_id: string
+          p_title: string
+          p_type: Database["public"]["Enums"]["workspace_type"]
+        }
+        Returns: string
+      }
+      default_workspace_modules: {
+        Args: { workspace_type: Database["public"]["Enums"]["workspace_type"] }
+        Returns: Database["public"]["Enums"]["workspace_module"][]
+      }
       join_team: { Args: { invite_code: string }; Returns: string }
+      set_workspace_modules: {
+        Args: {
+          p_modules: Database["public"]["Enums"]["workspace_module"][]
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       team_role: "owner" | "admin" | "member"
       team_type: "development" | "learning" | "general"
+      workspace_module:
+        | "issues"
+        | "docs"
+        | "diagrams"
+        | "github"
+        | "live"
+        | "learning"
+        | "exercises"
+        | "resources"
       workspace_role: "lead" | "member"
       workspace_type: "project" | "course" | "general"
     }
@@ -373,6 +429,16 @@ export const Constants = {
     Enums: {
       team_role: ["owner", "admin", "member"],
       team_type: ["development", "learning", "general"],
+      workspace_module: [
+        "issues",
+        "docs",
+        "diagrams",
+        "github",
+        "live",
+        "learning",
+        "exercises",
+        "resources",
+      ],
       workspace_role: ["lead", "member"],
       workspace_type: ["project", "course", "general"],
     },

@@ -52,8 +52,8 @@ type Crumb = { label: string; to: string }
 
 function TeamBreadcrumb() {
   const { team } = useCurrentTeam()
-  const { members, settings } = getTeamNav(team.slug)
-  const section = useSection([members, settings])
+  const { tools, members, settings } = getTeamNav(team.slug)
+  const section = useSection([...tools, members, settings])
   return <Crumbs crumbs={[{ label: team.name, to: teamPath(team.slug) }, ...section]} />
 }
 
@@ -62,7 +62,7 @@ function WorkspaceBreadcrumb() {
   const { workspace } = useCurrentWorkspace()
   const base = workspacePath(team.slug, workspace.id)
   const section = useSection([
-    ...getWorkspaceTabs(team.slug, workspace.id, workspace.type),
+    ...getWorkspaceTabs(team.slug, workspace.id, workspace.modules),
     { title: 'Settings', to: `${base}/settings`, icon: getTeamNav(team.slug).settings.icon },
   ])
   return (

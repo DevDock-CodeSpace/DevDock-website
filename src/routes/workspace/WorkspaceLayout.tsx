@@ -9,7 +9,7 @@ import { workspaceRoleLabel, workspaceTypes } from '@/features/teams/permissions
 import { workspaceMembersQuery } from '@/features/workspaces/api'
 import { cn } from '@/lib/utils'
 
-/** Workspace header (title, type, role, leads) + horizontal feature tabs. */
+/** Workspace header (type · your workspace role, title, leads) + horizontal feature tabs. */
 export function WorkspaceLayout() {
   const { team } = useCurrentTeam()
   const { workspace, workspaceRole, can } = useCurrentWorkspace()
@@ -22,11 +22,20 @@ export function WorkspaceLayout() {
     <>
       <header className="flex items-start justify-between gap-4">
         <div className="min-w-0 space-y-1.5">
-          <p className="flex items-center gap-1.5 font-mono text-xs text-muted-foreground">
+          {/* Workspace context only: type · your workspace role. Team owners/admins who
+              aren't in the workspace see just the type; their access is shown by the
+              settings/manage controls, not a label. */}
+          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <TypeIcon className="size-3.5" />
-            {typeLabel.toLowerCase()}
-            <span aria-hidden>·</span>
-            {workspaceRole ? workspaceRoleLabel[workspaceRole].toLowerCase() : 'team admin'}
+            {typeLabel}
+            {workspaceRole && (
+              <>
+                <span aria-hidden>·</span>
+                <span className={workspaceRole === 'lead' ? 'font-medium text-brand' : undefined}>
+                  {workspaceRoleLabel[workspaceRole]}
+                </span>
+              </>
+            )}
           </p>
           <h1 className="truncate text-2xl font-semibold tracking-tight">{workspace.title}</h1>
         </div>
@@ -54,7 +63,7 @@ export function WorkspaceLayout() {
         className="-mx-4 mt-5 overflow-x-auto overflow-y-hidden border-b [scrollbar-width:none] md:mx-0 [&::-webkit-scrollbar]:hidden"
       >
         <ul className="flex gap-1 px-4 md:px-0">
-          {getWorkspaceTabs(team.slug, workspace.id, workspace.type).map((tab) => (
+          {getWorkspaceTabs(team.slug, workspace.id, workspace.modules).map((tab) => (
             <li key={tab.to}>
               <NavLink
                 to={tab.to}

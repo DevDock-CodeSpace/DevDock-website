@@ -6,11 +6,17 @@ import type { Database, Tables, TablesInsert } from '@/types/database.types'
 
 export type WorkspaceRole = Database['public']['Enums']['workspace_role']
 export type WorkspaceType = Database['public']['Enums']['workspace_type']
+export type WorkspaceModule = Database['public']['Enums']['workspace_module']
 export type Workspace = Pick<
   Tables<'workspaces'>,
   'id' | 'team_id' | 'title' | 'description' | 'type' | 'created_at' | 'updated_at'
->
+> & {
+  /** Enabled tools; drives the workspace tabs. */
+  modules: WorkspaceModule[]
+}
 export type WorkspaceSummary = Pick<Tables<'workspaces'>, 'id' | 'title' | 'description' | 'type' | 'updated_at'> & {
+  /** Enabled tools (used by the team-level tool pages). */
+  modules: WorkspaceModule[]
   memberCount: number
   leads: NonNullable<PersonProfile>[]
 }
@@ -25,13 +31,16 @@ export const teamWorkspacesQuery = (teamId: string) =>
     queryFn: async (): Promise<WorkspaceSummary[]> => {
       const { data, error } = await supabase
         .from('workspaces')
-        .select('id, title, description, type, updated_at, workspace_members(role, profile:profiles(display_name, avatar_url))')
+        .select(
+          'id, title, description, type, updated_at, workspace_modules(module), workspace_members(role, profile:profiles(display_name, avatar_url))',
+        )
         .eq('team_id', teamId)
         .order('title')
       if (error) throw toDataError('load workspaces', error)
       // Rosters are small (a class or project group), so fetching them beats a second query.
-      return data.map(({ workspace_members, ...workspace }) => ({
+      return data.map(({ workspace_members, workspace_modules, ...workspace }) => ({
         ...workspace,
+        modules: workspace_modules.map((m) => m.module),
         memberCount: workspace_members.length,
         leads: workspace_members
           .filter((m) => m.role === 'lead')
@@ -63,11 +72,13 @@ export const workspaceQuery = (workspaceId: string) =>
     queryFn: async (): Promise<Workspace | null> => {
       const { data, error } = await supabase
         .from('workspaces')
-        .select('id, team_id, title, description, type, created_at, updated_at')
+        .select('id, team_id, title, description, type, created_at, updated_at, workspace_modules(module)')
         .eq('id', workspaceId)
         .maybeSingle()
       if (error) throw toDataError('load the workspace', error)
-      return data
+      if (!data) return null
+      const { workspace_modules, ...workspace } = data
+      return { ...workspace, modules: workspace_modules.map((m) => m.module) }
     },
   })
 
@@ -89,19 +100,26 @@ export const workspaceMembersQuery = (workspaceId: string) =>
 
 type WorkspaceInput = { title: string; description: string; type: WorkspaceType }
 
-export async function createWorkspace(teamId: string, input: WorkspaceInput): Promise<{ id: string }> {
-  const { data, error } = await supabase
-    .from('workspaces')
-    .insert({
-      team_id: teamId,
-      title: input.title.trim(),
-      description: input.description.trim() || null,
-      type: input.type,
-    })
-    .select('id')
-    .single()
+/** Creates the workspace and its enabled tools in one transaction (RPC, runs under RLS). */
+export async function createWorkspace(
+  teamId: string,
+  input: WorkspaceInput & { modules: WorkspaceModule[] },
+): Promise<{ id: string }> {
+  const { data, error } = await supabase.rpc('create_workspace', {
+    p_team_id: teamId,
+    p_title: input.title.trim(),
+    p_description: input.description.trim(),
+    p_type: input.type,
+    p_modules: input.modules,
+  })
   if (error) throw toDataError('create the workspace', error)
-  return data
+  return { id: data }
+}
+
+/** Replaces the workspace's enabled tools (team owner/admin or workspace lead). */
+export async function setWorkspaceModules(workspaceId: string, modules: WorkspaceModule[]) {
+  const { error } = await supabase.rpc('set_workspace_modules', { p_workspace_id: workspaceId, p_modules: modules })
+  if (error) throw toDataError('save the tools', error)
 }
 
 export async function updateWorkspace(workspaceId: string, input: WorkspaceInput) {

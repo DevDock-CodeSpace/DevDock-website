@@ -1,17 +1,18 @@
-import { useParams } from 'react-router'
-import { useCurrentWorkspace } from '@/features/teams/hooks'
-import { hasWorkspaceTab, workspaceTabDefs } from '@/features/teams/nav'
+import { Link, useParams } from 'react-router'
+import { useCurrentTeam, useCurrentWorkspace } from '@/features/teams/hooks'
+import { hasWorkspaceTab, isTeamTool, teamPath, teamToolDefs, workspaceTabDefs } from '@/features/teams/nav'
 
-/** Tabs whose features don't exist yet (Docs, Live, …). Unknown tabs for this type → not found. */
+/** Enabled tools whose features don't exist yet (Docs, Live, …). Tools not enabled here → not found. */
 export function WorkspaceTabPage() {
   const { tab = '' } = useParams()
+  const { team } = useCurrentTeam()
   const { workspace } = useCurrentWorkspace()
 
-  if (!hasWorkspaceTab(workspace.type, tab) || !workspaceTabDefs[tab].soon) {
+  if (!hasWorkspaceTab(workspace.modules, tab) || !workspaceTabDefs[tab].soon) {
     return (
       <div className="py-16 text-center">
         <p className="font-mono text-sm text-muted-foreground">404</p>
-        <p className="mt-1 font-medium">This page doesn’t exist in this workspace.</p>
+        <p className="mt-1 font-medium">This tool isn’t enabled in this workspace.</p>
       </div>
     )
   }
@@ -27,6 +28,15 @@ export function WorkspaceTabPage() {
           {title} <span className="ml-1 font-mono text-xs font-normal text-muted-foreground">coming soon</span>
         </p>
         <p className="text-sm text-muted-foreground">{soon}</p>
+        {isTeamTool(tab) && (
+          <p className="text-sm text-muted-foreground">
+            This tab shows only {teamToolDefs[tab].items} assigned to {workspace.title}. For everything in the team, see{' '}
+            <Link to={`${teamPath(team.slug)}/${tab}`} className="underline underline-offset-4 hover:text-foreground">
+              Team {title}
+            </Link>
+            .
+          </p>
+        )}
       </div>
     </div>
   )

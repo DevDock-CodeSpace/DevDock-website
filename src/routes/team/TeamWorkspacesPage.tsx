@@ -6,7 +6,7 @@ import { AvatarStack } from '@/components/PersonRow'
 import { useAuth } from '@/features/auth/hooks'
 import { useCurrentTeam } from '@/features/teams/hooks'
 import { workspacePath } from '@/features/teams/nav'
-import { workspaceNoun, workspaceRoleLabel, workspaceTypes } from '@/features/teams/permissions'
+import { workspaceRoleLabel, workspaceTypes } from '@/features/teams/permissions'
 import { myWorkspaceRolesQuery, teamWorkspacesQuery } from '@/features/workspaces/api'
 import { CreateWorkspaceDialog } from '@/features/workspaces/components/CreateWorkspaceDialog'
 import { timeAgo } from '@/lib/format'
@@ -21,7 +21,6 @@ export function TeamWorkspacesPage() {
   const workspaces = useSuspenseQuery(teamWorkspacesQuery(team.id)).data
   const myRoles = useSuspenseQuery(myWorkspaceRolesQuery(team.id, user.id)).data
   const [now] = useState(Date.now)
-  const noun = workspaceNoun[team.type]
 
   return (
     <>
@@ -29,23 +28,23 @@ export function TeamWorkspacesPage() {
         title={team.name}
         description={
           can.canManageWorkspaces
-            ? `All ${noun.plural.toLowerCase()} in this team.`
-            : `${noun.plural} you’ve been added to in this team.`
+            ? 'All courses, projects and workspaces in this team.'
+            : 'What you’ve been added to in this team.'
         }
       >
         {can.canManageWorkspaces && <CreateWorkspaceDialog />}
       </PageHeader>
 
       <div className="mb-2 flex items-baseline justify-between">
-        <h2 className="text-sm font-semibold">{noun.plural}</h2>
+        <h2 className="text-sm font-semibold">All</h2>
         <span className="font-mono text-xs text-muted-foreground">{workspaces.length}</span>
       </div>
 
       {workspaces.length === 0 ? (
         <p className="border-y py-10 text-center text-sm text-muted-foreground">
           {can.canManageWorkspaces
-            ? `No ${noun.plural.toLowerCase()} yet. Create one, then add people from this team to it.`
-            : `You haven’t been added to any ${noun.plural.toLowerCase()} yet. Ask a team owner or admin.`}
+            ? 'Nothing here yet. Create a course, project or workspace, then add people from this team to it.'
+            : 'You haven’t been added to anything in this team yet. Ask a team owner or admin.'}
         </p>
       ) : (
         <div className="border-y">

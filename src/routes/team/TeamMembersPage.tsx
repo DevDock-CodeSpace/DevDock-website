@@ -17,7 +17,7 @@ import { PersonRow } from '@/components/PersonRow'
 import { removeTeamMember, setTeamRole, teamMembersQuery, type TeamMember } from '@/features/teams/api'
 import { InvitesPanel } from '@/features/teams/components/InvitesPanel'
 import { useCurrentTeam } from '@/features/teams/hooks'
-import { teamRoleLabel, workspaceNoun } from '@/features/teams/permissions'
+import { teamRoleLabel } from '@/features/teams/permissions'
 import { errorMessage } from '@/lib/errors'
 
 const joinedFormat = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
@@ -60,7 +60,7 @@ export function TeamMembersPage() {
     <>
       <PageHeader
         title="Team members"
-        description={`${members.length} ${members.length === 1 ? 'person' : 'people'} in ${team.name}. Access to ${workspaceNoun[team.type].plural.toLowerCase()} is assigned separately.`}
+        description={`${members.length} ${members.length === 1 ? 'person' : 'people'} in ${team.name}. Access to each course, project or workspace is assigned separately.`}
       />
 
       <ul className="-mt-6 divide-y border-b">

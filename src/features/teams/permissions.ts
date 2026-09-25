@@ -52,10 +52,23 @@ export const teamTypes: Record<TeamType, { label: string; hint: string; icon: Lu
   general: { label: 'General', hint: 'Anything else', icon: Shapes },
 }
 
-export const workspaceTypes: Record<WorkspaceType, { label: string; hint: string; icon: LucideIcon }> = {
-  course: { label: 'Course', hint: 'Lessons, live classes, resources', icon: BookOpen },
-  project: { label: 'Project', hint: 'Code, docs, and planning', icon: FolderKanban },
-  general: { label: 'General', hint: 'A shared space', icon: LayoutGrid },
+export const workspaceTypes: Record<
+  WorkspaceType,
+  /** `noun` is what one is called in copy ("New course"), `plural` heads its sidebar section. */
+  { label: string; noun: string; plural: string; hint: string; icon: LucideIcon }
+> = {
+  course: { label: 'Course', noun: 'course', plural: 'Courses', hint: 'Lessons, live classes, resources', icon: BookOpen },
+  project: { label: 'Project', noun: 'project', plural: 'Projects', hint: 'Code, docs, and planning', icon: FolderKanban },
+  general: { label: 'General', noun: 'workspace', plural: 'Workspaces', hint: 'A shared space', icon: LayoutGrid },
+}
+
+/**
+ * Sidebar section order: the team type's own workspace type first, then the
+ * rest. Team type never restricts what a team can contain.
+ */
+export function workspaceTypeOrder(teamType: TeamType): WorkspaceType[] {
+  const first = defaultWorkspaceType[teamType]
+  return [first, ...(['course', 'project', 'general'] as const).filter((t) => t !== first)]
 }
 
 /** Sensible default workspace type for a team of this type. */
@@ -63,11 +76,4 @@ export const defaultWorkspaceType: Record<TeamType, WorkspaceType> = {
   learning: 'course',
   development: 'project',
   general: 'general',
-}
-
-/** What a team calls its workspaces, by team type. */
-export const workspaceNoun: Record<TeamType, { singular: string; plural: string }> = {
-  learning: { singular: 'Course', plural: 'Courses' },
-  development: { singular: 'Project', plural: 'Projects' },
-  general: { singular: 'Workspace', plural: 'Workspaces' },
 }

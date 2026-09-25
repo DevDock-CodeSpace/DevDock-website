@@ -11,7 +11,16 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useCurrentTeam, useCurrentWorkspace } from '@/features/teams/hooks'
 import { teamPath } from '@/features/teams/nav'
-import { deleteWorkspace, updateWorkspace, workspaceQuery, type WorkspaceType } from '@/features/workspaces/api'
+import { defaultModules, sortModules } from '@/features/teams/nav'
+import {
+  deleteWorkspace,
+  setWorkspaceModules,
+  updateWorkspace,
+  workspaceQuery,
+  type WorkspaceModule,
+  type WorkspaceType,
+} from '@/features/workspaces/api'
+import { ModulePicker } from '@/features/workspaces/components/ModulePicker'
 import { WorkspaceTypeSelect } from '@/features/workspaces/components/WorkspaceTypeSelect'
 import { errorMessage } from '@/lib/errors'
 
@@ -29,6 +38,7 @@ export function WorkspaceSettingsPage() {
   return (
     <div>
       <DetailsSection key={workspace.updated_at} />
+      <ToolsSection key={workspace.modules.join()} />
       {can.canDelete && <DangerSection />}
     </div>
   )
@@ -64,7 +74,7 @@ function DetailsSection() {
   return (
     <SettingsSection
       title="Details"
-      description="Shown to everyone in the workspace. The type decides which tabs appear."
+      description="Shown to everyone in the workspace. The type is a label; the tools below decide which tabs appear."
     >
       <form onSubmit={submit} className="space-y-4">
         <div className="space-y-1.5">
@@ -90,6 +100,50 @@ function DetailsSection() {
           Save changes
         </Button>
       </form>
+    </SettingsSection>
+  )
+}
+
+function ToolsSection() {
+  const { workspace } = useCurrentWorkspace()
+  const queryClient = useQueryClient()
+  const [modules, setModules] = useState<WorkspaceModule[]>(workspace.modules)
+  const dirty = sortModules(modules).join() !== sortModules(workspace.modules).join()
+  const suggested = defaultModules[workspace.type]
+  const isSuggested = sortModules(modules).join() === sortModules(suggested).join()
+
+  const save = useMutation({
+    mutationFn: () => setWorkspaceModules(workspace.id, modules),
+    onSuccess: () => {
+      toast.success('Tools updated')
+      return queryClient.invalidateQueries({ queryKey: workspaceQuery(workspace.id).queryKey })
+    },
+    onError: (error) => toast.error(errorMessage(error)),
+  })
+
+  return (
+    <SettingsSection
+      title="Tools"
+      description="Choose which tools appear as tabs in this workspace. Turning a tool off hides its tab; it doesn’t delete anything."
+    >
+      <div className="space-y-4">
+        <ModulePicker value={modules} onChange={setModules} disabled={save.isPending} />
+        <div className="flex items-center gap-3">
+          <Button size="sm" disabled={!dirty || save.isPending} onClick={() => save.mutate()}>
+            {save.isPending && <LoaderCircle className="animate-spin" />}
+            Save tools
+          </Button>
+          {!isSuggested && (
+            <button
+              type="button"
+              className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+              onClick={() => setModules(suggested)}
+            >
+              Reset to {workspace.type} defaults
+            </button>
+          )}
+        </div>
+      </div>
     </SettingsSection>
   )
 }
