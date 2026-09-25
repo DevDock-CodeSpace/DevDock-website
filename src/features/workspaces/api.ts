@@ -3,11 +3,15 @@ import { requireAffected, toDataError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
 import type { Database, Tables } from '@/types/database.types'
 
-export type WorkspaceRole = Database['public']['Enums']['workspace_role']
-export type Workspace = Pick<Tables<'workspaces'>, 'id' | 'name' | 'slug'>
+// DB model is Team → Workspace. The UI still says Workspace → Course until the
+// frontend is renamed, so this module keeps its UI-facing names but reads the
+// team tables: "workspace" here = public.teams.
+
+export type WorkspaceRole = Database['public']['Enums']['team_role']
+export type Workspace = Pick<Tables<'teams'>, 'id' | 'name' | 'slug'>
 export type WorkspaceMembership = { role: WorkspaceRole; joinedAt: string; workspace: Workspace }
 export type Invite = Pick<
-  Tables<'workspace_invites'>,
+  Tables<'team_invites'>,
   'id' | 'code' | 'created_at' | 'expires_at' | 'max_uses' | 'use_count'
 >
 export type PersonProfile = { display_name: string | null; avatar_url: string | null } | null
@@ -28,8 +32,8 @@ export const myWorkspacesQuery = (userId: string) =>
     queryKey: ['workspaces', 'mine', userId],
     queryFn: async (): Promise<WorkspaceMembership[]> => {
       const { data, error } = await supabase
-        .from('workspace_members')
-        .select('role, joined_at, workspace:workspaces(id, name, slug)')
+        .from('team_members')
+        .select('role, joined_at, workspace:teams(id, name, slug)')
         .eq('user_id', userId)
         .order('joined_at')
       if (error) throw toDataError('load your workspaces', error)
@@ -42,9 +46,9 @@ export const workspaceMembersQuery = (workspaceId: string) =>
     queryKey: ['workspaces', workspaceId, 'members'],
     queryFn: async (): Promise<WorkspaceMember[]> => {
       const { data, error } = await supabase
-        .from('workspace_members')
+        .from('team_members')
         .select('user_id, role, joined_at, profile:profiles(display_name, avatar_url)')
-        .eq('workspace_id', workspaceId)
+        .eq('team_id', workspaceId)
         .order('joined_at')
       if (error) throw toDataError('load workspace members', error)
       return data
@@ -56,9 +60,9 @@ export const invitesQuery = (workspaceId: string) =>
     queryKey: ['workspaces', workspaceId, 'invites'],
     queryFn: async (): Promise<Invite[]> => {
       const { data, error } = await supabase
-        .from('workspace_invites')
+        .from('team_invites')
         .select('id, code, created_at, expires_at, max_uses, use_count')
-        .eq('workspace_id', workspaceId)
+        .eq('team_id', workspaceId)
         .order('created_at', { ascending: false })
       if (error) throw toDataError('load invites', error)
       return data
@@ -69,7 +73,7 @@ export const invitesQuery = (workspaceId: string) =>
 
 export async function createWorkspace(input: { name: string; slug: string }): Promise<Workspace> {
   const { data, error } = await supabase
-    .from('workspaces')
+    .from('teams')
     .insert({ name: input.name.trim(), slug: input.slug })
     .select('id, name, slug')
     .single()
@@ -84,7 +88,7 @@ export async function createWorkspace(input: { name: string; slug: string }): Pr
 
 /** Returns the joined workspace's id. Already a member → same id, no error. */
 export async function joinWorkspace(inviteCode: string): Promise<string> {
-  const { data, error } = await supabase.rpc('join_workspace', { invite_code: inviteCode })
+  const { data, error } = await supabase.rpc('join_team', { invite_code: inviteCode })
   if (error) {
     throw toDataError('join the workspace', error, {
       P0001: 'That invite code is invalid, expired, or has no uses left.',
@@ -95,7 +99,7 @@ export async function joinWorkspace(inviteCode: string): Promise<string> {
 
 export async function renameWorkspace(workspaceId: string, name: string) {
   const { data, error } = await supabase
-    .from('workspaces')
+    .from('teams')
     .update({ name: name.trim() })
     .eq('id', workspaceId)
     .select('id')
@@ -104,16 +108,16 @@ export async function renameWorkspace(workspaceId: string, name: string) {
 }
 
 export async function deleteWorkspace(workspaceId: string) {
-  const { data, error } = await supabase.from('workspaces').delete().eq('id', workspaceId).select('id')
+  const { data, error } = await supabase.from('teams').delete().eq('id', workspaceId).select('id')
   if (error) throw toDataError('delete the workspace', error)
   requireAffected(data, 'delete workspace')
 }
 
 export async function setWorkspaceRole(workspaceId: string, userId: string, role: Exclude<WorkspaceRole, 'owner'>) {
   const { data, error } = await supabase
-    .from('workspace_members')
+    .from('team_members')
     .update({ role })
-    .eq('workspace_id', workspaceId)
+    .eq('team_id', workspaceId)
     .eq('user_id', userId)
     .select('user_id')
   if (error) throw toDataError('change the role', error)
@@ -123,9 +127,9 @@ export async function setWorkspaceRole(workspaceId: string, userId: string, role
 /** Remove someone, or leave (userId = yourself). Also removes them from the workspace's courses. */
 export async function removeWorkspaceMember(workspaceId: string, userId: string) {
   const { data, error } = await supabase
-    .from('workspace_members')
+    .from('team_members')
     .delete()
-    .eq('workspace_id', workspaceId)
+    .eq('team_id', workspaceId)
     .eq('user_id', userId)
     .select('user_id')
   if (error) throw toDataError('remove the member', error)
@@ -137,8 +141,8 @@ export async function createInvite(
   options: { expiresAt: string | null; maxUses: number | null },
 ): Promise<Invite> {
   const { data, error } = await supabase
-    .from('workspace_invites')
-    .insert({ workspace_id: workspaceId, expires_at: options.expiresAt, max_uses: options.maxUses })
+    .from('team_invites')
+    .insert({ team_id: workspaceId, expires_at: options.expiresAt, max_uses: options.maxUses })
     .select('id, code, created_at, expires_at, max_uses, use_count')
     .single()
   if (error) throw toDataError('create the invite', error)
@@ -146,7 +150,7 @@ export async function createInvite(
 }
 
 export async function revokeInvite(inviteId: string) {
-  const { data, error } = await supabase.from('workspace_invites').delete().eq('id', inviteId).select('id')
+  const { data, error } = await supabase.from('team_invites').delete().eq('id', inviteId).select('id')
   if (error) throw toDataError('revoke the invite', error)
   requireAffected(data, 'revoke invite')
 }

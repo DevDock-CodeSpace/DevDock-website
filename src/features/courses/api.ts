@@ -4,12 +4,17 @@ import { requireAffected, toDataError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
 import type { Database, Tables, TablesInsert } from '@/types/database.types'
 
-export type CourseRole = Database['public']['Enums']['course_role']
-export type Course = Pick<
-  Tables<'courses'>,
-  'id' | 'workspace_id' | 'title' | 'description' | 'created_at' | 'updated_at'
->
-export type CourseSummary = Pick<Tables<'courses'>, 'id' | 'title' | 'description'> & { memberCount: number }
+// DB model is Team → Workspace. The UI still says Workspace → Course until the
+// frontend is renamed, so this module keeps its UI-facing names but reads the
+// workspace tables: "course" here = public.workspaces, and a course's
+// "workspace_id" is the parent team (aliased from team_id in the selects).
+
+export type CourseRole = Database['public']['Enums']['workspace_role']
+export type Course = Pick<Tables<'workspaces'>, 'id' | 'title' | 'description' | 'created_at' | 'updated_at'> & {
+  /** Parent team id (DB column team_id). */
+  workspace_id: string
+}
+export type CourseSummary = Pick<Tables<'workspaces'>, 'id' | 'title' | 'description'> & { memberCount: number }
 export type CourseMember = { user_id: string; role: CourseRole; joined_at: string; profile: PersonProfile }
 
 // ---------------------------------------------------------------- queries
@@ -20,14 +25,14 @@ export const workspaceCoursesQuery = (workspaceId: string) =>
     queryKey: ['courses', 'workspace', workspaceId],
     queryFn: async (): Promise<CourseSummary[]> => {
       const { data, error } = await supabase
-        .from('courses')
-        .select('id, title, description, course_members(count)')
-        .eq('workspace_id', workspaceId)
+        .from('workspaces')
+        .select('id, title, description, workspace_members(count)')
+        .eq('team_id', workspaceId)
         .order('title')
       if (error) throw toDataError('load courses', error)
-      return data.map(({ course_members, ...course }) => ({
+      return data.map(({ workspace_members, ...course }) => ({
         ...course,
-        memberCount: course_members[0]?.count ?? 0,
+        memberCount: workspace_members[0]?.count ?? 0,
       }))
     },
   })
@@ -38,12 +43,12 @@ export const myCourseRolesQuery = (workspaceId: string, userId: string) =>
     queryKey: ['courses', 'workspace', workspaceId, 'my-roles', userId],
     queryFn: async (): Promise<Record<string, CourseRole>> => {
       const { data, error } = await supabase
-        .from('course_members')
-        .select('course_id, role')
-        .eq('workspace_id', workspaceId)
+        .from('workspace_members')
+        .select('workspace_id, role')
+        .eq('team_id', workspaceId)
         .eq('user_id', userId)
       if (error) throw toDataError('load your course roles', error)
-      return Object.fromEntries(data.map((row) => [row.course_id, row.role]))
+      return Object.fromEntries(data.map((row) => [row.workspace_id, row.role]))
     },
   })
 
@@ -53,8 +58,8 @@ export const courseQuery = (courseId: string) =>
     queryKey: ['courses', courseId],
     queryFn: async (): Promise<Course | null> => {
       const { data, error } = await supabase
-        .from('courses')
-        .select('id, workspace_id, title, description, created_at, updated_at')
+        .from('workspaces')
+        .select('id, workspace_id:team_id, title, description, created_at, updated_at')
         .eq('id', courseId)
         .maybeSingle()
       if (error) throw toDataError('load the course', error)
@@ -67,9 +72,9 @@ export const courseMembersQuery = (courseId: string) =>
     queryKey: ['courses', courseId, 'members'],
     queryFn: async (): Promise<CourseMember[]> => {
       const { data, error } = await supabase
-        .from('course_members')
+        .from('workspace_members')
         .select('user_id, role, joined_at, profile:profiles(display_name, avatar_url)')
-        .eq('course_id', courseId)
+        .eq('workspace_id', courseId)
         .order('joined_at')
       if (error) throw toDataError('load course members', error)
       return data
@@ -83,11 +88,12 @@ export async function createCourse(
   input: { title: string; description: string },
 ): Promise<{ id: string }> {
   const { data, error } = await supabase
-    .from('courses')
+    .from('workspaces')
     .insert({
-      workspace_id: workspaceId,
+      team_id: workspaceId,
       title: input.title.trim(),
       description: input.description.trim() || null,
+      type: 'course',
     })
     .select('id')
     .single()
@@ -97,7 +103,7 @@ export async function createCourse(
 
 export async function updateCourse(courseId: string, input: { title: string; description: string }) {
   const { data, error } = await supabase
-    .from('courses')
+    .from('workspaces')
     .update({ title: input.title.trim(), description: input.description.trim() || null })
     .eq('id', courseId)
     .select('id')
@@ -106,16 +112,16 @@ export async function updateCourse(courseId: string, input: { title: string; des
 }
 
 export async function deleteCourse(courseId: string) {
-  const { data, error } = await supabase.from('courses').delete().eq('id', courseId).select('id')
+  const { data, error } = await supabase.from('workspaces').delete().eq('id', courseId).select('id')
   if (error) throw toDataError('delete the course', error)
   requireAffected(data, 'delete course')
 }
 
 export async function addCourseMember(courseId: string, userId: string, role: CourseRole) {
-  // workspace_id is NOT NULL but always set by a DB trigger from the course (clients
+  // team_id is NOT NULL but always set by a DB trigger from the workspace (clients
   // have no INSERT privilege on it). Generated types can't see triggers, so omit it here.
-  const row: Omit<TablesInsert<'course_members'>, 'workspace_id'> = { course_id: courseId, user_id: userId, role }
-  const { error } = await supabase.from('course_members').insert(row as TablesInsert<'course_members'>)
+  const row: Omit<TablesInsert<'workspace_members'>, 'team_id'> = { workspace_id: courseId, user_id: userId, role }
+  const { error } = await supabase.from('workspace_members').insert(row as TablesInsert<'workspace_members'>)
   if (error) {
     throw toDataError('add the member', error, { '23505': 'They’re already in this course.' })
   }
@@ -123,9 +129,9 @@ export async function addCourseMember(courseId: string, userId: string, role: Co
 
 export async function setCourseRole(courseId: string, userId: string, role: CourseRole) {
   const { data, error } = await supabase
-    .from('course_members')
+    .from('workspace_members')
     .update({ role })
-    .eq('course_id', courseId)
+    .eq('workspace_id', courseId)
     .eq('user_id', userId)
     .select('user_id')
   if (error) throw toDataError('change the role', error)
@@ -135,9 +141,9 @@ export async function setCourseRole(courseId: string, userId: string, role: Cour
 /** Remove someone, or leave (userId = yourself). */
 export async function removeCourseMember(courseId: string, userId: string) {
   const { data, error } = await supabase
-    .from('course_members')
+    .from('workspace_members')
     .delete()
-    .eq('course_id', courseId)
+    .eq('workspace_id', courseId)
     .eq('user_id', userId)
     .select('user_id')
   if (error) throw toDataError('remove the member', error)
