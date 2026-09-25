@@ -9,14 +9,20 @@ export function PriorityPicker({
   onChange,
   children,
   align,
+  open,
+  onOpenChange,
 }: {
   value: IssuePriority
   onChange: (priority: IssuePriority) => void
   children: ReactNode
   align?: 'start' | 'center' | 'end'
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }) {
   return (
     <Picker
+      open={open}
+      onOpenChange={onOpenChange}
       placeholder="Set priority…"
       align={align}
       selected={[String(value)]}

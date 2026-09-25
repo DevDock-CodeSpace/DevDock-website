@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronRight, CircleUserRound, LoaderCircle, Tag } from 'lucide-react'
+import { ChevronRight, CircleUserRound, IterationCw, LoaderCircle, Tag } from 'lucide-react'
 import { useState, type ComponentProps, type FormEvent, type ReactNode } from 'react'
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
@@ -10,9 +10,11 @@ import { useCurrentTeam } from '@/features/teams/hooks'
 import { issuePath } from '@/features/teams/nav'
 import type { Json } from '@/types/database.types'
 import { createIssue, issueKeys, type Issue, type IssuePriority, type IssueStatus } from '../api'
+import { cycleTitle } from '../cycles'
 import { useIssueContext } from '../hooks'
 import { issueIdentifier, priorityLabel, statusLabel } from '../meta'
 import { AssigneePicker } from './AssigneePicker'
+import { CyclePicker } from './CyclePicker'
 import { LabelChip } from './LabelChip'
 import { LabelPicker } from './LabelPicker'
 import { PriorityIcon } from './PriorityIcon'
@@ -38,12 +40,20 @@ type CreateIssueDialogProps = {
   status?: IssueStatus
   /** Creates a sub-issue of this issue. */
   parent?: Pick<Issue, 'id' | 'number' | 'title'>
+  /** Starting cycle (e.g. opened from a cycle's page). */
+  cycleId?: string | null
 }
 
 /** Linear's "New issue" modal: title, description, and property chips. ⌘/Ctrl+Enter creates. */
-export function CreateIssueDialog({ open, onOpenChange, status: initialStatus = 'todo', parent }: CreateIssueDialogProps) {
+export function CreateIssueDialog({
+  open,
+  onOpenChange,
+  status: initialStatus = 'todo',
+  parent,
+  cycleId: initialCycle = null,
+}: CreateIssueDialogProps) {
   const { team } = useCurrentTeam()
-  const { workspace, members, labels, canManage, userId } = useIssueContext()
+  const { workspace, members, labels, cycles, canManage, userId } = useIssueContext()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
 
@@ -53,6 +63,7 @@ export function CreateIssueDialog({ open, onOpenChange, status: initialStatus = 
   const [priority, setPriority] = useState<IssuePriority>(0)
   const [assigneeId, setAssigneeId] = useState<string | null>(null)
   const [labelIds, setLabelIds] = useState<string[]>([])
+  const [cycleId, setCycleId] = useState<string | null>(initialCycle)
 
   const reset = () => {
     setTitle('')
@@ -61,6 +72,7 @@ export function CreateIssueDialog({ open, onOpenChange, status: initialStatus = 
     setPriority(0)
     setAssigneeId(null)
     setLabelIds([])
+    setCycleId(initialCycle)
   }
 
   const create = useMutation({
@@ -73,6 +85,7 @@ export function CreateIssueDialog({ open, onOpenChange, status: initialStatus = 
         priority,
         assigneeId,
         parentId: parent?.id ?? null,
+        cycleId,
         labelIds,
       }),
     onSuccess: async ({ number }) => {
@@ -94,6 +107,7 @@ export function CreateIssueDialog({ open, onOpenChange, status: initialStatus = 
 
   const assignee = members.find((m) => m.user_id === assigneeId)
   const chosenLabels = labels.filter((l) => labelIds.includes(l.id))
+  const cycle = cycles.find((c) => c.id === cycleId)
 
   return (
     <Dialog
@@ -177,6 +191,14 @@ export function CreateIssueDialog({ open, onOpenChange, status: initialStatus = 
                 )}
               </Chip>
             </LabelPicker>
+            {cycles.length > 0 && (
+              <CyclePicker value={cycleId} cycles={cycles} onChange={setCycleId}>
+                <Chip>
+                  <IterationCw className="size-3.5 text-muted-foreground" />
+                  {cycle ? cycleTitle(cycle) : 'Cycle'}
+                </Chip>
+              </CyclePicker>
+            )}
           </div>
           <div className="flex items-center justify-between gap-3 border-t px-5 py-3">
             <p role="alert" className="min-w-0 truncate text-sm text-destructive">

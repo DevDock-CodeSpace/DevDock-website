@@ -11,9 +11,12 @@ import { errorMessage } from '@/lib/errors'
 import { deleteIssue, issueKeys, workspaceIssuesQuery, type IssueDetail } from '../api'
 import { useIssueContext, useUpdateIssue } from '../hooks'
 import { issueIdentifier } from '../meta'
-import { IssueComments } from './IssueComments'
+import type { MenuKind } from '../nav-context'
+import { useShortcuts } from '../shortcuts'
+import { IssueActivity } from './IssueActivity'
 import { IssueDescription } from './IssueDescription'
 import { IssueProperties } from './IssueProperties'
+import { ShortcutsDialog } from './ShortcutsDialog'
 import { SubIssues } from './SubIssues'
 
 /**
@@ -22,13 +25,28 @@ import { SubIssues } from './SubIssues'
  */
 export default function IssueView({ issue }: { issue: IssueDetail }) {
   const { team } = useCurrentTeam()
-  const { workspace, canManage } = useIssueContext()
+  const { workspace, canManage, userId } = useIssueContext()
   const issues = useSuspenseQuery(workspaceIssuesQuery(workspace.id)).data
   const update = useUpdateIssue()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const parent = issues.find((i) => i.id === issue.parent_id)
   const id = issueIdentifier(workspace.issue_key, issue.number)
+
+  // ------------------------------------------------------------ shortcuts
+  // S/P/A/L/⇧C open the property menus, I assigns to me, Esc goes back, ? shows help.
+  const [menu, setMenu] = useState<MenuKind | null>(null)
+  const [help, setHelp] = useState(false)
+  useShortcuts({
+    s: () => setMenu('status'),
+    p: () => setMenu('priority'),
+    a: () => setMenu('assignee'),
+    l: () => setMenu('label'),
+    'shift+c': () => setMenu('cycle'),
+    i: () => update.mutate({ issue, patch: { assignee_id: issue.assignee_id === userId ? null : userId } }),
+    escape: () => void navigate(issuesPath(team.slug, workspace.id)),
+    '?': () => setHelp(true),
+  })
 
   // ------------------------------------------------------------ title
   const [title, setTitle] = useState(issue.title)
@@ -125,14 +143,15 @@ export default function IssueView({ issue }: { issue: IssueDetail }) {
 
         <div className="mt-10 space-y-10 border-t pt-6">
           <SubIssues issue={issue} />
-          <IssueComments issue={issue} />
+          <IssueActivity issue={issue} />
         </div>
       </div>
 
       <div className="shrink-0 border-t pt-6 lg:w-64 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-4">
-        <IssueProperties issue={issue} />
+        <IssueProperties issue={issue} menu={menu} onMenuChange={setMenu} />
       </div>
 
+      <ShortcutsDialog open={help} onOpenChange={setHelp} />
       <ConfirmDialog
         open={confirmDelete}
         onOpenChange={setConfirmDelete}

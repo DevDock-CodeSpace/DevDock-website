@@ -127,6 +127,54 @@ export type Database = {
           },
         ]
       }
+      issue_activity: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          from_value: string | null
+          id: number
+          issue_id: string
+          kind: string
+          to_value: string | null
+          workspace_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          from_value?: string | null
+          id?: never
+          issue_id: string
+          kind: string
+          to_value?: string | null
+          workspace_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          from_value?: string | null
+          id?: never
+          issue_id?: string
+          kind?: string
+          to_value?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "issue_activity_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "issue_activity_issue_fkey"
+            columns: ["issue_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "issues"
+            referencedColumns: ["id", "workspace_id"]
+          },
+        ]
+      }
       issue_comments: {
         Row: {
           author_id: string | null
@@ -169,6 +217,44 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "issues"
             referencedColumns: ["id", "workspace_id"]
+          },
+        ]
+      }
+      issue_cycles: {
+        Row: {
+          created_at: string
+          ends_on: string
+          id: string
+          name: string | null
+          number: number
+          starts_on: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          ends_on: string
+          id?: string
+          name?: string | null
+          number: number
+          starts_on: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          ends_on?: string
+          id?: string
+          name?: string | null
+          number?: number
+          starts_on?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "issue_cycles_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -243,6 +329,7 @@ export type Database = {
           completed_at: string | null
           created_at: string
           created_by: string | null
+          cycle_id: string | null
           description: Json | null
           due_date: string | null
           estimate: number | null
@@ -261,6 +348,7 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           created_by?: string | null
+          cycle_id?: string | null
           description?: Json | null
           due_date?: string | null
           estimate?: number | null
@@ -279,6 +367,7 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           created_by?: string | null
+          cycle_id?: string | null
           description?: Json | null
           due_date?: string | null
           estimate?: number | null
@@ -305,6 +394,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "issues_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "issue_cycles"
             referencedColumns: ["id"]
           },
           {
@@ -590,6 +686,10 @@ export type Database = {
         Returns: Database["public"]["Enums"]["workspace_module"][]
       }
       join_team: { Args: { invite_code: string }; Returns: string }
+      move_open_issues: {
+        Args: { p_from: string; p_to: string }
+        Returns: number
+      }
       set_issue_labels: {
         Args: { p_issue_id: string; p_label_ids: string[] }
         Returns: undefined

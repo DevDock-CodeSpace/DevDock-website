@@ -91,7 +91,7 @@ function WorkspaceBreadcrumb() {
  * crumb, but only where its loader would show it (same team/workspace).
  */
 function useItemCrumb(): Crumb[] {
-  const { docId, diagramId, issueNumber, workspaceId } = useParams()
+  const { docId, diagramId, issueNumber, cycleNumber, workspaceId } = useParams()
   const { pathname } = useLocation()
   const { team } = useCurrentTeam()
   const doc = useQuery({ ...documentQuery(docId ?? ''), enabled: docId !== undefined }).data
@@ -103,6 +103,13 @@ function useItemCrumb(): Crumb[] {
   const workspace = useQuery({ ...workspaceQuery(workspaceId ?? ''), enabled: workspaceId !== undefined }).data
   if (issueNumber && issue && workspace) {
     return [{ label: issueIdentifier(workspace.issue_key, issue.number), to: pathname }]
+  }
+  if (workspaceId && pathname.includes('/issues/cycles')) {
+    const cycles = `${pathname.split('/issues/cycles')[0]}/issues/cycles`
+    return [
+      { label: 'Cycles', to: cycles },
+      ...(cycleNumber ? [{ label: `Cycle ${cycleNumber}`, to: pathname }] : []),
+    ]
   }
   const item = docId ? doc : diagramId ? diagram : undefined
   const belongs =

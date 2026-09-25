@@ -9,14 +9,20 @@ export function StatusPicker({
   onChange,
   children,
   align,
+  open,
+  onOpenChange,
 }: {
   value: IssueStatus
   onChange: (status: IssueStatus) => void
   children: ReactNode
   align?: 'start' | 'center' | 'end'
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }) {
   return (
     <Picker
+      open={open}
+      onOpenChange={onOpenChange}
       placeholder="Change status…"
       align={align}
       selected={[value]}

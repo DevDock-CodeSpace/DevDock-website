@@ -14,6 +14,8 @@ export function AssigneePicker({
   onChange,
   children,
   align,
+  open,
+  onOpenChange,
 }: {
   value: string | null
   members: WorkspaceMember[]
@@ -22,10 +24,14 @@ export function AssigneePicker({
   onChange: (assigneeId: string | null) => void
   children: ReactNode
   align?: 'start' | 'center' | 'end'
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }) {
   const sorted = [...members].sort((a, b) => Number(b.user_id === userId) - Number(a.user_id === userId))
   return (
     <Picker
+      open={open}
+      onOpenChange={onOpenChange}
       placeholder="Assign to…"
       align={align}
       selected={[value ?? NOBODY]}

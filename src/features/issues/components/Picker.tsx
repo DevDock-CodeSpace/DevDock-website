@@ -17,16 +17,40 @@ type PickerProps = {
   /** Offer "Create “query”" when nothing matches exactly (labels, for managers). */
   onCreate?: (name: string) => void
   align?: 'start' | 'center' | 'end'
+  /** Controlled open state (keyboard shortcuts open menus); uncontrolled when omitted. */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 /**
  * Linear-style property menu: type to filter, ↑/↓ to move, Enter to pick.
  * Single-select closes on pick; multi-select toggles and stays open.
  */
-export function Picker({ children, options, selected, onSelect, multi, placeholder, onCreate, align = 'start' }: PickerProps) {
-  const [open, setOpen] = useState(false)
+export function Picker({
+  children,
+  options,
+  selected,
+  onSelect,
+  multi,
+  placeholder,
+  onCreate,
+  align = 'start',
+  open: controlledOpen,
+  onOpenChange,
+}: PickerProps) {
+  const [innerOpen, setInnerOpen] = useState(false)
+  const open = controlledOpen ?? innerOpen
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(0)
+  const setOpen = (next: boolean) => {
+    if (!next) {
+      // Start fresh next time, however it's opened (click or shortcut).
+      setQuery('')
+      setActive(0)
+    }
+    if (controlledOpen === undefined) setInnerOpen(next)
+    onOpenChange?.(next)
+  }
 
   const q = query.trim().toLowerCase()
   const shown = options.filter((o) => o.label.toLowerCase().includes(q))
@@ -36,7 +60,12 @@ export function Picker({ children, options, selected, onSelect, multi, placehold
   const choose = (index: number) => {
     if (index < shown.length) {
       onSelect(shown[index].value)
-      if (!multi) setOpen(false)
+      if (!multi) {
+        // Release the search box now: it keeps focus through the close
+        // animation, which would swallow a quick next shortcut key.
+        if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+        setOpen(false)
+      }
     } else if (canCreate) {
       onCreate?.(query.trim())
       setQuery('')
@@ -44,16 +73,7 @@ export function Picker({ children, options, selected, onSelect, multi, placehold
   }
 
   return (
-    <Popover
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next)
-        if (next) {
-          setQuery('')
-          setActive(0)
-        }
-      }}
-    >
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>{children}</PopoverTrigger>
       <PopoverContent
         align={align}

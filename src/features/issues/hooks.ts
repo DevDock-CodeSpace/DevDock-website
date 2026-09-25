@@ -1,10 +1,13 @@
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { useAuth } from '@/features/auth/hooks'
 import { useCurrentWorkspace } from '@/features/teams/hooks'
 import { workspaceMembersQuery } from '@/features/workspaces/api'
 import { errorMessage } from '@/lib/errors'
 import {
+  cyclesQuery,
   issueKeys,
   labelsQuery,
   setIssueLabels,
@@ -13,10 +16,11 @@ import {
   type IssueDetail,
   type IssuePatch,
 } from './api'
+import { readFilters, writeFilters, type IssueFilters } from './filters'
 
 /**
  * What issue screens need about the current workspace: its members (assignees),
- * labels, and whether the caller manages it (delete issues, manage labels).
+ * labels, cycles, and whether the caller manages it (delete issues, manage labels and cycles).
  * `canManage` mirrors private.can_manage_workspace() for showing UI only.
  */
 export function useIssueContext() {
@@ -24,7 +28,8 @@ export function useIssueContext() {
   const { workspace, can } = useCurrentWorkspace()
   const members = useSuspenseQuery(workspaceMembersQuery(workspace.id)).data
   const labels = useSuspenseQuery(labelsQuery(workspace.id)).data
-  return { workspace, members, labels, canManage: can.canEdit, userId: user.id }
+  const cycles = useSuspenseQuery(cyclesQuery(workspace.id)).data
+  return { workspace, members, labels, cycles, canManage: can.canEdit, userId: user.id }
 }
 
 type UpdateVars = { issue: Pick<Issue, 'id' | 'number'>; patch?: IssuePatch; labelIds?: string[] }
@@ -73,6 +78,36 @@ export function useUpdateIssue() {
     onSettled: (_data, _error, { issue }) => {
       void queryClient.invalidateQueries({ queryKey: issueKeys.workspace(workspace.id) })
       void queryClient.invalidateQueries({ queryKey: issueKeys.detail(workspace.id, issue.number) })
+      void queryClient.invalidateQueries({ queryKey: issueKeys.activity(issue.id) })
     },
   })
+}
+
+/** List ↔ Board, kept in the URL (?view=board) so it survives reloads and links. */
+export function useIssueView() {
+  const [params, setParams] = useSearchParams()
+  const view: 'list' | 'board' = params.get('view') === 'board' ? 'board' : 'list'
+  const setView = (next: 'list' | 'board') =>
+    setParams(
+      (p) => {
+        if (next === 'board') p.set('view', 'board')
+        else p.delete('view')
+        return p
+      },
+      { replace: true },
+    )
+  return [view, setView] as const
+}
+
+/**
+ * Filters as state (instant, and quick successive picks compose) mirrored into
+ * the URL so views can be shared and survive reloads.
+ */
+export function useIssueFilters() {
+  const [params, setParams] = useSearchParams()
+  const [filters, setFilters] = useState<IssueFilters>(() => readFilters(params))
+  useEffect(() => {
+    setParams((p) => writeFilters(p, filters), { replace: true })
+  }, [filters, setParams])
+  return [filters, setFilters] as const
 }

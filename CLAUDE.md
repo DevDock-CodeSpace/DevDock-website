@@ -18,7 +18,15 @@ DevDock is a private software-engineering teaching workspace for **one instructo
 
 **Phase 5c done: Diagrams (Lucidchart-style).** A `diagrams` table (same scope and RLS rules as `documents`) holding React Flow JSON, with Team → Diagrams and Workspace → Diagrams lists and an in-app editor styled like DevDock: a shape/icon library, containers, connectors, a properties panel, undo/redo, copy/paste, alignment guides, autosave. 
 
-**Phase 6a done: Issues (Linear-style), part 1.** Workspace-only issues with IDs like `CAP-12` (per-workspace `issue_key` + counter). Each issue has a status workflow, priority, assignee, labels, estimate, due date and sub-issues. Views are a List grouped by status and a Board with drag-and-drop; the issue page has a rich description (the Docs editor, without images), sub-issues, comments and a properties panel. Any workspace member can create and edit issues. Leads and team owners/admins delete issues and manage labels and the key. Phase 6b (next): cycles, filters/"My issues", activity log, keyboard shortcuts. Live, Learning and the other tools are still placeholder pages. Current status and next steps: `docs/STATUS.md`.
+**Phase 6a done: Issues (Linear-style), part 1.** Workspace-only issues with IDs like `CAP-12` (per-workspace `issue_key` + counter). Each issue has a status workflow, priority, assignee, labels, estimate, due date and sub-issues. Views are a List grouped by status and a Board with drag-and-drop; the issue page has a rich description (the Docs editor, without images), sub-issues, comments and a properties panel. Any workspace member can create and edit issues. Leads and team owners/admins delete issues and manage labels and the key. 
+
+**Phase 6b done: Issues, part 2.**
+- **Cycles:** Linear's sprints, numbered per workspace and never overlapping; managers create, edit and delete them, and there's a "move open issues to the next cycle" action.
+- **Views:** All / Active / Backlog / My issues tabs, and filters (status, priority, assignee, labels, cycle) kept in the URL.
+- **Activity log:** written by DB triggers and shown with comments as an Activity feed.
+- **Keyboard shortcuts:** Linear-style; press `?` for the list.
+
+Live, Learning and the other tools are still placeholder pages. Current status and next steps: `docs/STATUS.md`.
 
 ## Target stack
 
@@ -102,6 +110,10 @@ supabase/
   - Labels on an issue are replaced with `rpc('set_issue_labels')`.
   - Field edits go through `useUpdateIssue()` (optimistic, rolls back with a toast). Pickers use the searchable `Picker` popover.
   - `useIssueContext().canManage` mirrors `private.can_manage_workspace` (UI only).
+  - Cycles live under `…/issues/cycles[/:cycleNumber]` (`cycleLoader`). Numbering and the no-overlap rule are enforced by the `prepare_issue_cycle` trigger; `rpc('move_open_issues')` rolls open issues over.
+  - `issue_activity` is written only by triggers (`log_issue_activity`, `log_issue_label_activity`); clients can only read it. Don't add client-side activity writes.
+  - Views are URL state: `?tab=`, filter facets (`readFilters`/`writeFilters`, `useIssueFilters`), `?view=board`.
+  - Shortcuts use `useShortcuts` (ignored while typing or while a menu/dialog is open). Lists get J/K focus and per-row menus through `IssueCollection` + `IssueNavContext`.
 - **Data pattern:** `features/<name>/api.ts` exports `queryOptions` and mutation functions.
   - Loaders prime what the shell needs with `ensureQueryData`. Pages read with `useSuspenseQuery`; `AppLayout` has a Suspense boundary, so pages may also load secondary data that way.
   - Errors go through `lib/errors.ts` (`toDataError`, `requireAffected`), because RLS makes forbidden UPDATE/DELETE return 0 rows, not an error. Show them with `toast.error(errorMessage(e))`.

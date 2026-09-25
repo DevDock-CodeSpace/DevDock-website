@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { LoaderCircle, MoreHorizontal } from 'lucide-react'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { PersonAvatar } from '@/components/PersonRow'
 import { Button } from '@/components/ui/button'
@@ -11,22 +11,37 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { errorMessage } from '@/lib/errors'
-import { timeAgo } from '@/lib/format'
+import { formatShortDate, timeAgo } from '@/lib/format'
 import {
+  activityQuery,
   addComment,
   commentsQuery,
   deleteComment,
   issueKeys,
   updateComment,
+  workspaceIssuesQuery,
+  type IssueActivity as ActivityEntry,
   type IssueComment,
   type IssueDetail,
+  type IssuePriority,
+  type IssueStatus,
 } from '../api'
+import { cycleTitle } from '../cycles'
 import { useIssueContext } from '../hooks'
+import { issueIdentifier, priorityLabel, statusLabel } from '../meta'
+import { PriorityIcon } from './PriorityIcon'
+import { StatusIcon } from './StatusIcon'
 
-/** Comment thread + composer. Authors edit their own comments; authors and managers delete. */
-export function IssueComments({ issue }: { issue: IssueDetail }) {
+/**
+ * Linear's activity feed: the issue's history (who changed what, from the
+ * database's activity log) interleaved with comments, oldest first, then the
+ * comment box. Authors edit their own comments; authors and managers delete.
+ */
+export function IssueActivity({ issue }: { issue: IssueDetail }) {
   const { canManage, userId } = useIssueContext()
   const comments = useSuspenseQuery(commentsQuery(issue.id)).data
+  const activity = useSuspenseQuery(activityQuery(issue.id)).data
+  const describe = useDescribeActivity()
   const queryClient = useQueryClient()
   const [now] = useState(Date.now)
   const [draft, setDraft] = useState('')
@@ -44,23 +59,30 @@ export function IssueComments({ issue }: { issue: IssueDetail }) {
     if (draft.trim() && !post.isPending) post.mutate()
   }
 
+  const feed = [
+    ...activity.map((a) => ({ at: a.created_at, key: `a${a.id}`, activity: a })),
+    ...comments.map((c) => ({ at: c.created_at, key: `c${c.id}`, comment: c })),
+  ].sort((a, b) => a.at.localeCompare(b.at))
+
   return (
-    <section aria-label="Comments">
-      <h2 className="mb-3 text-sm font-semibold">
-        Comments {comments.length > 0 && <span className="font-mono text-xs font-normal text-muted-foreground">{comments.length}</span>}
-      </h2>
-      {comments.length > 0 && (
-        <ul className="mb-4 space-y-4">
-          {comments.map((comment) => (
-            <CommentItem
-              key={comment.id}
-              comment={comment}
-              now={now}
-              canEdit={comment.author_id === userId}
-              canDelete={comment.author_id === userId || canManage}
-              onChanged={refresh}
-            />
-          ))}
+    <section aria-label="Activity">
+      <h2 className="mb-3 text-sm font-semibold">Activity</h2>
+      {feed.length > 0 && (
+        <ul className="mb-4 space-y-3">
+          {feed.map((item) =>
+            'comment' in item && item.comment ? (
+              <CommentItem
+                key={item.key}
+                comment={item.comment}
+                now={now}
+                canEdit={item.comment.author_id === userId}
+                canDelete={item.comment.author_id === userId || canManage}
+                onChanged={refresh}
+              />
+            ) : 'activity' in item && item.activity ? (
+              <ActivityItem key={item.key} entry={item.activity} now={now} text={describe(item.activity)} />
+            ) : null,
+          )}
         </ul>
       )}
       <div className="rounded-lg border focus-within:ring-2 focus-within:ring-brand/40">
@@ -89,6 +111,84 @@ export function IssueComments({ issue }: { issue: IssueDetail }) {
       </div>
     </section>
   )
+}
+
+/** One history line: small avatar, "Priya changed status from Todo to In Progress", time. */
+function ActivityItem({ entry, now, text }: { entry: ActivityEntry; now: number; text: ReactNode }) {
+  return (
+    <li className="flex items-center gap-2 pl-1 text-xs text-muted-foreground">
+      <PersonAvatar profile={entry.actor} className="size-4" />
+      <span className="min-w-0">
+        <span className="font-medium text-foreground">{entry.actor?.display_name ?? 'Someone'}</span> {text}
+      </span>
+      <span aria-hidden>·</span>
+      <time dateTime={entry.created_at} className="shrink-0">
+        {timeAgo(entry.created_at, now)}
+      </time>
+    </li>
+  )
+}
+
+/** Turns an activity row into words, resolving ids to names from what's already loaded. */
+function useDescribeActivity() {
+  const { workspace, members, cycles } = useIssueContext()
+  const issues = useSuspenseQuery(workspaceIssuesQuery(workspace.id)).data
+  const person = (id: string | null) =>
+    members.find((m) => m.user_id === id)?.profile?.display_name ?? 'a former member'
+  const strong = (node: ReactNode) => <span className="font-medium text-foreground">{node}</span>
+  const status = (s: string | null) => (
+    <span className="inline-flex items-center gap-1 align-middle text-foreground">
+      <StatusIcon status={s as IssueStatus} className="size-3" />
+      {statusLabel[s as IssueStatus] ?? s}
+    </span>
+  )
+
+  return (a: ActivityEntry): ReactNode => {
+    const from = a.from_value
+    const to = a.to_value
+    switch (a.kind) {
+      case 'created':
+        return 'created the issue'
+      case 'title':
+        return <>changed the title to {strong(`“${to}”`)}</>
+      case 'status':
+        return <>changed status from {status(from)} to {status(to)}</>
+      case 'priority': {
+        const p = Number(to) as IssuePriority
+        return p === 0 ? (
+          'removed the priority'
+        ) : (
+          <>
+            set priority to{' '}
+            <span className="inline-flex items-center gap-1 align-middle text-foreground">
+              <PriorityIcon priority={p} className="size-3" />
+              {priorityLabel[p]}
+            </span>
+          </>
+        )
+      }
+      case 'assignee':
+        return to === null ? <>unassigned {strong(person(from))}</> : <>assigned the issue to {strong(person(to))}</>
+      case 'parent': {
+        const parent = issues.find((i) => i.id === to)
+        if (to === null) return 'removed the parent issue'
+        return <>made this a sub-issue of {strong(parent ? issueIdentifier(workspace.issue_key, parent.number) : 'a deleted issue')}</>
+      }
+      case 'cycle': {
+        const cycle = cycles.find((c) => c.id === (to ?? from))
+        const name = cycle ? cycleTitle(cycle) : 'a deleted cycle'
+        return to === null ? <>removed the issue from {strong(name)}</> : <>moved the issue to {strong(name)}</>
+      }
+      case 'estimate':
+        return to === null ? 'removed the estimate' : <>set the estimate to {strong(`${to} ${to === '1' ? 'point' : 'points'}`)}</>
+      case 'due_date':
+        return to === null ? 'removed the due date' : <>set the due date to {strong(formatShortDate(to))}</>
+      case 'label_added':
+        return <>added label {strong(to)}</>
+      case 'label_removed':
+        return <>removed label {strong(to)}</>
+    }
+  }
 }
 
 function CommentItem({

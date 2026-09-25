@@ -22,6 +22,7 @@ export type Issue = {
   priority: IssuePriority
   assignee_id: string | null
   parent_id: string | null
+  cycle_id: string | null
   estimate: number | null
   due_date: string | null
   completed_at: string | null
@@ -32,6 +33,40 @@ export type Issue = {
 }
 /** One issue with its description and creator. */
 export type IssueDetail = Issue & { description: Json | null; creator: PersonProfile }
+
+/** A Linear-style cycle (sprint). Dates are local calendar dates ("YYYY-MM-DD"). */
+export type IssueCycle = {
+  id: string
+  workspace_id: string
+  number: number
+  name: string | null
+  starts_on: string
+  ends_on: string
+}
+
+export type ActivityKind =
+  | 'created'
+  | 'title'
+  | 'status'
+  | 'priority'
+  | 'assignee'
+  | 'parent'
+  | 'cycle'
+  | 'estimate'
+  | 'due_date'
+  | 'label_added'
+  | 'label_removed'
+
+/** One change to an issue, written by a database trigger. Values are text (ids for assignee/parent/cycle). */
+export type IssueActivity = {
+  id: number
+  kind: ActivityKind
+  from_value: string | null
+  to_value: string | null
+  actor_id: string | null
+  created_at: string
+  actor: PersonProfile
+}
 
 export type IssueLabel = { id: string; workspace_id: string; name: string; color: LabelColor }
 export type IssueComment = {
@@ -46,13 +81,13 @@ export type IssueComment = {
 
 /** Fields the UI can change on an existing issue (column grants allow exactly these). */
 export type IssuePatch = Partial<
-  Pick<Issue, 'title' | 'status' | 'priority' | 'assignee_id' | 'parent_id' | 'estimate' | 'due_date'> & {
+  Pick<Issue, 'title' | 'status' | 'priority' | 'assignee_id' | 'parent_id' | 'cycle_id' | 'estimate' | 'due_date'> & {
     description: Json | null
   }
 >
 
 const ISSUE_COLUMNS =
-  'id, workspace_id, number, title, status, priority, assignee_id, parent_id, estimate, due_date, completed_at, created_by, created_at, updated_at, issue_label_links(label_id)'
+  'id, workspace_id, number, title, status, priority, assignee_id, parent_id, cycle_id, estimate, due_date, completed_at, created_by, created_at, updated_at, issue_label_links(label_id)'
 
 type IssueRow = Omit<Issue, 'labelIds' | 'priority'> & { priority: number; issue_label_links: { label_id: string }[] }
 
@@ -73,6 +108,8 @@ export const issueKeys = {
   detail: (workspaceId: string, number: number) => ['issues', 'detail', workspaceId, number] as const,
   labels: (workspaceId: string) => ['issues', 'labels', workspaceId] as const,
   comments: (issueId: string) => ['issues', 'comments', issueId] as const,
+  activity: (issueId: string) => ['issues', 'activity', issueId] as const,
+  cycles: (workspaceId: string) => ['issues', 'cycles', workspaceId] as const,
 }
 
 /** Every issue in the workspace (small teams: one query, grouped and filtered client-side). */
@@ -122,6 +159,36 @@ export const labelsQuery = (workspaceId: string) =>
     },
   })
 
+/** Oldest first. */
+export const cyclesQuery = (workspaceId: string) =>
+  queryOptions({
+    queryKey: issueKeys.cycles(workspaceId),
+    queryFn: async (): Promise<IssueCycle[]> => {
+      const { data, error } = await supabase
+        .from('issue_cycles')
+        .select('id, workspace_id, number, name, starts_on, ends_on')
+        .eq('workspace_id', workspaceId)
+        .order('starts_on')
+      if (error) throw toDataError('load cycles', error)
+      return data
+    },
+  })
+
+export const activityQuery = (issueId: string) =>
+  queryOptions({
+    queryKey: issueKeys.activity(issueId),
+    queryFn: async (): Promise<IssueActivity[]> => {
+      const { data, error } = await supabase
+        .from('issue_activity')
+        .select('id, kind, from_value, to_value, actor_id, created_at, actor:profiles!issue_activity_actor_id_fkey(display_name, avatar_url)')
+        .eq('issue_id', issueId)
+        .order('created_at')
+        .order('id')
+      if (error) throw toDataError('load the activity', error)
+      return data as IssueActivity[]
+    },
+  })
+
 export const commentsQuery = (issueId: string) =>
   queryOptions({
     queryKey: issueKeys.comments(issueId),
@@ -146,6 +213,7 @@ export type NewIssue = {
   priority?: IssuePriority
   assigneeId?: string | null
   parentId?: string | null
+  cycleId?: string | null
   labelIds?: string[]
 }
 
@@ -159,6 +227,7 @@ export async function createIssue(input: NewIssue): Promise<{ id: string; number
     priority: input.priority ?? 0,
     assignee_id: input.assigneeId ?? null,
     parent_id: input.parentId ?? null,
+    cycle_id: input.cycleId ?? null,
   }
   // Generated types can't see the insert trigger that fills team_id and number.
   const { data, error } = await supabase
@@ -220,6 +289,52 @@ export async function deleteLabel(labelId: string) {
   const { data, error } = await supabase.from('issue_labels').delete().eq('id', labelId).select('id')
   if (error) throw toDataError('delete the label', error, labelErrors)
   requireAffected(data, 'delete label')
+}
+
+const cycleErrors = {
+  '42501': 'Only workspace leads and team owners/admins can manage cycles.',
+  '23P01': 'Those dates overlap another cycle.',
+  '23514': 'The end date must be on or after the start date.',
+}
+
+export type CycleInput = { name: string; startsOn: string; endsOn: string }
+
+/** The number is set by the database (next in the workspace). */
+export async function createCycle(workspaceId: string, input: CycleInput) {
+  const row = { workspace_id: workspaceId, name: input.name.trim() || null, starts_on: input.startsOn, ends_on: input.endsOn }
+  // Generated types can't see the trigger that sets `number`.
+  const { data, error } = await supabase
+    .from('issue_cycles')
+    .insert(row as TablesInsert<'issue_cycles'>)
+    .select('number')
+    .single()
+  if (error) throw toDataError('create the cycle', error, cycleErrors)
+  return data
+}
+
+export async function updateCycle(cycleId: string, input: CycleInput) {
+  const { data, error } = await supabase
+    .from('issue_cycles')
+    .update({ name: input.name.trim() || null, starts_on: input.startsOn, ends_on: input.endsOn })
+    .eq('id', cycleId)
+    .select('id')
+  if (error) throw toDataError('save the cycle', error, cycleErrors)
+  requireAffected(data, 'update cycle')
+}
+
+/** Its issues are kept, without a cycle. */
+export async function deleteCycle(cycleId: string) {
+  const { data, error } = await supabase.from('issue_cycles').delete().eq('id', cycleId).select('id')
+  if (error) throw toDataError('delete the cycle', error, cycleErrors)
+  requireAffected(data, 'delete cycle')
+}
+
+/** Moves a cycle's unfinished issues to another cycle (or out of cycles). Returns how many moved. */
+export async function moveOpenIssues(fromCycleId: string, toCycleId: string | null): Promise<number> {
+  // The function accepts null (out of cycles); generated RPC argument types are never nullable.
+  const { data, error } = await supabase.rpc('move_open_issues', { p_from: fromCycleId, p_to: toCycleId as string })
+  if (error) throw toDataError('move the issues', error, writeErrors)
+  return data
 }
 
 export async function addComment(issueId: string, workspaceId: string, body: string) {

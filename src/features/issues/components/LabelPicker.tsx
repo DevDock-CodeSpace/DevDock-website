@@ -19,6 +19,8 @@ export function LabelPicker({
   onChange,
   children,
   align,
+  open,
+  onOpenChange,
 }: {
   workspaceId: string
   value: string[]
@@ -27,6 +29,8 @@ export function LabelPicker({
   onChange: (labelIds: string[]) => void
   children: ReactNode
   align?: 'start' | 'center' | 'end'
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }) {
   const queryClient = useQueryClient()
   const create = async (name: string) => {
@@ -42,6 +46,8 @@ export function LabelPicker({
 
   return (
     <Picker
+      open={open}
+      onOpenChange={onOpenChange}
       multi
       placeholder={canCreate ? 'Add labels, or type to create…' : 'Add labels…'}
       align={align}

@@ -4,7 +4,7 @@ import { authCallbackLoader, loginLoader } from '@/features/auth/loaders'
 import { watchAuthIdentity } from '@/features/auth/session'
 import { diagramLoader } from '@/features/diagrams/loaders'
 import { docLoader } from '@/features/docs/loaders'
-import { issueLoader } from '@/features/issues/loaders'
+import { cycleLoader, issueLoader } from '@/features/issues/loaders'
 import { TEAM_TOOLS } from '@/features/teams/nav'
 import { appIndexLoader, onboardingLoader, teamLoader, workspaceLoader } from '@/features/teams/loaders'
 import { AppLayout } from '@/layouts/AppLayout'
@@ -23,6 +23,8 @@ import { TeamToolPage } from '@/routes/team/TeamToolPage'
 import { TeamWorkspacesPage } from '@/routes/team/TeamWorkspacesPage'
 import { WorkspaceDiagramsPage } from '@/routes/workspace/WorkspaceDiagramsPage'
 import { WorkspaceDocsPage } from '@/routes/workspace/WorkspaceDocsPage'
+import { IssueCyclePage } from '@/routes/workspace/IssueCyclePage'
+import { IssueCyclesPage } from '@/routes/workspace/IssueCyclesPage'
 import { IssuePage } from '@/routes/workspace/IssuePage'
 import { WorkspaceIssuesPage } from '@/routes/workspace/WorkspaceIssuesPage'
 import { WorkspaceLayout } from '@/routes/workspace/WorkspaceLayout'
@@ -114,6 +116,8 @@ export const router = createBrowserRouter([
                     element: <WorkspaceToolGate tool="issues" />,
                     children: [
                       { index: true, element: <WorkspaceIssuesPage /> },
+                      { path: 'cycles', element: <IssueCyclesPage /> },
+                      { path: 'cycles/:cycleNumber', loader: cycleLoader, element: <IssueCyclePage /> },
                       { path: ':issueNumber', loader: issueLoader, element: <IssuePage /> },
                     ],
                   },

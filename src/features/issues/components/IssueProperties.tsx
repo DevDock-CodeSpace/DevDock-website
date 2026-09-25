@@ -1,13 +1,16 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
-import { CalendarDays, CircleUserRound, Gauge, GitPullRequestArrow, Tag, X } from 'lucide-react'
+import { CalendarDays, CircleUserRound, Gauge, GitPullRequestArrow, IterationCw, Tag, X } from 'lucide-react'
 import { useRef, useState, type ComponentProps, type ReactNode } from 'react'
 import { PersonAvatar } from '@/components/PersonRow'
 import { formatDate, localDateISO, timeAgo } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { workspaceIssuesQuery, type IssueDetail } from '../api'
+import { cycleTitle } from '../cycles'
 import { useIssueContext, useUpdateIssue } from '../hooks'
 import { issueIdentifier, priorityLabel, statusLabel } from '../meta'
+import type { MenuKind } from '../nav-context'
 import { AssigneePicker } from './AssigneePicker'
+import { CyclePicker } from './CyclePicker'
 import { LabelChip } from './LabelChip'
 import { LabelPicker } from './LabelPicker'
 import { Picker } from './Picker'
@@ -20,9 +23,25 @@ import { StatusPicker } from './StatusPicker'
 const ESTIMATES = [1, 2, 3, 5, 8, 13]
 const NONE = 'none'
 
-/** Right-hand properties panel on the issue page. Every property is a menu; changes save at once. */
-export function IssueProperties({ issue }: { issue: IssueDetail }) {
-  const { workspace, members, labels, canManage, userId } = useIssueContext()
+/**
+ * Right-hand properties panel on the issue page. Every property is a menu;
+ * changes save at once. `menu` lets keyboard shortcuts open one.
+ */
+export function IssueProperties({
+  issue,
+  menu,
+  onMenuChange,
+}: {
+  issue: IssueDetail
+  menu: MenuKind | null
+  onMenuChange: (menu: MenuKind | null) => void
+}) {
+  const { workspace, members, labels, cycles, canManage, userId } = useIssueContext()
+  const menuFor = (kind: MenuKind) => ({
+    open: menu === kind,
+    onOpenChange: (open: boolean) => onMenuChange(open ? kind : null),
+  })
+  const cycle = cycles.find((c) => c.id === issue.cycle_id)
   const issues = useSuspenseQuery(workspaceIssuesQuery(workspace.id)).data
   const update = useUpdateIssue()
   const [now] = useState(Date.now)
@@ -47,7 +66,11 @@ export function IssueProperties({ issue }: { issue: IssueDetail }) {
   return (
     <aside aria-label="Properties" className="space-y-1 text-sm">
       <Row label="Status">
-        <StatusPicker value={issue.status} onChange={(status) => update.mutate({ issue, patch: { status } })}>
+        <StatusPicker
+          value={issue.status}
+          onChange={(status) => update.mutate({ issue, patch: { status } })}
+          {...menuFor('status')}
+        >
           <Value>
             <StatusIcon status={issue.status} />
             {statusLabel[issue.status]}
@@ -55,7 +78,11 @@ export function IssueProperties({ issue }: { issue: IssueDetail }) {
         </StatusPicker>
       </Row>
       <Row label="Priority">
-        <PriorityPicker value={issue.priority} onChange={(priority) => update.mutate({ issue, patch: { priority } })}>
+        <PriorityPicker
+          value={issue.priority}
+          onChange={(priority) => update.mutate({ issue, patch: { priority } })}
+          {...menuFor('priority')}
+        >
           <Value muted={issue.priority === 0}>
             <PriorityIcon priority={issue.priority} />
             {priorityLabel[issue.priority]}
@@ -68,6 +95,7 @@ export function IssueProperties({ issue }: { issue: IssueDetail }) {
           members={members}
           userId={userId}
           onChange={(assignee_id) => update.mutate({ issue, patch: { assignee_id } })}
+          {...menuFor('assignee')}
         >
           <Value muted={!assignee}>
             {assignee ? (
@@ -90,6 +118,7 @@ export function IssueProperties({ issue }: { issue: IssueDetail }) {
           labels={labels}
           canCreate={canManage}
           onChange={(labelIds) => update.mutate({ issue, labelIds })}
+          {...menuFor('label')}
         >
           <Value muted={issueLabels.length === 0} className="h-auto min-h-8 flex-wrap py-1">
             {issueLabels.length === 0 ? (
@@ -101,6 +130,19 @@ export function IssueProperties({ issue }: { issue: IssueDetail }) {
             )}
           </Value>
         </LabelPicker>
+      </Row>
+      <Row label="Cycle">
+        <CyclePicker
+          value={issue.cycle_id}
+          cycles={cycles}
+          onChange={(cycle_id) => update.mutate({ issue, patch: { cycle_id } })}
+          {...menuFor('cycle')}
+        >
+          <Value muted={!cycle}>
+            <IterationCw className="size-4" />
+            <span className="truncate">{cycle ? cycleTitle(cycle) : 'No cycle'}</span>
+          </Value>
+        </CyclePicker>
       </Row>
       <Row label="Estimate">
         <Picker

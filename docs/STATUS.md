@@ -1,6 +1,6 @@
 # DevDock: project status
 
-_Last updated: 2026-09-25 (Phase 6a: issues)_
+_Last updated: 2026-09-25 (Phase 6b: cycles, filters, activity, shortcuts)_
 
 A handoff for anyone (human or AI) planning the next phase. For conventions, see [CLAUDE.md](../CLAUDE.md); for setup, see [README.md](../README.md).
 
@@ -31,6 +31,7 @@ A private software-engineering teaching workspace for one instructor and a few s
 | 5b: Rich docs editor (Dropbox Paper-style, TipTap) + doc images | 🟡 Migration applied to hosted project, types regenerated; body/image RLS verified locally (24/24); editor checked with mocked Supabase; **not yet tried with real accounts / real Storage** | `feat/docs` |
 | 5c: Diagrams (Lucidchart-style editor, React Flow) | 🟡 Migration applied to hosted project, types regenerated; RLS verified locally (55/55); editor checked with mocked Supabase (40 browser checks); **not yet tried with real accounts** | `feat/diagrams` (from `feat/docs`) |
 | 6a: Issues, part 1 (Linear-style: issues, sub-issues, status/priority/assignee/labels, List + Board, comments) | 🟡 Migration applied to hosted project, types regenerated; RLS verified locally (87/87); UI checked with mocked Supabase (49 browser checks, 4 clean runs); **not yet tried with real accounts** | `feat/issues` (from `feat/diagrams`) |
+| 6b: Issues, part 2 (cycles, tabs + filters, activity log, keyboard shortcuts) | 🟡 Migration applied to hosted project, types regenerated; RLS verified locally (52/52, plus 87/87 and 55/55 still pass); UI checked with mocked Supabase (99 browser checks incl. phase 1, 3 clean runs); **not yet tried with real accounts** | `feat/issues` |
 
 ### Phase 1: frontend shell
 - Collapsible sidebar (slide-out panel on mobile) with Overview, Lessons, Live Class, Resources, Members and Settings; a breadcrumb header; and a light/dark/system theme.
@@ -477,7 +478,45 @@ Migration `20260925001632_add_workspace_invites.sql`: tested locally (28 checks)
   - Inline status and assignee menus; collapsing groups; board drag; the page doesn't overflow sideways.
   - Issue-page edits (title, description autosave, estimate, labels, due date, parent options), sub-issue creation and progress, comments, delete, unknown number 404s.
   - Member restrictions; a failed save rolling back; settings (key, labels); the issues tab when the tool is off. Diagrams' 40 checks still pass.
-- **Not built yet (Phase 6b):** cycles, filters and "My issues", an activity log, keyboard shortcuts. Also not built: issue relations, notifications, live updates.
+- Phase 6b below added cycles, filters/"My issues", the activity log and keyboard shortcuts.
+
+### Phase 6b: Issues, part 2 (cycles, filters, activity, shortcuts)
+- **Migration** `20260925060642_issues_cycles_and_activity.sql` (applied to the hosted project; types regenerated):
+  - **`issue_cycles`:** columns `number` (per workspace), optional `name`, and `starts_on`/`ends_on` dates.
+    - The `prepare_issue_cycle` trigger (security definer) numbers cycles under an advisory lock and refuses overlapping dates with error `23P01`. Reversed dates are left to the check constraint, so users see a clear message; the local tests caught that the date-range builder would otherwise throw a generic error first.
+    - Only managers can write cycles; workspace viewers can read them.
+  - **`issues.cycle_id`:** deleting a cycle keeps its issues. `check_issue` (replaced) also requires the cycle to be in the issue's workspace. Members can set `cycle_id` (column grant).
+  - **`rpc('move_open_issues', p_from, p_to)`** (security invoker): moves a cycle's unfinished issues to another cycle, or out of cycles when `p_to` is null. Returns how many moved.
+  - **`issue_activity`:**
+    - Written only by the `log_issue_activity` trigger (after insert/update on issues, one row per changed field: title, status, priority, assignee, parent, cycle, estimate, due date; description edits aren't logged) and by `log_issue_label_activity` (label added/removed, stored by name).
+    - Label removals caused by deleting the issue or the label aren't logged.
+    - Clients get `select` only.
+- **Local RLS tests: 52/52 pass** (`scratchpad/issues2-test.sql`):
+  - Cycles: numbering, overlap on edit and at a shared boundary day, reversed dates, column grants, per-workspace numbering, visibility, manager-only writes.
+  - A cycle from another workspace is refused.
+  - Activity: rows per field with the actor, nothing on no-op or description edits, no client writes/edits/deletes, labels by name, no entry when a label is deleted.
+  - Moving open issues: done issues stay; cross-workspace refused; a no-op for outsiders.
+  - Cascades: deleting a cycle (issues kept), an issue (its activity removed), and a workspace with labelled issues.
+  - The Phase 6a (87/87) and Diagrams (55/55) suites still pass.
+- **Frontend:**
+  - **Issues sub-navigation:** All issues · Active · Backlog · My issues | Cycles (`IssuesNav`). Tabs, filters and List/Board are URL state.
+  - **Filters:** a Filter menu (`F`) with a checkbox submenu per property: status, priority, assignee (me, none, members), labels, cycle (current, none, cycles).
+    - Each active filter shows as a chip ("Priority is any of Urgent, High") that you can edit with search or remove with ×; there's also a Clear button.
+    - Filters are kept in React state and mirrored to the URL, so quick successive picks don't lose each other (a real bug found in testing).
+  - **Cycles page:** Current / Upcoming / Past sections with dates, "N days left", and a progress bar (done / scope). Managers can create (the new cycle starts the day after the last one ends; 1/2/3-week presets), edit or delete a cycle.
+  - **A cycle's page:** Scope / Started / Completed and progress; its issues as a List or Board with filters; previous/next arrows.
+    - Managers can move open issues to the next cycle or out of cycles, and edit or delete the cycle.
+    - Issues created there start in that cycle.
+  - **Cycle everywhere:** a Cycle property on the issue page, a chip in "New issue", and a cycle number on list rows.
+  - **Activity feed** on the issue page: history lines ("Sam Chen changed status from Todo to In Progress", with icons; assignee, parent and cycle ids resolved to names) interleaved with comments.
+  - **Keyboard shortcuts** (`useShortcuts`, `?` shows them all):
+    - Lists: `C` new issue, `J`/`K` or ↓/↑ to move the focus (hover focuses too, as in Linear), `Enter` to open.
+    - Acting on the focused row or the open issue: `S`/`P`/`A`/`L`/`⇧C` open the status, priority, assignee, labels and cycle menus; `I` assigns to me.
+    - Issue page: `Esc` goes back to the list.
+    - Shortcuts are ignored while typing or while a menu or dialog is open.
+    - Two real issues were found and fixed in testing. Menus animating closed swallowed the next key; the check now only counts `data-state="open"` overlays. The menu's search box kept focus after a choice; it's now released at once.
+- **Mocked-Supabase Playwright:** `scratchpad/issues-test.mjs` now runs 99 checks (the Phase 6a ones plus Phase 6b tabs, filters, shortcuts, cycles for lead and member, and activity), 3 clean runs in a row. Diagrams' 40 still pass.
+- **Not built:** automatic cycle rollover (it's a manual action), issue relations (blocks / related / duplicate), notifications, live updates, and a team-wide "My issues" across workspaces.
 
 ## Current configuration (hosted)
 - **Supabase URL Configuration:** Site URL `http://localhost:5173`; Redirect URLs `http://localhost:5173/**`.

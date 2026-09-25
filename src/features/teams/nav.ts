@@ -42,6 +42,10 @@ export const diagramPath = (teamSlug: string, diagramId: string, workspaceId?: s
 
 /** Issues are workspace-only (no team-wide view). */
 export const issuesPath = (teamSlug: string, workspaceId: string) => `${workspacePath(teamSlug, workspaceId)}/issues`
+/** A workspace's cycles, and one cycle by its number. */
+export const cyclesPath = (teamSlug: string, workspaceId: string) => `${issuesPath(teamSlug, workspaceId)}/cycles`
+export const cyclePath = (teamSlug: string, workspaceId: string, number: number) =>
+  `${cyclesPath(teamSlug, workspaceId)}/${number}`
 /** One issue, by its number in the workspace (CAP-12 → 12). */
 export const issuePath = (teamSlug: string, workspaceId: string, number: number) =>
   `${issuesPath(teamSlug, workspaceId)}/${number}`
