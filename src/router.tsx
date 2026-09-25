@@ -2,21 +2,25 @@ import { createBrowserRouter, Outlet, redirect } from 'react-router'
 import { AuthLoading } from '@/features/auth/components/AuthLoading'
 import { authCallbackLoader, loginLoader } from '@/features/auth/loaders'
 import { watchAuthIdentity } from '@/features/auth/session'
+import { diagramLoader } from '@/features/diagrams/loaders'
 import { docLoader } from '@/features/docs/loaders'
 import { TEAM_TOOLS } from '@/features/teams/nav'
 import { appIndexLoader, onboardingLoader, teamLoader, workspaceLoader } from '@/features/teams/loaders'
 import { AppLayout } from '@/layouts/AppLayout'
 import { APP_ROUTE_ID, appLoader } from '@/layouts/app-loader'
 import { queryClient } from '@/lib/query-client'
+import { DiagramPage } from '@/routes/DiagramPage'
 import { DocPage } from '@/routes/DocPage'
 import { LoginPage } from '@/routes/LoginPage'
 import { NotFoundPage, RouteErrorPage } from '@/routes/NotFoundPage'
 import { OnboardingPage } from '@/routes/OnboardingPage'
+import { TeamDiagramsPage } from '@/routes/team/TeamDiagramsPage'
 import { TeamDocsPage } from '@/routes/team/TeamDocsPage'
 import { TeamMembersPage } from '@/routes/team/TeamMembersPage'
 import { TeamSettingsPage } from '@/routes/team/TeamSettingsPage'
 import { TeamToolPage } from '@/routes/team/TeamToolPage'
 import { TeamWorkspacesPage } from '@/routes/team/TeamWorkspacesPage'
+import { WorkspaceDiagramsPage } from '@/routes/workspace/WorkspaceDiagramsPage'
 import { WorkspaceDocsPage } from '@/routes/workspace/WorkspaceDocsPage'
 import { WorkspaceLayout } from '@/routes/workspace/WorkspaceLayout'
 import { WorkspaceMembersPage } from '@/routes/workspace/WorkspaceMembersPage'
@@ -67,8 +71,10 @@ export const router = createBrowserRouter([
               // Team → Docs: team-wide docs + docs of every workspace the user can see.
               { path: 'docs', element: <TeamDocsPage /> },
               { path: 'docs/:docId', loader: docLoader, element: <DocPage /> },
-              // Team-wide views of tools not built yet (Diagrams, Live): placeholders.
-              ...TEAM_TOOLS.filter((tool) => tool !== 'docs').map((tool) => ({
+              { path: 'diagrams', element: <TeamDiagramsPage /> },
+              { path: 'diagrams/:diagramId', loader: diagramLoader, element: <DiagramPage /> },
+              // Team-wide views of tools not built yet (Live): placeholders.
+              ...TEAM_TOOLS.filter((tool) => tool !== 'docs' && tool !== 'diagrams').map((tool) => ({
                 path: tool,
                 element: <TeamToolPage tool={tool} />,
               })),
@@ -90,7 +96,16 @@ export const router = createBrowserRouter([
                       { path: ':docId', loader: docLoader, element: <DocPage /> },
                     ],
                   },
-                  // Feature tabs that don't exist yet (Diagrams, Live, …); checked against the enabled tools.
+                  {
+                    // Only diagrams assigned to this workspace.
+                    path: 'diagrams',
+                    element: <WorkspaceToolGate tool="diagrams" />,
+                    children: [
+                      { index: true, element: <WorkspaceDiagramsPage /> },
+                      { path: ':diagramId', loader: diagramLoader, element: <DiagramPage /> },
+                    ],
+                  },
+                  // Feature tabs that don't exist yet (Live, …); checked against the enabled tools.
                   { path: ':tab', element: <WorkspaceTabPage /> },
                 ],
               },

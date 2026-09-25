@@ -1,6 +1,6 @@
 # DevDock: project status
 
-_Last updated: 2026-09-25 (Phase 5b: rich docs editor)_
+_Last updated: 2026-09-25 (Phase 5c: diagrams)_
 
 A handoff for anyone (human or AI) planning the next phase. For conventions, see [CLAUDE.md](../CLAUDE.md); for setup, see [README.md](../README.md).
 
@@ -8,7 +8,7 @@ A handoff for anyone (human or AI) planning the next phase. For conventions, see
 
 A private software-engineering teaching workspace for one instructor and a few students. It's not a public product: optimize for clarity, low maintenance and low hosting cost. Repo folder `DevDock-website`. Default branch `prod`.
 
-**Stack:** React 19 + TypeScript (strict) + Vite, React Router 7 (data mode), Tailwind v4, shadcn/ui, TanStack Query, and Supabase (Postgres, Auth, RLS). Planned: TipTap, draw.io, Jitsi Meet, GitHub links, Vercel hosting.
+**Stack:** React 19 + TypeScript (strict) + Vite, React Router 7 (data mode), Tailwind v4, shadcn/ui, TanStack Query, and Supabase (Postgres, Auth, RLS). TipTap (docs) and React Flow (diagrams) are in. Planned: Jitsi Meet, GitHub links, Vercel hosting.
 
 ## Phases
 
@@ -29,6 +29,7 @@ A private software-engineering teaching workspace for one instructor and a few s
 | 4h: Team-level tools (Docs, Diagrams, Live) nav + placeholder pages | ✅ Merged to `prod` (PR #3, with 4f/4g) | `prod` |
 | 5a: Docs (documents table, RLS, list/create/edit/delete) | ✅ Committed (`4bed00d`); RLS verified locally (50/50); not yet clicked through with real accounts | `feat/docs` |
 | 5b: Rich docs editor (Dropbox Paper-style, TipTap) + doc images | 🟡 Migration applied to hosted project, types regenerated; body/image RLS verified locally (24/24); editor checked with mocked Supabase; **not yet tried with real accounts / real Storage** | `feat/docs` |
+| 5c: Diagrams (Lucidchart-style editor, React Flow) | 🟡 Migration applied to hosted project, types regenerated; RLS verified locally (55/55); editor checked with mocked Supabase (40 browser checks); **not yet tried with real accounts** | `feat/diagrams` (from `feat/docs`) |
 
 ### Phase 1: frontend shell
 - Collapsible sidebar (slide-out panel on mobile) with Overview, Lessons, Live Class, Resources, Members and Settings; a breadcrumb header; and a light/dark/system theme.
@@ -399,6 +400,43 @@ Migration `20260925001632_add_workspace_invites.sql`: tested locally (28 checks)
 - Automated browser tests, logged out: every new route redirects to `/login` with `next` preserved; the old `/courses/demo` URL now 404s; there are no console errors.
 - **Not yet verified with a signed-in user.** Manual testing was chosen over temporary test accounts. See the checklist in the Phase 4b report.
 
+### Phase 5c: Diagrams (Lucidchart-style)
+- **Choice:** the user wanted Lucidchart-like architecture diagrams that **look like DevDock**. draw.io was the planned embed, but it runs in an iframe with its own UI, so we built our own editor on **React Flow** (`@xyflow/react` 12, MIT). Scope agreed with the user: basic shapes, architecture icons, proper connectors, a properties panel and everyday editing. Export and templates are not built.
+- **Migration** `20260925043413_create_diagrams.sql` (applied to the hosted project; types regenerated):
+  - `diagrams` (`team_id`, nullable `workspace_id` with the same composite FK as documents, `title`, `data jsonb` defaulting to `{"nodes":[],"edges":[]}`, `created_by` default `auth.uid()`, timestamps with the `set_updated_at` trigger). Checks: title 1–200 chars; `data` must be an object of at most 2 MB.
+  - **Same access rules as docs**, reusing `private.can_read_document` / `private.can_write_document` (they only take team and workspace). Grants: select/delete; insert on `team_id, workspace_id, title, data`; update on `title, data`. Scope and author can't change.
+- **Local RLS tests: 55/55 pass** (`scratchpad/diagrams-test.sql`, derived from the docs suite, on a fresh local Postgres with every migration): create/read/update/delete for owner, admin, lead, member, plain member, outsider and anon; column grants; the FK; losing access on removal or demotion; cascade on workspace delete; the default, object-only and size checks.
+- **Frontend:**
+  - `features/diagrams/{api,loaders,hooks}.ts`. The access rule is `useCanWriteDiagrams`, which is the docs rule.
+  - Pages: `TeamDiagramsPage`, `WorkspaceDiagramsPage` (the list reuses `DocList` with an icon prop) and `DiagramPage`, which lazy-loads `DiagramView` (about 77 kB gzipped).
+  - Routes: `/t/:slug/diagrams[/:diagramId]` and `…/w/:id/diagrams[/:diagramId]` (under `WorkspaceToolGate`). The breadcrumb shows the diagram title.
+  - The "New doc" dialog became the shared `components/CreateInScopeDialog`, and `CreateDocDialog`/`CreateDiagramDialog` wrap it.
+- **Editor** (`features/diagrams/editor/*`):
+  - **Shape panel** (searchable; click to add, or drag onto the canvas):
+    - 12 shapes: rectangle, rounded, ellipse, decision, cylinder, input/output, hexagon, triangle, document, cloud, note and text.
+    - 2 containers: Group and dashed Zone.
+    - 49 architecture icons (Lucide) in 7 groups: clients, compute, data, network, messaging, security, dev & ops. Each group has its own default color.
+  - **Containers** work like Lucid's. A shape dropped or moved into one becomes its child (the smallest container under its center) and moves with it; dragging it out detaches it. Copying a container copies its contents.
+  - **Connectors:**
+    - Drag from a side dot (4 per shape, visible on hover and while connecting). Ends can be reattached.
+    - Routing: elbow, straight or curved. Arrowheads: none, end or both. Solid or dashed, 9 colors, an optional label (double-click to edit) and an "animate direction" flow.
+    - Arrowheads are drawn per edge, so they follow the line color in both themes.
+  - **Properties panel:**
+    - Text field, fill (none plus 9 colors), border color and style (solid, dashed or none), and text size S/M/L plus bold.
+    - Align ×6 and distribute ×2 for multi-selections; to front, to back, duplicate and delete.
+    - With nothing selected: snap to grid and a shortcuts list.
+    - The toolbar button at the far right collapses the panel; the choice is remembered in this browser (localStorage).
+  - **Editing:**
+    - Double-click or Enter edits text in place.
+    - Undo and redo (⌘Z, ⇧⌘Z or ⌘Y), copy, cut, paste and duplicate (⌘C/X/V/D), select all (⌘A), arrow-key nudge (1 px, or 10 px with Shift), delete (⌫).
+    - Dragging on the canvas selects an area; space-drag or scroll pans; ⌘-scroll or pinch zooms.
+    - Alignment guides snap a dragged shape to others' edges and centers.
+    - The toolbar has zoom and fit controls and full screen (Esc exits).
+  - **Autosave** 1 s after a change, with the same flow as Docs: an Editing/Saving/Saved status, ⌘S, and a save before leaving the page or a warning on close. Opening a diagram doesn't save. Only content is stored (no selection or measurements), and `parse()` drops malformed stored data.
+  - **Read-only** viewers get the same canvas (pan and zoom) with no panels or editing. On phones the side panels are hidden.
+- **Mocked-Supabase Playwright** (`scratchpad/diagram-test.mjs`, light and dark, 40 checks, no page errors): rendering; click/drag add; label edit plus undo/redo; connecting; connector styling; fill; copy/paste/duplicate/delete; container duplicate/undo; drag into a container sets `parentId`; autosave payload (title, styles, no per-viewer state, parents first); Enter-to-edit; align; full screen; search; reload round-trip; read-only (no panel, no edits, no writes, no New button); create → delete; a cross-workspace URL 404s. At 390 px the page has no horizontal overflow.
+- **Not built:** export (PNG/SVG), templates, shape rotation, and connectors that route around shapes.
+
 ## Current configuration (hosted)
 - **Supabase URL Configuration:** Site URL `http://localhost:5173`; Redirect URLs `http://localhost:5173/**`.
 - **Supabase Google provider:** enabled. Client ID and secret are set in the dashboard only; nonce checks are on; users without an email are not allowed.
@@ -409,7 +447,7 @@ Migration `20260925001632_add_workspace_invites.sql`: tested locally (28 checks)
 - **Phase 4b follow-ups:** manual testing of all flows with real accounts; ownership transfer (the schema supports it, but there's no UI or function yet).
 - **Still to design:** an ownership-transfer function (the schema supports it; there's no API yet), email invitations (today: invite codes, or an owner/admin adds by user id), lessons, resources and live sessions.
 - **Profile visibility between members:** needs a new, narrowly scoped `profiles` SELECT policy, e.g. "users who share a workspace". Today it's own-row only, so member lists can show roles but not other people's names or avatars. `workspace_members.user_id` and `course_members.user_id` reference `profiles`, so the API can embed them once that policy exists.
-- **Later:** TipTap, draw.io, Jitsi, Storage, Vercel deployment.
+- **Later:** Jitsi, Vercel deployment.
 
 ## Open items and decisions for Phase 4
 - **Who may use DevDock:** any Google account allowed by Google (only listed test users while the app is in *Testing* mode) can sign in, and any signed-in user can create their own workspace. They can't see or join anyone else's. If workspace creation should be restricted (e.g. instructors only), that needs a follow-up migration.

@@ -1,4 +1,4 @@
-import { FileText } from 'lucide-react'
+import { FileText, type LucideIcon } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { PersonAvatar } from '@/components/PersonRow'
@@ -13,10 +13,12 @@ type DocListProps = {
   /** Team view: show which workspace (or Team-wide) each doc belongs to. */
   showScope?: boolean
   empty: ReactNode
+  /** Row icon (the diagrams list reuses this component). */
+  icon?: LucideIcon
 }
 
 /** Dense, hairline-separated doc list (title | scope | author | updated). */
-export function DocList({ docs, href, showScope = false, empty }: DocListProps) {
+export function DocList({ docs, href, showScope = false, empty, icon: Icon = FileText }: DocListProps) {
   const [now] = useState(Date.now)
   const columns = showScope
     ? 'md:grid-cols-[minmax(0,1fr)_200px_160px_96px]'
@@ -44,7 +46,7 @@ export function DocList({ docs, href, showScope = false, empty }: DocListProps) 
               className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-0.5 px-3 py-2.5 transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none ${columns}`}
             >
               <span className="flex min-w-0 items-center gap-2.5">
-                <FileText className="size-4 shrink-0 text-muted-foreground" />
+                <Icon className="size-4 shrink-0 text-muted-foreground" />
                 <span className="truncate text-sm font-medium">{doc.title}</span>
               </span>
               {showScope && (
