@@ -6,8 +6,12 @@ import { ThemeProvider } from '@/components/ThemeProvider'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { queryClient } from '@/lib/query-client'
+import { watchForStaleBuild } from '@/lib/stale-build'
 import { router } from '@/router'
 import './index.css'
+
+// A tab left open across a deploy reloads itself instead of failing to open pages.
+watchForStaleBuild()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
