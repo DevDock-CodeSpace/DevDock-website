@@ -1,7 +1,7 @@
 import type { LucideIcon } from 'lucide-react'
 import { PageHeader } from '@/components/PageHeader'
 
-/** Placeholder for course sections whose data model doesn't exist yet. */
+/** Placeholder for workspace sections whose data model doesn't exist yet. */
 export function ComingSoonPage({ title, icon: Icon, description }: { title: string; icon: LucideIcon; description: string }) {
   return (
     <>

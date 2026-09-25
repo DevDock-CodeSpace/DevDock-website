@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { LoaderCircle } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
+import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { PageHeader } from '@/components/PageHeader'
@@ -8,135 +9,116 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useAuth } from '@/features/auth/hooks'
-import { deleteWorkspace, removeWorkspaceMember, renameWorkspace } from '@/features/workspaces/api'
-import { useCurrentWorkspace, useExitWorkspace } from '@/features/workspaces/hooks'
-import { workspaceRoleLabel } from '@/features/workspaces/permissions'
+import { Textarea } from '@/components/ui/textarea'
+import { useCurrentTeam, useCurrentWorkspace } from '@/features/teams/hooks'
+import { teamPath } from '@/features/teams/nav'
+import { deleteWorkspace, updateWorkspace, workspaceQuery, type WorkspaceType } from '@/features/workspaces/api'
+import { WorkspaceTypeSelect } from '@/features/workspaces/components/WorkspaceTypeSelect'
 import { errorMessage } from '@/lib/errors'
 
 export function WorkspaceSettingsPage() {
-  const { workspace, role, can } = useCurrentWorkspace()
+  const { workspace, can } = useCurrentWorkspace()
+
+  if (!can.canEdit) {
+    return (
+      <>
+        <PageHeader title="Settings" />
+        <p className="text-sm text-muted-foreground">Only the workspace lead and team owners/admins can change workspace settings.</p>
+      </>
+    )
+  }
 
   return (
     <>
-      <PageHeader title="Settings" description={`Workspace settings. Your role: ${workspaceRoleLabel[role]}.`} />
+      <PageHeader title="Settings" description="Workspace details." />
       <div className="space-y-6">
-        <GeneralCard key={workspace.id} />
-        {can.canLeave && <LeaveCard />}
-        {can.canDelete && <DeleteCard />}
+        <DetailsCard key={workspace.updated_at} />
+        {can.canDelete && <DeleteWorkspaceCard />}
       </div>
     </>
   )
 }
 
-function GeneralCard() {
-  const { workspace, can } = useCurrentWorkspace()
+function DetailsCard() {
+  const { team } = useCurrentTeam()
+  const { workspace } = useCurrentWorkspace()
   const queryClient = useQueryClient()
-  const [name, setName] = useState(workspace.name)
-  const dirty = name.trim() !== workspace.name && name.trim().length > 0
+  const [title, setTitle] = useState(workspace.title)
+  const [description, setDescription] = useState(workspace.description ?? '')
+  const [type, setType] = useState<WorkspaceType>(workspace.type)
+  const dirty =
+    title.trim() !== workspace.title || description.trim() !== (workspace.description ?? '') || type !== workspace.type
 
-  const rename = useMutation({
-    mutationFn: () => renameWorkspace(workspace.id, name),
+  const save = useMutation({
+    mutationFn: () => updateWorkspace(workspace.id, { title, description, type }),
     onSuccess: () => {
-      toast.success('Workspace renamed')
-      return queryClient.invalidateQueries({ queryKey: ['workspaces'] })
+      toast.success('Workspace saved')
+      return Promise.all([
+        queryClient.invalidateQueries({ queryKey: workspaceQuery(workspace.id).queryKey }),
+        queryClient.invalidateQueries({ queryKey: ['workspaces', 'team', team.id] }),
+      ])
     },
     onError: (error) => toast.error(errorMessage(error)),
   })
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
-    if (dirty) rename.mutate()
+    if (dirty && title.trim()) save.mutate()
   }
 
   return (
     <Card>
       <form onSubmit={submit}>
         <CardHeader>
-          <CardTitle>General</CardTitle>
-          <CardDescription>
-            {can.canRename ? 'Owners and admins can rename the workspace.' : 'Only owners and admins can change these.'}
-          </CardDescription>
+          <CardTitle>Details</CardTitle>
+          <CardDescription>Shown to everyone in the workspace.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 py-4">
           <div className="space-y-1.5">
-            <Label htmlFor="ws-name">Name</Label>
-            <Input
-              id="ws-name"
-              value={name}
-              maxLength={100}
-              disabled={!can.canRename}
-              onChange={(e) => setName(e.target.value)}
-            />
+            <Label htmlFor="ws-type">Type</Label>
+            <WorkspaceTypeSelect id="ws-type" value={type} onChange={setType} />
           </div>
           <div className="space-y-1.5">
-            <Label>URL</Label>
-            <p className="font-mono text-sm text-muted-foreground">/w/{workspace.slug}</p>
+            <Label htmlFor="ws-title">Title</Label>
+            <Input id="ws-title" value={title} maxLength={200} onChange={(e) => setTitle(e.target.value)} required />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="ws-description">Description</Label>
+            <Textarea
+              id="ws-description"
+              value={description}
+              maxLength={5000}
+              rows={4}
+              onChange={(e) => setDescription(e.target.value)}
+            />
           </div>
         </CardContent>
-        {can.canRename && (
-          <CardFooter className="justify-end">
-            <Button type="submit" disabled={!dirty || rename.isPending}>
-              {rename.isPending && <LoaderCircle className="animate-spin" />}
-              Save
-            </Button>
-          </CardFooter>
-        )}
+        <CardFooter className="justify-end">
+          <Button type="submit" disabled={!dirty || !title.trim() || save.isPending}>
+            {save.isPending && <LoaderCircle className="animate-spin" />}
+            Save
+          </Button>
+        </CardFooter>
       </form>
     </Card>
   )
 }
 
-function LeaveCard() {
-  const { user } = useAuth()
+function DeleteWorkspaceCard() {
+  const { team } = useCurrentTeam()
   const { workspace } = useCurrentWorkspace()
-  const exitWorkspace = useExitWorkspace()
+  const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const [confirming, setConfirming] = useState(false)
-
-  const leave = useMutation({
-    mutationFn: () => removeWorkspaceMember(workspace.id, user.id),
-    onSuccess: async () => {
-      toast.success(`You left ${workspace.name}`)
-      await exitWorkspace(workspace.id)
-    },
-    onError: (error) => toast.error(errorMessage(error)),
-  })
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Leave workspace</CardTitle>
-        <CardDescription>You’ll lose access to this workspace and all of its courses.</CardDescription>
-      </CardHeader>
-      <CardFooter className="justify-end">
-        <Button variant="outline" onClick={() => setConfirming(true)}>
-          Leave workspace
-        </Button>
-      </CardFooter>
-      <ConfirmDialog
-        open={confirming}
-        onOpenChange={setConfirming}
-        title={`Leave ${workspace.name}?`}
-        description="You’ll need a new invite code to come back."
-        confirmLabel="Leave"
-        pending={leave.isPending}
-        onConfirm={() => leave.mutate()}
-      />
-    </Card>
-  )
-}
-
-function DeleteCard() {
-  const { workspace } = useCurrentWorkspace()
-  const exitWorkspace = useExitWorkspace()
-  const [confirming, setConfirming] = useState(false)
-  const [typed, setTyped] = useState('')
 
   const remove = useMutation({
     mutationFn: () => deleteWorkspace(workspace.id),
     onSuccess: async () => {
-      toast.success(`${workspace.name} was deleted`)
-      await exitWorkspace(workspace.id)
+      toast.success(`${workspace.title} was deleted`)
+      // Leave the page before dropping its data (see useExitTeam for why).
+      await navigate(teamPath(team.slug), { replace: true })
+      queryClient.removeQueries({ queryKey: ['workspaces', workspace.id] })
+      await queryClient.invalidateQueries({ queryKey: ['workspaces', 'team', team.id] })
     },
     onError: (error) => toast.error(errorMessage(error)),
   })
@@ -145,9 +127,7 @@ function DeleteCard() {
     <Card className="ring-destructive/30">
       <CardHeader>
         <CardTitle>Delete workspace</CardTitle>
-        <CardDescription>
-          Permanently deletes the workspace, its courses, memberships, and invite codes. This can’t be undone.
-        </CardDescription>
+        <CardDescription>Removes the workspace and everyone’s access to it. People stay in the team.</CardDescription>
       </CardHeader>
       <CardFooter className="justify-end">
         <Button variant="destructive" onClick={() => setConfirming(true)}>
@@ -156,19 +136,13 @@ function DeleteCard() {
       </CardFooter>
       <ConfirmDialog
         open={confirming}
-        onOpenChange={(open) => {
-          setConfirming(open)
-          if (!open) setTyped('')
-        }}
-        title={`Delete ${workspace.name}?`}
-        description="Everyone loses access immediately. Type the workspace name to confirm."
-        confirmLabel="Delete forever"
+        onOpenChange={setConfirming}
+        title={`Delete ${workspace.title}?`}
+        description="This can’t be undone."
+        confirmLabel="Delete workspace"
         pending={remove.isPending}
-        confirmDisabled={typed !== workspace.name}
         onConfirm={() => remove.mutate()}
-      >
-        <Input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={workspace.name} aria-label="Workspace name" />
-      </ConfirmDialog>
+      />
     </Card>
   )
 }

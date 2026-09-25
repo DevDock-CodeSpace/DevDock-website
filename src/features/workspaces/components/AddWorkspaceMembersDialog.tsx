@@ -14,35 +14,41 @@ import {
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { addCourseMember, courseMembersQuery, type CourseRole } from '@/features/courses/api'
-import { workspaceMembersQuery } from '@/features/workspaces/api'
-import { useCurrentCourse, useCurrentWorkspace } from '@/features/workspaces/hooks'
+import { teamMembersQuery } from '@/features/teams/api'
+import { TeamInviteCode } from '@/features/teams/components/TeamInviteCode'
+import { useCurrentTeam, useCurrentWorkspace } from '@/features/teams/hooks'
+import { addWorkspaceMember, workspaceMembersQuery, type WorkspaceRole } from '../api'
 import { errorMessage } from '@/lib/errors'
 import { initials } from '@/lib/utils'
 
-/** Add people who are already in the workspace to this course. */
-export function AddCourseMembersDialog() {
-  const { workspace } = useCurrentWorkspace()
-  const { course, can } = useCurrentCourse()
+/** Add people who are already in the team to this workspace. */
+export function AddWorkspaceMembersDialog() {
+  const { team } = useCurrentTeam()
+  const { workspace, can } = useCurrentWorkspace()
   const queryClient = useQueryClient()
+  const teamMembers = useSuspenseQuery(teamMembersQuery(team.id)).data
   const workspaceMembers = useSuspenseQuery(workspaceMembersQuery(workspace.id)).data
-  const courseMembers = useSuspenseQuery(courseMembersQuery(course.id)).data
-  const [role, setRole] = useState<CourseRole>('member')
-  const inCourse = new Set(courseMembers.map((m) => m.user_id))
-  const candidates = workspaceMembers.filter((m) => !inCourse.has(m.user_id))
+  const [role, setRole] = useState<WorkspaceRole>('member')
+  const inWorkspace = new Set(workspaceMembers.map((m) => m.user_id))
+  const candidates = teamMembers.filter((m) => !inWorkspace.has(m.user_id))
 
   const add = useMutation({
-    mutationFn: (userId: string) => addCourseMember(course.id, userId, role),
+    mutationFn: (userId: string) => addWorkspaceMember(workspace.id, userId, role),
     onSuccess: () =>
       Promise.all([
-        queryClient.invalidateQueries({ queryKey: courseMembersQuery(course.id).queryKey }),
-        queryClient.invalidateQueries({ queryKey: ['courses', 'workspace', workspace.id] }),
+        queryClient.invalidateQueries({ queryKey: workspaceMembersQuery(workspace.id).queryKey }),
+        queryClient.invalidateQueries({ queryKey: ['workspaces', 'team', team.id] }),
       ]),
     onError: (error) => toast.error(errorMessage(error)),
   })
 
   return (
-    <Dialog>
+    <Dialog
+      onOpenChange={(open) => {
+        // Pick up anyone who just joined the team with an invite code.
+        if (open) void queryClient.invalidateQueries({ queryKey: teamMembersQuery(team.id).queryKey })
+      }}
+    >
       <DialogTrigger asChild>
         <Button>
           <UserPlus /> Add people
@@ -50,16 +56,16 @@ export function AddCourseMembersDialog() {
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add people to {course.title}</DialogTitle>
+          <DialogTitle>Add people to {workspace.title}</DialogTitle>
           <DialogDescription>
-            Only members of {workspace.name} can be added. To bring in someone new, share a workspace invite code first.
+            Pick from people already in {team.name}. To bring in someone new, share the team invite code below.
           </DialogDescription>
         </DialogHeader>
 
         {can.canAssignLeads && (
           <div className="flex items-center gap-3">
             <Label className="shrink-0">Add as</Label>
-            <Select value={role} onValueChange={(v) => setRole(v as CourseRole)}>
+            <Select value={role} onValueChange={(v) => setRole(v as WorkspaceRole)}>
               <SelectTrigger className="w-40">
                 <SelectValue />
               </SelectTrigger>
@@ -72,7 +78,7 @@ export function AddCourseMembersDialog() {
         )}
 
         {candidates.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">Everyone in this workspace is already in the course.</p>
+          <p className="py-6 text-center text-sm text-muted-foreground">Everyone in this team is already in the workspace.</p>
         ) : (
           <ul className="max-h-80 divide-y overflow-y-auto rounded-lg border">
             {candidates.map((person) => {
@@ -95,6 +101,8 @@ export function AddCourseMembersDialog() {
             })}
           </ul>
         )}
+
+        <TeamInviteCode />
       </DialogContent>
     </Dialog>
   )

@@ -11,7 +11,7 @@ npm install
 npm run dev        # http://localhost:5173
 ```
 
-Sign-in uses **Google via Supabase Auth**, so the app needs `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` (see [Environment variables](#environment-variables)). Workspaces, courses and memberships come from the database. Lessons, Live Class and Resources are placeholders until their tables exist.
+Sign-in uses **Google via Supabase Auth**, so the app needs `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` (see [Environment variables](#environment-variables)). Teams, workspaces and memberships come from the database; Lessons, Live Session and Resources are placeholders until their tables exist.
 
 Checks (all must pass before merging):
 
@@ -32,7 +32,7 @@ Node 22 LTS is recommended. Node 20 is end-of-life, and newer `@supabase/supabas
 | Supabase feature | DevDock use |
 |---|---|
 | Auth | Sign-in with Google (OAuth, PKCE flow) |
-| Postgres | Profiles now; courses, lessons, members, and resources later |
+| Postgres | Profiles, teams, workspaces, memberships and invites; lessons and resources later |
 | Row Level Security | The authorization layer: who can read or change which rows |
 | Storage | Later: uploaded files |
 
@@ -82,9 +82,10 @@ Current migrations (all applied to the hosted project):
 | Migration | What it does |
 |---|---|
 | `20260924214141_create_profiles.sql` | `profiles` table, `set_updated_at()` helper, RLS policies, and a trigger that creates a profile for each new auth user |
-| `20260925000709_create_workspaces_and_courses.sql` | Workspaces, courses and their memberships with roles; the exactly-one-owner rule; RLS |
-| `20260925001632_add_workspace_invites.sql` | Invite codes and the `join_workspace(invite_code)` RPC |
-| `20260925002856_profiles_visible_to_workspace_peers.sql` | Lets people who share a workspace see each other's name and avatar |
+| `20260925000709_create_workspaces_and_courses.sql` | Role model (originally "workspaces → courses"), with memberships, roles, the exactly-one-owner rule and RLS |
+| `20260925001632_add_workspace_invites.sql` | Invite codes and a join-by-code RPC |
+| `20260925002856_profiles_visible_to_workspace_peers.sql` | Lets people who share a group see each other's name and avatar |
+| `20260925010950_rename_to_teams_and_workspaces.sql` | **Renames to the current model:** teams (+ type) → workspaces (+ type), `team_role` and `workspace_role`, `join_team(invite_code)`. All policies and functions are recreated with the new names. |
 
 **Applying migrations to the hosted project** (after linking):
 
@@ -116,8 +117,21 @@ Commit the generated file. Re-run the command after every migration.
 - `public.profiles` holds one row per `auth.users` row: `display_name`, `avatar_url`, `created_at`, `updated_at`.
 - Rows are created by the `on_auth_user_created` trigger, which copies the name and avatar from OAuth metadata when they exist and leaves them null otherwise.
 - RLS: a signed-in user can **read** and **update** only their own profile. Anonymous users can't read profiles at all. Clients can't insert or delete profiles, and can only change `display_name` and `avatar_url`.
-- Visibility will be widened later (e.g. course members seeing each other's names) with an additional, narrowly scoped policy.
+- People who share a **team** can read each other's profile (name and avatar). There is no other visibility.
 - Generated `Insert`/`Update` types list every column, but database grants are stricter. Clients can only update `display_name` and `avatar_url`, and can't insert profiles at all.
+
+### Data model
+
+```
+team  (owner | admin | member; type: learning | development | general)
+ ├── team_members, team_invites  (join with an invite code → member)
+ └── workspaces  (type: course | project | general)
+      └── workspace_members  (lead | member; must already be in the team)
+```
+
+- **Roles live only in the membership tables.** A person can hold a different role in each team and workspace.
+- **Joining a team doesn't grant workspace access.** Team owners/admins, or a workspace's lead, add people to a workspace.
+- **URLs:** `/t/:teamSlug` shows a team's workspaces; `/t/:teamSlug/w/:workspaceId` is a workspace.
 
 ---
 
@@ -179,4 +193,4 @@ The app always sends `redirectTo = window.location.origin + '/auth/callback'`, s
 ### Not implemented yet (intentionally)
 
 - Lessons, resources and live sessions (no tables yet; the pages are placeholders).
-- **Restricting who can sign in.** Any Google account that Google allows (see *Testing* mode above) can sign in, and any signed-in user can create their own workspace. They can't see or join anyone else's without an invite code.
+- **Restricting who can sign in.** Any Google account that Google allows (see *Testing* mode above) can sign in, and any signed-in user can create their own team. They can't see or join anyone else's without an invite code.

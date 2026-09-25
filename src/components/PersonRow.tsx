@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
-import type { PersonProfile } from '@/features/workspaces/api'
+import type { PersonProfile } from '@/features/teams/api'
 import { initials } from '@/lib/utils'
 
 type PersonRowProps = {

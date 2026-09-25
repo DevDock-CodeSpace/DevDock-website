@@ -33,7 +33,7 @@ function ErrorScreen({ code, message, inline = false }: { code: string; message:
       <p className="font-mono text-sm text-muted-foreground">{code}</p>
       <h1 className="text-xl font-semibold">{message}</h1>
       <Button asChild variant="outline">
-        <Link to="/app">Back to your workspace</Link>
+        <Link to="/app">Back to your team</Link>
       </Button>
     </div>
   )

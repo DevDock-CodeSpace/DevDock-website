@@ -9,15 +9,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuth, useSignOut, useUserIdentity } from '@/features/auth/hooks'
-import { createWorkspace, joinWorkspace, myWorkspacesQuery, SLUG_PATTERN } from '@/features/workspaces/api'
-import { workspacePath } from '@/features/workspaces/nav'
-import { slugify } from '@/features/workspaces/slug'
+import { createTeam, joinTeam, myTeamsQuery, SLUG_PATTERN, type TeamType } from '@/features/teams/api'
+import { teamPath } from '@/features/teams/nav'
+import { teamTypes } from '@/features/teams/permissions'
+import { slugify } from '@/features/teams/slug'
+import { cn } from '@/lib/utils'
 
-/** Create a workspace (→ owner) or join one with an invite code (→ member). */
+/** Create a team (→ owner) or join one with an invite code (→ member). */
 export function OnboardingPage() {
   const { user } = useAuth()
-  const memberships = useSuspenseQuery(myWorkspacesQuery(user.id)).data
-  const isFirstWorkspace = memberships.length === 0
+  const memberships = useSuspenseQuery(myTeamsQuery(user.id)).data
+  const isFirstTeam = memberships.length === 0
 
   return (
     <div className="relative min-h-svh bg-background px-4 py-10">
@@ -31,48 +33,49 @@ export function OnboardingPage() {
           <LogoWordmark className="h-6" />
         </div>
 
-        {!isFirstWorkspace && (
+        {!isFirstTeam && (
           <Button variant="ghost" size="sm" asChild className="-ml-2 mb-4">
             <Link to="/app">
-              <ArrowLeft /> Back to your workspace
+              <ArrowLeft /> Back to your team
             </Link>
           </Button>
         )}
 
         <h1 className="text-2xl font-semibold tracking-tight">
-          {isFirstWorkspace ? 'Welcome to DevDock' : 'Create or join a workspace'}
+          {isFirstTeam ? 'Welcome to DevDock' : 'Create or join a team'}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {isFirstWorkspace
-            ? 'Start your own workspace, or join one with an invite code from your instructor.'
-            : 'You can belong to several workspaces, with a different role in each.'}
+          {isFirstTeam
+            ? 'Start your own team, or join one with an invite code from a teammate or instructor.'
+            : 'You can belong to several teams, with a different role in each.'}
         </p>
 
         <div className="mt-8 grid gap-4 md:grid-cols-2">
-          <CreateWorkspaceCard />
-          <JoinWorkspaceCard />
+          <CreateTeamCard />
+          <JoinTeamCard />
         </div>
 
-        {isFirstWorkspace && <SignedInAs />}
+        {isFirstTeam && <SignedInAs />}
       </main>
     </div>
   )
 }
 
-function CreateWorkspaceCard() {
+function CreateTeamCard() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
   const [slugEdited, setSlugEdited] = useState(false)
+  const [type, setType] = useState<TeamType>('learning')
   const effectiveSlug = slugEdited ? slug : slugify(name)
   const slugValid = effectiveSlug.length >= 3 && effectiveSlug.length <= 48 && SLUG_PATTERN.test(effectiveSlug)
 
   const create = useMutation({
-    mutationFn: () => createWorkspace({ name, slug: effectiveSlug }),
-    onSuccess: async (workspace) => {
-      await queryClient.invalidateQueries({ queryKey: ['workspaces'] })
-      navigate(workspacePath(workspace.slug))
+    mutationFn: () => createTeam({ name, slug: effectiveSlug, type }),
+    onSuccess: async (team) => {
+      await queryClient.invalidateQueries({ queryKey: ['teams'] })
+      navigate(teamPath(team.slug))
     },
   })
 
@@ -84,15 +87,39 @@ function CreateWorkspaceCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Create a workspace</CardTitle>
-        <CardDescription>For your own class or group. You’ll be its owner.</CardDescription>
+        <CardTitle>Create a team</CardTitle>
+        <CardDescription>For your class, cohort, or project group. You’ll be its owner.</CardDescription>
       </CardHeader>
       <CardContent>
         <form className="space-y-4" onSubmit={submit}>
+          <fieldset className="space-y-1.5">
+            <legend className="text-sm font-medium">Type</legend>
+            <div className="grid grid-cols-3 gap-2">
+              {(Object.keys(teamTypes) as TeamType[]).map((value) => {
+                const { label, icon: Icon } = teamTypes[value]
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    aria-pressed={type === value}
+                    onClick={() => setType(value)}
+                    className={cn(
+                      'flex flex-col items-center gap-1 rounded-md border px-2 py-2.5 text-xs transition-colors',
+                      type === value ? 'border-primary bg-primary/5 font-medium' : 'text-muted-foreground hover:bg-muted',
+                    )}
+                  >
+                    <Icon className="size-4" />
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
+            <p className="text-xs text-muted-foreground">{teamTypes[type].hint}</p>
+          </fieldset>
           <div className="space-y-1.5">
-            <Label htmlFor="ws-name">Name</Label>
+            <Label htmlFor="team-name">Name</Label>
             <Input
-              id="ws-name"
+              id="team-name"
               value={name}
               maxLength={100}
               placeholder="Evening Cohort"
@@ -101,11 +128,11 @@ function CreateWorkspaceCard() {
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="ws-slug">URL</Label>
+            <Label htmlFor="team-slug">URL</Label>
             <div className="flex items-center rounded-md border bg-muted/40 pl-3 font-mono text-sm focus-within:ring-2 focus-within:ring-ring/50">
-              <span className="text-muted-foreground">/w/</span>
+              <span className="text-muted-foreground">/t/</span>
               <input
-                id="ws-slug"
+                id="team-slug"
                 className="h-8 min-w-0 flex-1 bg-transparent pr-3 outline-none"
                 value={effectiveSlug}
                 maxLength={48}
@@ -128,7 +155,7 @@ function CreateWorkspaceCard() {
           )}
           <Button type="submit" className="w-full" disabled={!name.trim() || !slugValid || create.isPending}>
             {create.isPending && <LoaderCircle className="animate-spin" />}
-            Create workspace
+            Create team
           </Button>
         </form>
       </CardContent>
@@ -136,19 +163,19 @@ function CreateWorkspaceCard() {
   )
 }
 
-function JoinWorkspaceCard() {
+function JoinTeamCard() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const { user } = useAuth()
   const [code, setCode] = useState('')
 
   const join = useMutation({
-    mutationFn: () => joinWorkspace(code),
-    onSuccess: async (workspaceId) => {
-      await queryClient.invalidateQueries({ queryKey: ['workspaces'] })
-      const memberships = await queryClient.fetchQuery(myWorkspacesQuery(user.id))
-      const joined = memberships.find((m) => m.workspace.id === workspaceId)
-      navigate(joined ? workspacePath(joined.workspace.slug) : '/app')
+    mutationFn: () => joinTeam(code),
+    onSuccess: async (teamId) => {
+      await queryClient.invalidateQueries({ queryKey: ['teams'] })
+      const memberships = await queryClient.fetchQuery(myTeamsQuery(user.id))
+      const joined = memberships.find((m) => m.team.id === teamId)
+      navigate(joined ? teamPath(joined.team.slug) : '/app')
     },
   })
 
@@ -161,7 +188,7 @@ function JoinWorkspaceCard() {
     <Card>
       <CardHeader>
         <CardTitle>Join with an invite code</CardTitle>
-        <CardDescription>You’ll join as a member. Course access is granted separately.</CardDescription>
+        <CardDescription>You’ll join as a member. Workspace access is granted separately.</CardDescription>
       </CardHeader>
       <CardContent>
         <form className="space-y-4" onSubmit={submit}>
@@ -185,7 +212,7 @@ function JoinWorkspaceCard() {
           )}
           <Button type="submit" variant="outline" className="w-full" disabled={!code.trim() || join.isPending}>
             {join.isPending && <LoaderCircle className="animate-spin" />}
-            Join workspace
+            Join team
           </Button>
         </form>
       </CardContent>

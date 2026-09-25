@@ -17,14 +17,14 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { errorMessage } from '@/lib/errors'
 import { createInvite, invitesQuery, revokeInvite, type Invite } from '../api'
-import { useCurrentWorkspace } from '../hooks'
+import { useCurrentTeam } from '../hooks'
 
 const dateFormat = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 
-/** Owners/admins: invite codes that let people join this workspace as members. */
+/** Owners/admins: invite codes that let people join this team as members. */
 export function InvitesPanel() {
-  const { workspace } = useCurrentWorkspace()
-  const invites = useSuspenseQuery(invitesQuery(workspace.id)).data
+  const { team } = useCurrentTeam()
+  const invites = useSuspenseQuery(invitesQuery(team.id)).data
   const queryClient = useQueryClient()
   const [now] = useState(Date.now)
 
@@ -32,7 +32,7 @@ export function InvitesPanel() {
     mutationFn: revokeInvite,
     onSuccess: () => {
       toast.success('Invite revoked')
-      return queryClient.invalidateQueries({ queryKey: invitesQuery(workspace.id).queryKey })
+      return queryClient.invalidateQueries({ queryKey: invitesQuery(team.id).queryKey })
     },
     onError: (error) => toast.error(errorMessage(error)),
   })
@@ -124,7 +124,7 @@ const EXPIRY_OPTIONS = { '7': '7 days', '30': '30 days', never: 'Never' } as con
 const USES_OPTIONS = { unlimited: 'Unlimited', '1': '1 use', '10': '10 uses', '30': '30 uses' } as const
 
 function CreateInviteDialog() {
-  const { workspace } = useCurrentWorkspace()
+  const { team } = useCurrentTeam()
   const queryClient = useQueryClient()
   const [open, setOpen] = useState(false)
   const [expiry, setExpiry] = useState<keyof typeof EXPIRY_OPTIONS>('7')
@@ -132,12 +132,12 @@ function CreateInviteDialog() {
 
   const create = useMutation({
     mutationFn: () =>
-      createInvite(workspace.id, {
+      createInvite(team.id, {
         expiresAt: expiry === 'never' ? null : new Date(Date.now() + Number(expiry) * 86_400_000).toISOString(),
         maxUses: uses === 'unlimited' ? null : Number(uses),
       }),
     onSuccess: async (invite) => {
-      await queryClient.invalidateQueries({ queryKey: invitesQuery(workspace.id).queryKey })
+      await queryClient.invalidateQueries({ queryKey: invitesQuery(team.id).queryKey })
       setOpen(false)
       try {
         await navigator.clipboard.writeText(invite.code)
@@ -171,8 +171,8 @@ function CreateInviteDialog() {
           <DialogHeader>
             <DialogTitle>New invite code</DialogTitle>
             <DialogDescription>
-              People who use it join <strong className="font-medium">{workspace.name}</strong> as members. They
-              won’t see any course until someone adds them to it.
+              People who use it join <strong className="font-medium">{team.name}</strong> as members. They
+              won’t see any workspace until someone adds them to it.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 sm:grid-cols-2">

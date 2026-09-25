@@ -14,23 +14,23 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar'
 import { UserMenu } from '@/features/auth/components/UserMenu'
-import { WorkspaceSwitcher } from '@/features/workspaces/components/WorkspaceSwitcher'
-import { useCurrentCourse, useCurrentWorkspace } from '@/features/workspaces/hooks'
-import { getCourseNav, getWorkspaceNav, type NavItem } from '@/features/workspaces/nav'
+import { TeamSwitcher } from '@/features/teams/components/TeamSwitcher'
+import { useCurrentTeam, useCurrentWorkspace } from '@/features/teams/hooks'
+import { getTeamNav, getWorkspaceNav, type NavItem } from '@/features/teams/nav'
 
 export function AppSidebar() {
-  const { workspace } = useCurrentWorkspace()
-  const { courseId } = useParams()
+  const { team } = useCurrentTeam()
+  const { workspaceId } = useParams()
 
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        <WorkspaceSwitcher />
+        <TeamSwitcher />
       </SidebarHeader>
 
       <SidebarContent>
-        <NavGroup label="Workspace" items={getWorkspaceNav(workspace.slug)} />
-        {courseId && <CourseNavGroup />}
+        <NavGroup label="Team" items={getTeamNav(team.slug)} />
+        {workspaceId && <WorkspaceNavGroup />}
       </SidebarContent>
 
       <SidebarFooter>
@@ -41,13 +41,13 @@ export function AppSidebar() {
   )
 }
 
-function CourseNavGroup() {
-  const { workspace } = useCurrentWorkspace()
-  const { course, can } = useCurrentCourse()
-  const items = getCourseNav(workspace.slug, course.id).filter(
+function WorkspaceNavGroup() {
+  const { team } = useCurrentTeam()
+  const { workspace, can } = useCurrentWorkspace()
+  const items = getWorkspaceNav(team.slug, workspace.id, workspace.type).filter(
     (item) => item.title !== 'Settings' || can.canEdit,
   )
-  return <NavGroup label={course.title} items={items} />
+  return <NavGroup label={workspace.title} items={items} />
 }
 
 function NavGroup({ label, items }: { label: string; items: NavItem[] }) {

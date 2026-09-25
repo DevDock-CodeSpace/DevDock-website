@@ -1,43 +1,67 @@
 import { queryOptions } from '@tanstack/react-query'
+import type { PersonProfile } from '@/features/teams/api'
 import { requireAffected, toDataError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
-import type { Database, Tables } from '@/types/database.types'
+import type { Database, Tables, TablesInsert } from '@/types/database.types'
 
-// DB model is Team → Workspace. The UI still says Workspace → Course until the
-// frontend is renamed, so this module keeps its UI-facing names but reads the
-// team tables: "workspace" here = public.teams.
-
-export type WorkspaceRole = Database['public']['Enums']['team_role']
-export type Workspace = Pick<Tables<'teams'>, 'id' | 'name' | 'slug'>
-export type WorkspaceMembership = { role: WorkspaceRole; joinedAt: string; workspace: Workspace }
-export type Invite = Pick<
-  Tables<'team_invites'>,
-  'id' | 'code' | 'created_at' | 'expires_at' | 'max_uses' | 'use_count'
+export type WorkspaceRole = Database['public']['Enums']['workspace_role']
+export type WorkspaceType = Database['public']['Enums']['workspace_type']
+export type Workspace = Pick<
+  Tables<'workspaces'>,
+  'id' | 'team_id' | 'title' | 'description' | 'type' | 'created_at' | 'updated_at'
 >
-export type PersonProfile = { display_name: string | null; avatar_url: string | null } | null
-export type WorkspaceMember = {
-  user_id: string
-  role: WorkspaceRole
-  joined_at: string
-  profile: PersonProfile
+export type WorkspaceSummary = Pick<Tables<'workspaces'>, 'id' | 'title' | 'description' | 'type'> & {
+  memberCount: number
 }
-
-export const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/
+export type WorkspaceMember = { user_id: string; role: WorkspaceRole; joined_at: string; profile: PersonProfile }
 
 // ---------------------------------------------------------------- queries
 
-/** Workspaces the user belongs to, with their role in each. Empty → onboarding. */
-export const myWorkspacesQuery = (userId: string) =>
+/** Workspaces visible to the caller: all of them for team owners/admins, assigned ones otherwise (RLS). */
+export const teamWorkspacesQuery = (teamId: string) =>
   queryOptions({
-    queryKey: ['workspaces', 'mine', userId],
-    queryFn: async (): Promise<WorkspaceMembership[]> => {
+    queryKey: ['workspaces', 'team', teamId],
+    queryFn: async (): Promise<WorkspaceSummary[]> => {
       const { data, error } = await supabase
-        .from('team_members')
-        .select('role, joined_at, workspace:teams(id, name, slug)')
+        .from('workspaces')
+        .select('id, title, description, type, workspace_members(count)')
+        .eq('team_id', teamId)
+        .order('title')
+      if (error) throw toDataError('load workspaces', error)
+      return data.map(({ workspace_members, ...workspace }) => ({
+        ...workspace,
+        memberCount: workspace_members[0]?.count ?? 0,
+      }))
+    },
+  })
+
+/** The caller's role in each workspace of a team they're assigned to. */
+export const myWorkspaceRolesQuery = (teamId: string, userId: string) =>
+  queryOptions({
+    queryKey: ['workspaces', 'team', teamId, 'my-roles', userId],
+    queryFn: async (): Promise<Record<string, WorkspaceRole>> => {
+      const { data, error } = await supabase
+        .from('workspace_members')
+        .select('workspace_id, role')
+        .eq('team_id', teamId)
         .eq('user_id', userId)
-        .order('joined_at')
-      if (error) throw toDataError('load your workspaces', error)
-      return data.map((row) => ({ role: row.role, joinedAt: row.joined_at, workspace: row.workspace }))
+      if (error) throw toDataError('load your workspace roles', error)
+      return Object.fromEntries(data.map((row) => [row.workspace_id, row.role]))
+    },
+  })
+
+/** null when the workspace doesn't exist or the caller can't see it. */
+export const workspaceQuery = (workspaceId: string) =>
+  queryOptions({
+    queryKey: ['workspaces', workspaceId],
+    queryFn: async (): Promise<Workspace | null> => {
+      const { data, error } = await supabase
+        .from('workspaces')
+        .select('id, team_id, title, description, type, created_at, updated_at')
+        .eq('id', workspaceId)
+        .maybeSingle()
+      if (error) throw toDataError('load the workspace', error)
+      return data
     },
   })
 
@@ -46,111 +70,79 @@ export const workspaceMembersQuery = (workspaceId: string) =>
     queryKey: ['workspaces', workspaceId, 'members'],
     queryFn: async (): Promise<WorkspaceMember[]> => {
       const { data, error } = await supabase
-        .from('team_members')
+        .from('workspace_members')
         .select('user_id, role, joined_at, profile:profiles(display_name, avatar_url)')
-        .eq('team_id', workspaceId)
+        .eq('workspace_id', workspaceId)
         .order('joined_at')
       if (error) throw toDataError('load workspace members', error)
       return data
     },
   })
 
-export const invitesQuery = (workspaceId: string) =>
-  queryOptions({
-    queryKey: ['workspaces', workspaceId, 'invites'],
-    queryFn: async (): Promise<Invite[]> => {
-      const { data, error } = await supabase
-        .from('team_invites')
-        .select('id, code, created_at, expires_at, max_uses, use_count')
-        .eq('team_id', workspaceId)
-        .order('created_at', { ascending: false })
-      if (error) throw toDataError('load invites', error)
-      return data
-    },
-  })
-
 // -------------------------------------------------------------- mutations
 
-export async function createWorkspace(input: { name: string; slug: string }): Promise<Workspace> {
+type WorkspaceInput = { title: string; description: string; type: WorkspaceType }
+
+export async function createWorkspace(teamId: string, input: WorkspaceInput): Promise<{ id: string }> {
   const { data, error } = await supabase
-    .from('teams')
-    .insert({ name: input.name.trim(), slug: input.slug })
-    .select('id, name, slug')
+    .from('workspaces')
+    .insert({
+      team_id: teamId,
+      title: input.title.trim(),
+      description: input.description.trim() || null,
+      type: input.type,
+    })
+    .select('id')
     .single()
-  if (error) {
-    throw toDataError('create the workspace', error, {
-      '23505': 'That workspace URL is already taken. Try another.',
-      '23514': 'Use 3–48 lowercase letters, numbers, and single dashes for the URL.',
-    })
-  }
+  if (error) throw toDataError('create the workspace', error)
   return data
 }
 
-/** Returns the joined workspace's id. Already a member → same id, no error. */
-export async function joinWorkspace(inviteCode: string): Promise<string> {
-  const { data, error } = await supabase.rpc('join_team', { invite_code: inviteCode })
-  if (error) {
-    throw toDataError('join the workspace', error, {
-      P0001: 'That invite code is invalid, expired, or has no uses left.',
-    })
-  }
-  return data
-}
-
-export async function renameWorkspace(workspaceId: string, name: string) {
+export async function updateWorkspace(workspaceId: string, input: WorkspaceInput) {
   const { data, error } = await supabase
-    .from('teams')
-    .update({ name: name.trim() })
+    .from('workspaces')
+    .update({ title: input.title.trim(), description: input.description.trim() || null, type: input.type })
     .eq('id', workspaceId)
     .select('id')
-  if (error) throw toDataError('rename the workspace', error)
-  requireAffected(data, 'rename workspace')
+  if (error) throw toDataError('save the workspace', error)
+  requireAffected(data, 'update workspace')
 }
 
 export async function deleteWorkspace(workspaceId: string) {
-  const { data, error } = await supabase.from('teams').delete().eq('id', workspaceId).select('id')
+  const { data, error } = await supabase.from('workspaces').delete().eq('id', workspaceId).select('id')
   if (error) throw toDataError('delete the workspace', error)
   requireAffected(data, 'delete workspace')
 }
 
-export async function setWorkspaceRole(workspaceId: string, userId: string, role: Exclude<WorkspaceRole, 'owner'>) {
+export async function addWorkspaceMember(workspaceId: string, userId: string, role: WorkspaceRole) {
+  // team_id is NOT NULL but always set by a DB trigger from the workspace (clients
+  // have no INSERT privilege on it). Generated types can't see triggers, so omit it here.
+  const row: Omit<TablesInsert<'workspace_members'>, 'team_id'> = { workspace_id: workspaceId, user_id: userId, role }
+  const { error } = await supabase.from('workspace_members').insert(row as TablesInsert<'workspace_members'>)
+  if (error) {
+    throw toDataError('add the member', error, { '23505': 'They’re already in this workspace.' })
+  }
+}
+
+export async function setWorkspaceRole(workspaceId: string, userId: string, role: WorkspaceRole) {
   const { data, error } = await supabase
-    .from('team_members')
+    .from('workspace_members')
     .update({ role })
-    .eq('team_id', workspaceId)
+    .eq('workspace_id', workspaceId)
     .eq('user_id', userId)
     .select('user_id')
   if (error) throw toDataError('change the role', error)
   requireAffected(data, 'change workspace role')
 }
 
-/** Remove someone, or leave (userId = yourself). Also removes them from the workspace's courses. */
+/** Remove someone, or leave (userId = yourself). */
 export async function removeWorkspaceMember(workspaceId: string, userId: string) {
   const { data, error } = await supabase
-    .from('team_members')
+    .from('workspace_members')
     .delete()
-    .eq('team_id', workspaceId)
+    .eq('workspace_id', workspaceId)
     .eq('user_id', userId)
     .select('user_id')
   if (error) throw toDataError('remove the member', error)
   requireAffected(data, 'remove workspace member')
-}
-
-export async function createInvite(
-  workspaceId: string,
-  options: { expiresAt: string | null; maxUses: number | null },
-): Promise<Invite> {
-  const { data, error } = await supabase
-    .from('team_invites')
-    .insert({ team_id: workspaceId, expires_at: options.expiresAt, max_uses: options.maxUses })
-    .select('id, code, created_at, expires_at, max_uses, use_count')
-    .single()
-  if (error) throw toDataError('create the invite', error)
-  return data
-}
-
-export async function revokeInvite(inviteId: string) {
-  const { data, error } = await supabase.from('team_invites').delete().eq('id', inviteId).select('id')
-  if (error) throw toDataError('revoke the invite', error)
-  requireAffected(data, 'revoke invite')
 }

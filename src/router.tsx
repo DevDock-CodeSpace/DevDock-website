@@ -3,19 +3,19 @@ import { createBrowserRouter, Outlet, redirect } from 'react-router'
 import { AuthLoading } from '@/features/auth/components/AuthLoading'
 import { authCallbackLoader, loginLoader } from '@/features/auth/loaders'
 import { watchAuthIdentity } from '@/features/auth/session'
-import { appIndexLoader, courseLoader, onboardingLoader, workspaceLoader } from '@/features/workspaces/loaders'
+import { appIndexLoader, onboardingLoader, teamLoader, workspaceLoader } from '@/features/teams/loaders'
 import { AppLayout } from '@/layouts/AppLayout'
 import { APP_ROUTE_ID, appLoader } from '@/layouts/app-loader'
 import { queryClient } from '@/lib/query-client'
 import { LoginPage } from '@/routes/LoginPage'
 import { NotFoundPage, RouteErrorPage } from '@/routes/NotFoundPage'
 import { OnboardingPage } from '@/routes/OnboardingPage'
-import { ComingSoonPage } from '@/routes/course/ComingSoonPage'
-import { CourseMembersPage } from '@/routes/course/CourseMembersPage'
-import { CourseOverviewPage } from '@/routes/course/CourseOverviewPage'
-import { CourseSettingsPage } from '@/routes/course/CourseSettingsPage'
-import { CoursesPage } from '@/routes/workspace/CoursesPage'
+import { TeamMembersPage } from '@/routes/team/TeamMembersPage'
+import { TeamSettingsPage } from '@/routes/team/TeamSettingsPage'
+import { TeamWorkspacesPage } from '@/routes/team/TeamWorkspacesPage'
+import { ComingSoonPage } from '@/routes/workspace/ComingSoonPage'
 import { WorkspaceMembersPage } from '@/routes/workspace/WorkspaceMembersPage'
+import { WorkspaceOverviewPage } from '@/routes/workspace/WorkspaceOverviewPage'
 import { WorkspaceSettingsPage } from '@/routes/workspace/WorkspaceSettingsPage'
 
 export const router = createBrowserRouter([
@@ -42,27 +42,27 @@ export const router = createBrowserRouter([
     errorElement: <RouteErrorPage />,
     hydrateFallbackElement: <AuthLoading />,
     children: [
-      // Redirects to the last/first workspace, or /onboarding when there are none.
+      // Redirects to the last/first team, or /onboarding when there are none.
       { path: 'app', loader: appIndexLoader, element: <AuthLoading /> },
       { path: 'onboarding', loader: onboardingLoader, element: <OnboardingPage /> },
       {
-        // Must be a member (workspaceLoader). Renders the sidebar shell.
-        path: 'w/:workspaceSlug',
-        loader: workspaceLoader,
+        // Must be a team member (teamLoader). Renders the sidebar shell.
+        path: 't/:teamSlug',
+        loader: teamLoader,
         element: <AppLayout />,
         children: [
           {
             errorElement: <RouteErrorPage inline />,
             children: [
-              { index: true, element: <CoursesPage /> },
-              { path: 'members', element: <WorkspaceMembersPage /> },
-              { path: 'settings', element: <WorkspaceSettingsPage /> },
+              { index: true, element: <TeamWorkspacesPage /> },
+              { path: 'members', element: <TeamMembersPage /> },
+              { path: 'settings', element: <TeamSettingsPage /> },
               {
-                // Visible to workspace owners/admins and course members (courseLoader + RLS).
-                path: 'courses/:courseId',
-                loader: courseLoader,
+                // Visible to team owners/admins and workspace members (workspaceLoader + RLS).
+                path: 'w/:workspaceId',
+                loader: workspaceLoader,
                 children: [
-                  { index: true, element: <CourseOverviewPage /> },
+                  { index: true, element: <WorkspaceOverviewPage /> },
                   {
                     path: 'lessons',
                     element: (
@@ -77,7 +77,7 @@ export const router = createBrowserRouter([
                     path: 'live',
                     element: (
                       <ComingSoonPage
-                        title="Live Class"
+                        title="Live Session"
                         icon={Video}
                         description="Scheduled sessions and the live room (Jitsi) are coming in a later phase."
                       />
@@ -89,12 +89,12 @@ export const router = createBrowserRouter([
                       <ComingSoonPage
                         title="Resources"
                         icon={FolderGit2}
-                        description="Links, repositories, and diagrams shared with the course are coming soon."
+                        description="Links, repositories, and diagrams shared with the workspace are coming soon."
                       />
                     ),
                   },
-                  { path: 'members', element: <CourseMembersPage /> },
-                  { path: 'settings', element: <CourseSettingsPage /> },
+                  { path: 'members', element: <WorkspaceMembersPage /> },
+                  { path: 'settings', element: <WorkspaceSettingsPage /> },
                 ],
               },
             ],

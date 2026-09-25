@@ -13,15 +13,15 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
-import { useCurrentCourse, useCurrentWorkspace } from '@/features/workspaces/hooks'
-import { coursePath, getCourseNav, getWorkspaceNav, workspacePath } from '@/features/workspaces/nav'
+import { useCurrentTeam, useCurrentWorkspace } from '@/features/teams/hooks'
+import { getTeamNav, getWorkspaceNav, teamPath, workspacePath } from '@/features/teams/nav'
 
 // The shadcn sidebar writes its open/collapsed state to this cookie but doesn't read it back.
 const sidebarStartsOpen = () => !document.cookie.includes('sidebar_state=false')
 
-/** Workspace shell: sidebar + header + page. Rendered for /w/:workspaceSlug/*. */
+/** Team shell: sidebar + header + page. Rendered for /t/:teamSlug/*. */
 export function AppLayout() {
-  const { courseId } = useParams()
+  const { workspaceId } = useParams()
   return (
     <SidebarProvider defaultOpen={sidebarStartsOpen()}>
       <AppSidebar />
@@ -29,7 +29,7 @@ export function AppLayout() {
         <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4 data-vertical:self-center" />
-          {courseId ? <CourseBreadcrumb /> : <WorkspaceBreadcrumb />}
+          {workspaceId ? <WorkspaceBreadcrumb /> : <TeamBreadcrumb />}
           <div className="ml-auto">
             <ThemeToggle />
           </div>
@@ -49,21 +49,21 @@ export function AppLayout() {
 
 type Crumb = { label: string; to: string }
 
-function WorkspaceBreadcrumb() {
-  const { workspace } = useCurrentWorkspace()
-  const section = useSection(getWorkspaceNav(workspace.slug))
-  return <Crumbs crumbs={[{ label: workspace.name, to: workspacePath(workspace.slug) }, ...section]} />
+function TeamBreadcrumb() {
+  const { team } = useCurrentTeam()
+  const section = useSection(getTeamNav(team.slug))
+  return <Crumbs crumbs={[{ label: team.name, to: teamPath(team.slug) }, ...section]} />
 }
 
-function CourseBreadcrumb() {
+function WorkspaceBreadcrumb() {
+  const { team } = useCurrentTeam()
   const { workspace } = useCurrentWorkspace()
-  const { course } = useCurrentCourse()
-  const section = useSection(getCourseNav(workspace.slug, course.id))
+  const section = useSection(getWorkspaceNav(team.slug, workspace.id, workspace.type))
   return (
     <Crumbs
       crumbs={[
-        { label: workspace.name, to: workspacePath(workspace.slug) },
-        { label: course.title, to: coursePath(workspace.slug, course.id) },
+        { label: team.name, to: teamPath(team.slug) },
+        { label: workspace.title, to: workspacePath(team.slug, workspace.id) },
         ...section,
       ]}
     />
@@ -71,7 +71,7 @@ function CourseBreadcrumb() {
 }
 
 /** The current non-index nav item as a crumb, if any. */
-function useSection(items: ReturnType<typeof getWorkspaceNav>): Crumb[] {
+function useSection(items: ReturnType<typeof getTeamNav>): Crumb[] {
   const { pathname } = useLocation()
   const item = items.find((i) => !i.end && matchPath({ path: i.to, end: false }, pathname))
   return item ? [{ label: item.title, to: item.to }] : []

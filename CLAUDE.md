@@ -8,9 +8,9 @@ DevDock is a private software-engineering teaching workspace for **one instructo
 
 **Phase 2 done: Supabase foundation.** `@supabase/supabase-js`, a typed browser client (`src/lib/supabase.ts`), the `supabase/` CLI project, and the first migration (`profiles` + RLS + a sign-up trigger), **applied to the hosted project** (ref `ejqrrxxiatvvdiyxtvid`, linked via `supabase link`).
 
-**Phase 3 done: Google sign-in** via Supabase Auth (PKCE). All app routes require a session, and the sidebar shows the signed-in user's profile. Sign-in verified end-to-end with a real Google account. The app now **requires** the Supabase env vars. Course content is still mock data.
+**Phase 3 done: Google sign-in** via Supabase Auth (PKCE). All app routes require a session, and the sidebar shows the signed-in user's profile. Sign-in verified end-to-end with a real Google account. The app now **requires** the Supabase env vars.
 
-**Phase 4 (in progress): workspaces and courses are real.** The role model, invite codes and profile visibility for workspace peers are in the database. The UI has onboarding (create a workspace or join with a code), a workspace switcher, and real course, member, invite and settings pages. **The mock data is gone.** Lessons, Live Class and Resources are placeholder pages (no tables yet). Current status and next steps: `docs/STATUS.md`.
+**Phase 4 (in progress): Team → Workspace model is real.** A **team** (owner/admin/member; type learning/development/general) contains **workspaces** (lead/member; type course/project/general). Invite codes join a team, and workspace access is assigned separately. The UI has onboarding (create a team or join with a code), a team switcher, and real workspace, member, invite and settings pages. The mock data is gone. Lessons, Live Session and Resources are placeholder pages (no tables yet); Lessons shows only for course workspaces. Current status and next steps: `docs/STATUS.md`.
 
 ## Target stack
 
@@ -61,9 +61,9 @@ Before calling a task done, run `npm run typecheck`, `npm run lint`, and `npm ru
 src/
   main.tsx           # providers: QueryClient → Theme → Tooltip → Router
   router.tsx         # all routes (createBrowserRouter, data mode)
-  layouts/           # AppLayout (workspace shell: sidebar + header + <Suspense><Outlet/>), app-loader.ts (auth guard)
-  routes/            # page components: workspace/* and course/* under /w/:workspaceSlug
-  features/<name>/   # feature-scoped components, types, api.ts, hooks (auth/, courses/)
+  layouts/           # AppLayout (team shell: sidebar + header + <Suspense><Outlet/>), app-loader.ts (auth guard)
+  routes/            # page components: team/* (under /t/:teamSlug) and workspace/* (under …/w/:workspaceId)
+  features/<name>/   # feature-scoped components, types, api.ts, hooks (auth/, teams/, workspaces/)
   components/ui/     # shadcn/ui generated components (don't hand-edit much)
   components/        # shared app components (AppSidebar, PageHeader, Theme*)
   hooks/             # shared hooks
@@ -79,19 +79,19 @@ supabase/
 - **Routes.**
   - Public: `/login`, `/auth/callback`.
   - Authenticated (under route id `app`):
-    - `/app` redirects to the last-used workspace, or to `/onboarding` when the user has none.
+    - `/app` redirects to the last-used team, or to `/onboarding` when the user has none.
     - `/onboarding`
-    - `/w/:workspaceSlug` (courses), plus `members` and `settings`.
-    - `/w/:workspaceSlug/courses/:courseId` (overview), plus `lessons`, `live`, `resources`, `members` and `settings`.
+    - `/t/:teamSlug` (the team's workspaces), plus `members` and `settings`.
+    - `/t/:teamSlug/w/:workspaceId` (overview), plus `lessons` (course type only in the nav), `live`, `resources`, `members` and `settings`.
   - `/` redirects to `/app`.
-- **Access checks in loaders** (`features/workspaces/loaders.ts`): `workspaceLoader` 404s when the user isn't a member; `courseLoader` 404s when the course isn't visible (RLS) or belongs to another workspace.
-- **Current context:** `useCurrentWorkspace()` and `useCurrentCourse()` (`features/workspaces/hooks.ts`) return the entity, the user's role, and `can`, a permissions object from `features/workspaces/permissions.ts` that mirrors RLS. **`can` is for showing and hiding UI only.** Every write is re-checked by RLS.
-- **Navigation:** sidebar and breadcrumb items come from `features/workspaces/nav.ts`.
+- **Access checks in loaders** (`features/teams/loaders.ts`): `teamLoader` 404s when the user isn't a team member; `workspaceLoader` 404s when the workspace isn't visible (RLS) or belongs to another team.
+- **Current context:** `useCurrentTeam()` and `useCurrentWorkspace()` (`features/teams/hooks.ts`) return the entity, the user's role, and `can`, a permissions object from `features/teams/permissions.ts` that mirrors RLS. **`can` is for showing and hiding UI only.** Every write is re-checked by RLS. Type labels and icons are in `teamTypes` and `workspaceTypes` in the same file.
+- **Navigation:** sidebar and breadcrumb items come from `features/teams/nav.ts` (`teamPath`, `workspacePath`, `getTeamNav`, `getWorkspaceNav`).
 - **Data pattern:** `features/<name>/api.ts` exports `queryOptions` and mutation functions.
   - Loaders prime what the shell needs with `ensureQueryData`. Pages read with `useSuspenseQuery`; `AppLayout` has a Suspense boundary, so pages may also load secondary data that way.
   - Errors go through `lib/errors.ts` (`toDataError`, `requireAffected`), because RLS makes forbidden UPDATE/DELETE return 0 rows, not an error. Show them with `toast.error(errorMessage(e))`.
-- **Query keys:** `['workspaces', …]` and `['courses', …]`; invalidate by prefix after mutations.
-- **Leaving or deleting** the current workspace or course: navigate away *first*, then invalidate (see `useExitWorkspace`). Otherwise the page crashes when its data disappears, or `/app` bounces back through the stale cache.
+- **Query keys:** `['teams', …]` and `['workspaces', …]`; invalidate by prefix after mutations.
+- **Leaving or deleting** the current team or workspace: navigate away *first*, then invalidate (see `useExitTeam`). Otherwise the page crashes when its data disappears, or `/app` bounces back through the stale cache.
 - Avoid `Date.now()` in render (oxlint `react/purity`); capture it with `useState(Date.now)`.
 
 ### UI

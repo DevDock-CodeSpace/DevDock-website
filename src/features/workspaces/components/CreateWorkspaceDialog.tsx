@@ -15,24 +15,27 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { createCourse } from '@/features/courses/api'
-import { useCurrentWorkspace } from '@/features/workspaces/hooks'
-import { coursePath } from '@/features/workspaces/nav'
+import { useCurrentTeam } from '@/features/teams/hooks'
+import { workspacePath } from '@/features/teams/nav'
+import { defaultWorkspaceType } from '@/features/teams/permissions'
+import { createWorkspace, type WorkspaceType } from '../api'
+import { WorkspaceTypeSelect } from './WorkspaceTypeSelect'
 
-export function CreateCourseDialog() {
-  const { workspace } = useCurrentWorkspace()
+export function CreateWorkspaceDialog() {
+  const { team } = useCurrentTeam()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
+  const [type, setType] = useState<WorkspaceType>(defaultWorkspaceType[team.type])
 
   const create = useMutation({
-    mutationFn: () => createCourse(workspace.id, { title, description }),
+    mutationFn: () => createWorkspace(team.id, { title, description, type }),
     onSuccess: async ({ id }) => {
-      await queryClient.invalidateQueries({ queryKey: ['courses'] })
+      await queryClient.invalidateQueries({ queryKey: ['workspaces'] })
       setOpen(false)
-      navigate(coursePath(workspace.slug, id))
+      navigate(workspacePath(team.slug, id))
     },
   })
 
@@ -49,43 +52,48 @@ export function CreateCourseDialog() {
         if (!next) {
           setTitle('')
           setDescription('')
+          setType(defaultWorkspaceType[team.type])
           create.reset()
         }
       }}
     >
       <DialogTrigger asChild>
         <Button>
-          <Plus /> New course
+          <Plus /> New workspace
         </Button>
       </DialogTrigger>
       <DialogContent>
         <form onSubmit={submit} className="space-y-4">
           <DialogHeader>
-            <DialogTitle>New course</DialogTitle>
+            <DialogTitle>New workspace</DialogTitle>
             <DialogDescription>
-              Only workspace owners and admins see it until you add people to it.
+              Only team owners and admins see it until you add people to it.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-1.5">
-            <Label htmlFor="course-title">Title</Label>
+            <Label htmlFor="ws-type">Type</Label>
+            <WorkspaceTypeSelect id="ws-type" value={type} onChange={setType} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="ws-title">Title</Label>
             <Input
-              id="course-title"
+              id="ws-title"
               value={title}
               maxLength={200}
-              placeholder="Software Engineering Fundamentals"
+              placeholder={type === 'course' ? 'Software Engineering Fundamentals' : type === 'project' ? 'Capstone API' : 'Study group'}
               onChange={(e) => setTitle(e.target.value)}
               required
               autoFocus
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="course-description">Description</Label>
+            <Label htmlFor="ws-description">Description</Label>
             <Textarea
-              id="course-description"
+              id="ws-description"
               value={description}
               maxLength={5000}
               rows={3}
-              placeholder="What will students learn?"
+              placeholder="What is this workspace for?"
               onChange={(e) => setDescription(e.target.value)}
             />
           </div>
@@ -97,7 +105,7 @@ export function CreateCourseDialog() {
           <DialogFooter>
             <Button type="submit" disabled={!title.trim() || create.isPending}>
               {create.isPending && <LoaderCircle className="animate-spin" />}
-              Create course
+              Create workspace
             </Button>
           </DialogFooter>
         </form>
