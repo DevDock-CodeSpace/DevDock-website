@@ -1,6 +1,6 @@
 # DevDock: project status
 
-_Last updated: 2026-09-25 (Phase 4a: role model schema)_
+_Last updated: 2026-09-25 (Phase 4b: workspaces and courses UI)_
 
 A handoff for anyone (human or AI) planning the next phase. For conventions, see [CLAUDE.md](../CLAUDE.md); for setup, see [README.md](../README.md).
 
@@ -20,7 +20,7 @@ A private software-engineering teaching workspace for one instructor and a few s
 | 3: Google authentication | ✅ Done: sign-in verified with a real Google account | merged to `dev` (PR #2) |
 | 4a: Role model schema (workspaces, courses, memberships) | ✅ Done: migration applied, types generated; **no frontend yet** | `feat/workspace-roles` |
 | 4a+: Onboarding schema (invite codes) | ✅ Done: migration applied, types generated; no frontend yet | `feat/workspace-roles` |
-| 4b: Wire the UI to real courses | ⏳ Not started | |
+| 4b: Workspaces and courses UI | 🟡 Built; checks pass; **awaiting manual testing** with a real account | `feat/workspace-roles` |
 
 ### Phase 1: frontend shell
 - Collapsible sidebar (slide-out panel on mobile) with Overview, Lessons, Live Class, Resources, Members and Settings; a breadcrumb header; and a light/dark/system theme.
@@ -127,6 +127,36 @@ Migration `20260925001632_add_workspace_invites.sql`: tested locally (28 checks)
 - Unknown, expired, used-up and revoked codes all return the same `invalid_invite` error, so callers can't probe which codes exist.
 - It's the only way to add yourself to a workspace; direct inserts are still blocked by RLS.
 
+### Phase 4b: workspaces and courses UI
+**Schema addition:** migration `20260925002856_profiles_visible_to_workspace_peers.sql`, **applied**. It adds one `profiles` SELECT policy: you can read the name and avatar of people who share a workspace with you. There's no visibility otherwise, and profiles are still editable only by their owner. It was tested locally: a peer is visible, a non-peer isn't, a peer's profile can't be edited, and `anon` is denied.
+
+**Frontend.** The mock data is removed (`mock-data.ts` and the pages built on it).
+- **`/app`:** goes to the last-used workspace, or `/onboarding` when the user has none.
+- **`/onboarding`:** create a workspace (name, with an auto-generated editable URL slug) → owner; or join with an invite code → member. Also reachable later from the workspace switcher ("Create or join a workspace").
+- **Sidebar:** workspace switcher (all workspaces, with your role in each), Workspace nav (Courses, Members, Settings), a course nav group when inside a course (Settings only for course leads and workspace owners/admins), and the user menu.
+- **Courses (`/w/:slug`):**
+  - Owners/admins see every course and can create one.
+  - Members see only assigned courses, and get an empty state that explains why.
+  - Each card shows your role and the member count.
+- **Workspace Members:**
+  - Everyone sees the member list with roles.
+  - The owner can make someone admin or member.
+  - The owner or an admin can remove members, as allowed by RLS.
+  - Owners and admins also get **invite codes**: create (7 days, 30 days or no expiry; 1, 10 or 30 uses, or unlimited), copy, and revoke.
+- **Workspace Settings:** owners/admins rename; members and admins leave; the owner deletes (by typing the name to confirm).
+- **Course Overview:** member count, the leads, and links to the upcoming sections.
+- **Course Members:**
+  - Owners/admins and the lead can **add people from the workspace**. Only owners/admins can add or make someone a lead.
+  - Owners/admins and the lead remove people as allowed by RLS; anyone can leave.
+- **Course Settings:** leads and owners/admins edit the title and description; owners/admins delete the course.
+- **Lessons, Live Class, Resources:** "Not available yet" placeholders.
+- **Errors and feedback:** Supabase errors become friendly toasts (`lib/errors.ts`). RLS "0 rows affected" is treated as "no permission". Raw errors go to the console only.
+
+**Verified:**
+- `npm run typecheck`, `npm run lint` and `npm run build` pass.
+- Automated browser tests, logged out: every new route redirects to `/login` with `next` preserved; the old `/courses/demo` URL now 404s; there are no console errors.
+- **Not yet verified with a signed-in user.** Manual testing was chosen over temporary test accounts. See the checklist in the Phase 4b report.
+
 ## Current configuration (hosted)
 - **Supabase URL Configuration:** Site URL `http://localhost:5173`; Redirect URLs `http://localhost:5173/**`.
 - **Supabase Google provider:** enabled. Client ID and secret are set in the dashboard only; nonce checks are on; users without an email are not allowed.
@@ -134,7 +164,7 @@ Migration `20260925001632_add_workspace_invites.sql`: tested locally (28 checks)
 - **Local env:** `.env` holds `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` and is git-ignored.
 
 ## Not done yet
-- **Phase 4b:** replace the mock fetchers in `src/features/courses/api.ts` with queries against `courses` and `course_members` (keep the query keys), and add a workspace selector or creation flow.
+- **Phase 4b follow-ups:** manual testing of all flows with real accounts; ownership transfer (the schema supports it, but there's no UI or function yet).
 - **Still to design:** an ownership-transfer function (the schema supports it; there's no API yet), email invitations (today: invite codes, or an owner/admin adds by user id), lessons, resources and live sessions.
 - **Profile visibility between members:** needs a new, narrowly scoped `profiles` SELECT policy, e.g. "users who share a workspace". Today it's own-row only, so member lists can show roles but not other people's names or avatars. `workspace_members.user_id` and `course_members.user_id` reference `profiles`, so the API can embed them once that policy exists.
 - **Later:** TipTap, draw.io, Jitsi, Storage, Vercel deployment.

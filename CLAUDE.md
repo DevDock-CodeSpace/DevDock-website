@@ -4,13 +4,13 @@ DevDock is a private software-engineering teaching workspace for **one instructo
 
 ## Current status
 
-**Phase 1 done: frontend shell.** React Router, Tailwind v4, shadcn/ui, and TanStack Query are installed. The app has a responsive sidebar layout, light/dark/system theme, and placeholder pages driven by **mock data** (`src/features/courses/mock-data.ts`). TipTap, draw.io, and Jitsi are not installed yet. **Add each piece only when a task needs it**, and don't build ahead.
+**Phase 1 done: frontend shell.** React Router, Tailwind v4, shadcn/ui, and TanStack Query are installed. The app has a responsive sidebar layout, light/dark/system theme, and placeholder pages driven by mock data (replaced by real data in Phase 4). TipTap, draw.io, and Jitsi are not installed yet. **Add each piece only when a task needs it**, and don't build ahead.
 
 **Phase 2 done: Supabase foundation.** `@supabase/supabase-js`, a typed browser client (`src/lib/supabase.ts`), the `supabase/` CLI project, and the first migration (`profiles` + RLS + a sign-up trigger), **applied to the hosted project** (ref `ejqrrxxiatvvdiyxtvid`, linked via `supabase link`).
 
 **Phase 3 done: Google sign-in** via Supabase Auth (PKCE). All app routes require a session, and the sidebar shows the signed-in user's profile. Sign-in verified end-to-end with a real Google account. The app now **requires** the Supabase env vars. Course content is still mock data.
 
-Explicitly **not yet**: course/lesson/member/invitation tables and replacing mock data (Phase 4). Current status and next steps: `docs/STATUS.md`.
+**Phase 4 (in progress): workspaces and courses are real.** The role model, invite codes and profile visibility for workspace peers are in the database. The UI has onboarding (create a workspace or join with a code), a workspace switcher, and real course, member, invite and settings pages. **The mock data is gone.** Lessons, Live Class and Resources are placeholder pages (no tables yet). Current status and next steps: `docs/STATUS.md`.
 
 ## Target stack
 
@@ -61,8 +61,8 @@ Before calling a task done, run `npm run typecheck`, `npm run lint`, and `npm ru
 src/
   main.tsx           # providers: QueryClient → Theme → Tooltip → Router
   router.tsx         # all routes (createBrowserRouter, data mode)
-  layouts/           # AppLayout (sidebar + header + <Outlet/>), app-loader.ts (auth guard + cache priming)
-  routes/            # page components; routes/course/* for /courses/:courseId/*
+  layouts/           # AppLayout (workspace shell: sidebar + header + <Suspense><Outlet/>), app-loader.ts (auth guard)
+  routes/            # page components: workspace/* and course/* under /w/:workspaceSlug
   features/<name>/   # feature-scoped components, types, api.ts, hooks (auth/, courses/)
   components/ui/     # shadcn/ui generated components (don't hand-edit much)
   components/        # shared app components (AppSidebar, PageHeader, Theme*)
@@ -76,9 +76,22 @@ supabase/
 
 ### Routing & data
 
-- Routes: `/login`, `/auth/callback` (public), plus the authenticated layout (route id `app`): `/app` (workspace home), `/courses/:courseId` (overview) and `lessons`, `live`, `resources`, `members`, `settings`. `/` redirects to `/app`.
-- Course sidebar items are defined once in `src/features/courses/nav.ts`; the sidebar and breadcrumb both read it.
-- Data pattern: `features/<name>/api.ts` exports `queryOptions`. The layout route's `loader` primes the cache with `queryClient.ensureQueryData`, and components read with `useSuspenseQuery` (e.g. `useCurrentCourse()`). To move to Supabase, replace the fetcher bodies in `api.ts` and keep the query keys.
+- **Routes.**
+  - Public: `/login`, `/auth/callback`.
+  - Authenticated (under route id `app`):
+    - `/app` redirects to the last-used workspace, or to `/onboarding` when the user has none.
+    - `/onboarding`
+    - `/w/:workspaceSlug` (courses), plus `members` and `settings`.
+    - `/w/:workspaceSlug/courses/:courseId` (overview), plus `lessons`, `live`, `resources`, `members` and `settings`.
+  - `/` redirects to `/app`.
+- **Access checks in loaders** (`features/workspaces/loaders.ts`): `workspaceLoader` 404s when the user isn't a member; `courseLoader` 404s when the course isn't visible (RLS) or belongs to another workspace.
+- **Current context:** `useCurrentWorkspace()` and `useCurrentCourse()` (`features/workspaces/hooks.ts`) return the entity, the user's role, and `can`, a permissions object from `features/workspaces/permissions.ts` that mirrors RLS. **`can` is for showing and hiding UI only.** Every write is re-checked by RLS.
+- **Navigation:** sidebar and breadcrumb items come from `features/workspaces/nav.ts`.
+- **Data pattern:** `features/<name>/api.ts` exports `queryOptions` and mutation functions.
+  - Loaders prime what the shell needs with `ensureQueryData`. Pages read with `useSuspenseQuery`; `AppLayout` has a Suspense boundary, so pages may also load secondary data that way.
+  - Errors go through `lib/errors.ts` (`toDataError`, `requireAffected`), because RLS makes forbidden UPDATE/DELETE return 0 rows, not an error. Show them with `toast.error(errorMessage(e))`.
+- **Query keys:** `['workspaces', …]` and `['courses', …]`; invalidate by prefix after mutations.
+- **Leaving or deleting** the current workspace or course: navigate away *first*, then invalidate (see `useExitWorkspace`). Otherwise the page crashes when its data disappears, or `/app` bounces back through the stale cache.
 - Avoid `Date.now()` in render (oxlint `react/purity`); capture it with `useState(Date.now)`.
 
 ### UI
@@ -105,7 +118,7 @@ supabase/
 
 - **Supabase Auth with Google only** (no email/password, magic links or other providers unless asked). PKCE flow (`flowType: 'pkce'` in `src/lib/supabase.ts`); `redirectTo` is always `window.location.origin + '/auth/callback'`, never a hardcoded host.
 - **All auth calls live in `src/features/auth/api.ts`.** Components use the hooks in `features/auth/hooks.ts` (`useAuth`, `useCurrentProfile`, `useUserIdentity`, `useSignInWithGoogle`, `useSignOut`) and never import `supabase` directly.
-- **Route protection happens in loaders, not components.** Any new authenticated route goes *under* the `app` layout route, whose loader (`src/layouts/app-loader.ts`) calls `requireUser(request)` before anything else. Don't add `useEffect`-style redirect guards.
+- **Route protection happens in loaders, not components.** Any new authenticated route goes *under* the `app` route, whose loader (`src/layouts/app-loader.ts`) calls `requireUser(request)` before anything else. Child loaders that need the user call `requireUser` again (it's cheap; loaders run in parallel). Don't add `useEffect`-style redirect guards.
 - **Post-login destination:** `/login?next=` (validated by `safeNextPath`: same-site paths only). It's stored in sessionStorage across the Google round trip so the callback URL stays fixed.
 - **Identity changes** (sign-in/out in another tab, expired session) are handled once, in `watchAuthIdentity` (router.tsx): clear the query cache, then `router.revalidate()`. Never call Supabase APIs inside an `onAuthStateChange` callback (deadlock risk; defer with `setTimeout`).
 - **Profiles are created only by the DB trigger.** Don't add client-side profile inserts. If a profile is missing or fails to load, the UI falls back to Google metadata (`useUserIdentity`).

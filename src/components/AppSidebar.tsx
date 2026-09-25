@@ -1,5 +1,4 @@
-import { Link, matchPath, useLocation } from 'react-router'
-import { LogoMark, LogoWordmark } from '@/components/Logo'
+import { Link, matchPath, useLocation, useParams } from 'react-router'
 import {
   Sidebar,
   SidebarContent,
@@ -15,54 +14,23 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar'
 import { UserMenu } from '@/features/auth/components/UserMenu'
-import { getCourseNav } from '@/features/courses/nav'
-import { useCurrentCourse } from '@/features/courses/use-course'
+import { WorkspaceSwitcher } from '@/features/workspaces/components/WorkspaceSwitcher'
+import { useCurrentCourse, useCurrentWorkspace } from '@/features/workspaces/hooks'
+import { getCourseNav, getWorkspaceNav, type NavItem } from '@/features/workspaces/nav'
 
 export function AppSidebar() {
-  const course = useCurrentCourse()
-  const { pathname } = useLocation()
-  const { isMobile, setOpenMobile } = useSidebar()
-  const closeOnMobile = () => {
-    if (isMobile) setOpenMobile(false)
-  }
+  const { workspace } = useCurrentWorkspace()
+  const { courseId } = useParams()
 
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild tooltip="DevDock home">
-              <Link to="/app" onClick={closeOnMobile}>
-                <LogoMark className="size-8 object-contain" />
-                <LogoWordmark className="h-[18px]" />
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+        <WorkspaceSwitcher />
       </SidebarHeader>
 
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel className="font-mono">{course.code}</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {getCourseNav(course.id).map((item) => (
-                <SidebarMenuItem key={item.to}>
-                  <SidebarMenuButton
-                    asChild
-                    tooltip={item.title}
-                    isActive={matchPath({ path: item.to, end: item.end ?? false }, pathname) !== null}
-                  >
-                    <Link to={item.to} onClick={closeOnMobile}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        <NavGroup label="Workspace" items={getWorkspaceNav(workspace.slug)} />
+        {courseId && <CourseNavGroup />}
       </SidebarContent>
 
       <SidebarFooter>
@@ -70,5 +38,43 @@ export function AppSidebar() {
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
+  )
+}
+
+function CourseNavGroup() {
+  const { workspace } = useCurrentWorkspace()
+  const { course, can } = useCurrentCourse()
+  const items = getCourseNav(workspace.slug, course.id).filter(
+    (item) => item.title !== 'Settings' || can.canEdit,
+  )
+  return <NavGroup label={course.title} items={items} />
+}
+
+function NavGroup({ label, items }: { label: string; items: NavItem[] }) {
+  const { pathname } = useLocation()
+  const { isMobile, setOpenMobile } = useSidebar()
+
+  return (
+    <SidebarGroup>
+      <SidebarGroupLabel className="truncate">{label}</SidebarGroupLabel>
+      <SidebarGroupContent>
+        <SidebarMenu>
+          {items.map((item) => (
+            <SidebarMenuItem key={item.to}>
+              <SidebarMenuButton
+                asChild
+                tooltip={item.title}
+                isActive={matchPath({ path: item.to, end: item.end ?? false }, pathname) !== null}
+              >
+                <Link to={item.to} onClick={() => isMobile && setOpenMobile(false)}>
+                  <item.icon />
+                  <span>{item.title}</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          ))}
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
   )
 }

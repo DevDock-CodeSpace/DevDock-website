@@ -11,7 +11,7 @@ npm install
 npm run dev        # http://localhost:5173
 ```
 
-Sign-in uses **Google via Supabase Auth**, so the app needs `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` (see [Environment variables](#environment-variables)). Course content is still **mock data** (`src/features/courses/mock-data.ts`).
+Sign-in uses **Google via Supabase Auth**, so the app needs `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` (see [Environment variables](#environment-variables)). Workspaces, courses and memberships come from the database. Lessons, Live Class and Resources are placeholders until their tables exist.
 
 Checks (all must pass before merging):
 
@@ -77,11 +77,14 @@ supabase/
 - Migrations are append-only. Once a migration has been applied anywhere, change the schema with a *new* migration and never edit the old one.
 - Every new table enables RLS in the same migration that creates it.
 
-Current migrations:
+Current migrations (all applied to the hosted project):
 
 | Migration | What it does |
 |---|---|
-| `20260924214141_create_profiles.sql` (applied to the hosted project) | `profiles` table, `set_updated_at()` helper, RLS policies, and a trigger that creates a profile for each new auth user |
+| `20260924214141_create_profiles.sql` | `profiles` table, `set_updated_at()` helper, RLS policies, and a trigger that creates a profile for each new auth user |
+| `20260925000709_create_workspaces_and_courses.sql` | Workspaces, courses and their memberships with roles; the exactly-one-owner rule; RLS |
+| `20260925001632_add_workspace_invites.sql` | Invite codes and the `join_workspace(invite_code)` RPC |
+| `20260925002856_profiles_visible_to_workspace_peers.sql` | Lets people who share a workspace see each other's name and avatar |
 
 **Applying migrations to the hosted project** (after linking):
 
@@ -175,5 +178,5 @@ The app always sends `redirectTo = window.location.origin + '/auth/callback'`, s
 
 ### Not implemented yet (intentionally)
 
-- Course, lesson, membership, invitation and resource tables (Phase 4). Course content is still mock data, and `src/features/courses/api.ts` is where the swap will happen.
-- **Access control beyond sign-in.** Any Google account that Google allows (see *Testing* mode above) can sign in and gets a profile. There's no private data yet beyond each user's own profile.
+- Lessons, resources and live sessions (no tables yet; the pages are placeholders).
+- **Restricting who can sign in.** Any Google account that Google allows (see *Testing* mode above) can sign in, and any signed-in user can create their own workspace. They can't see or join anyone else's without an invite code.
