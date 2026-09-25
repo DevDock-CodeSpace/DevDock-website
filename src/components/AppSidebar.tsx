@@ -1,6 +1,5 @@
-import { SquareTerminal } from 'lucide-react'
 import { Link, matchPath, useLocation } from 'react-router'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { LogoMark, LogoWordmark } from '@/components/Logo'
 import {
   Sidebar,
   SidebarContent,
@@ -15,7 +14,7 @@ import {
   SidebarRail,
   useSidebar,
 } from '@/components/ui/sidebar'
-import { initials } from '@/features/courses/format'
+import { UserMenu } from '@/features/auth/components/UserMenu'
 import { getCourseNav } from '@/features/courses/nav'
 import { useCurrentCourse } from '@/features/courses/use-course'
 
@@ -26,23 +25,16 @@ export function AppSidebar() {
   const closeOnMobile = () => {
     if (isMobile) setOpenMobile(false)
   }
-  // TEMPORARY: mock signed-in user until auth exists.
-  const instructor = course.members.find((m) => m.role === 'instructor')
 
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild tooltip="DevDoc home">
+            <SidebarMenuButton size="lg" asChild tooltip="DevDock home">
               <Link to="/app" onClick={closeOnMobile}>
-                <div className="flex aspect-square size-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
-                  <SquareTerminal className="size-4" />
-                </div>
-                <div className="grid flex-1 text-left leading-tight">
-                  <span className="truncate font-semibold">DevDoc</span>
-                  <span className="truncate font-mono text-xs text-muted-foreground">workspace</span>
-                </div>
+                <LogoMark className="size-8 object-contain" />
+                <LogoWordmark className="h-[18px]" />
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -73,27 +65,9 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      {instructor && (
-        <SidebarFooter>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton size="lg" tooltip={instructor.name}>
-                <Avatar className="size-8 rounded-md">
-                  <AvatarFallback className="rounded-md text-xs">
-                    {initials(instructor.name)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="grid flex-1 text-left leading-tight">
-                  <span className="truncate text-sm font-medium">{instructor.name}</span>
-                  <span className="truncate font-mono text-xs text-muted-foreground">
-                    @{instructor.handle}
-                  </span>
-                </div>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarFooter>
-      )}
+      <SidebarFooter>
+        <UserMenu />
+      </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   )

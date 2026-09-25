@@ -1,8 +1,8 @@
 import { PageHeader } from '@/components/PageHeader'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
-import { initials } from '@/features/courses/format'
 import { useCurrentCourse } from '@/features/courses/use-course'
+import { initials } from '@/lib/utils'
 
 export function MembersPage() {
   const course = useCurrentCourse()

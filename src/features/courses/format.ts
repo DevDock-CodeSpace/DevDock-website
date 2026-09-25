@@ -13,12 +13,3 @@ const sessionFormat = new Intl.DateTimeFormat(undefined, {
 export function formatSessionTime(iso: string) {
   return sessionFormat.format(new Date(iso))
 }
-
-export function initials(name: string) {
-  return name
-    .split(' ')
-    .map((part) => part[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase()
-}

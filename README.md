@@ -1,4 +1,4 @@
-# DevDoc
+# DevDock
 
 A private software-engineering teaching workspace for one instructor and a few students.
 
@@ -11,7 +11,7 @@ npm install
 npm run dev        # http://localhost:5173
 ```
 
-The UI currently runs entirely on **mock data** (`src/features/courses/mock-data.ts`). No Supabase project or credentials are needed to run it.
+Sign-in uses **Google via Supabase Auth**, so the app needs `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` (see [Environment variables](#environment-variables)). Course content is still **mock data** (`src/features/courses/mock-data.ts`).
 
 Checks (all must pass before merging):
 
@@ -29,9 +29,9 @@ Node 22 LTS is recommended. Node 20 is end-of-life, and newer `@supabase/supabas
 
 ### What it's for
 
-| Supabase feature | DevDoc use |
+| Supabase feature | DevDock use |
 |---|---|
-| Auth | Sign-in (Google OAuth, Phase 3) |
+| Auth | Sign-in with Google (OAuth, PKCE flow) |
 | Postgres | Profiles now; courses, lessons, members, and resources later |
 | Row Level Security | The authorization layer: who can read or change which rows |
 | Storage | Later: uploaded files |
@@ -40,7 +40,7 @@ The browser talks to Supabase directly with a **publishable** key. That key is p
 
 ### Environment variables
 
-Copy `.env.example` to `.env.local` (git-ignored) and fill in:
+Copy `.env.example` to `.env.local` (or `.env`; both are git-ignored) and fill in:
 
 | Variable | Where to find it | Notes |
 |---|---|---|
@@ -114,11 +114,66 @@ Commit the generated file. Re-run the command after every migration.
 - Rows are created by the `on_auth_user_created` trigger, which copies the name and avatar from OAuth metadata when they exist and leaves them null otherwise.
 - RLS: a signed-in user can **read** and **update** only their own profile. Anonymous users can't read profiles at all. Clients can't insert or delete profiles, and can only change `display_name` and `avatar_url`.
 - Visibility will be widened later (e.g. course members seeing each other's names) with an additional, narrowly scoped policy.
+- Generated `Insert`/`Update` types list every column, but database grants are stricter. Clients can only update `display_name` and `avatar_url`, and can't insert profiles at all.
+
+---
+
+## Authentication
+
+### How it works
+
+- **Provider:** Google only, through Supabase Auth. There's no email/password, magic link or sign-up form.
+- **Flow:** PKCE.
+  1. `/login` calls `supabase.auth.signInWithOAuth({ provider: 'google', redirectTo: <origin>/auth/callback })`.
+  2. The browser goes to Google, then to Supabase's `/auth/v1/callback`.
+  3. Supabase sends it back to `/auth/callback?code=…`.
+  4. supabase-js swaps that one-time code for a session on startup (`detectSessionInUrl`), and the `/auth/callback` loader sends the user to the page they originally asked for.
+- **Session:** supabase-js keeps it in `localStorage` and refreshes tokens automatically, so a page refresh keeps you signed in.
+- **Route protection:** the authenticated layout's loader (`appLoader` → `requireUser`) runs *before* anything renders, and redirects to `/login?next=<requested path>` when there's no session.
+  - `/login` redirects already-signed-in users to `next` (or `/app`).
+  - `next` accepts only same-site paths, so it can't be used as an open redirect.
+  - A loading screen shows while the session is restored.
+- **Staying in sync:** `onAuthStateChange` watches for identity changes: sign-out in another tab, or a session that expired and couldn't be refreshed. On a change it clears the TanStack Query cache and re-runs the route loaders, which redirect as needed.
+- **Identity in the UI:** the sidebar shows the `profiles` row (name and avatar). If the profile is missing or fails to load, it falls back to the Google account details.
+- **Sign out** (sidebar user menu) ends this browser's session, clears cached data, and goes to `/login`.
+- **Security:** route guards are only for the user experience. **The database is the security boundary:** RLS lets a user read and update only their own profile.
+
+Code lives in `src/features/auth/` (`api.ts`, `loaders.ts`, `hooks.ts`, `session.ts`, `redirect.ts`, `components/`), plus `src/routes/LoginPage.tsx` and `src/layouts/app-loader.ts`.
+
+### Google Cloud setup
+
+In [Google Cloud Console](https://console.cloud.google.com/) → **Google Auth Platform**:
+
+1. **Branding / Audience:** set the app name (DevDock) and support email. The user type is **External**.
+   - While the publishing status is **Testing**, only the accounts listed under **Audience → Test users** can sign in. Add yourself and your students, or publish the app. DevDock only uses the basic `openid`, `email` and `profile` scopes, which don't require Google's app verification.
+2. **Data Access:** the scopes are `openid`, `.../auth/userinfo.email` and `.../auth/userinfo.profile`.
+3. **Clients → Create client → Web application:**
+   - **Authorized JavaScript origins:** `http://localhost:5173`, plus each deployed origin later.
+   - **Authorized redirect URIs:** `https://<project-ref>.supabase.co/auth/v1/callback`. This is Supabase's callback, *not* the app's `/auth/callback`.
+   - Copy the **Client ID** and **Client secret** into Supabase (next section). **The client secret never goes in `.env` or frontend code.**
+
+### Supabase Auth setup
+
+In the Supabase Dashboard → **Authentication**:
+
+1. **Sign In / Providers → Google:**
+   - Enable it, and paste the Google **Client ID** and **Client Secret**.
+   - Leave *Skip nonce checks* and *Allow users without an email* **off**.
+   - The *Callback URL* shown there must match the Google redirect URI above.
+2. **URL Configuration:**
+   - **Site URL:** `http://localhost:5173` for now.
+   - **Redirect URLs:** `http://localhost:5173/**` (or exactly `http://localhost:5173/auth/callback`).
+
+The app always sends `redirectTo = window.location.origin + '/auth/callback'`, so no URLs are hardcoded. Each environment's origin just needs to be on the allow-list.
+
+**When deploying to Vercel or a custom domain:**
+- **Supabase:** set **Site URL** to the production origin. Add `https://<domain>/auth/callback` to **Redirect URLs**, plus `https://*-<team>.vercel.app/**` if you want preview deployments to work.
+- **Google:** add the production origin to **Authorized JavaScript origins**. The redirect URI stays the Supabase callback.
+- **Vercel:** set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` in the project's environment variables.
+
+`supabase/config.toml` only configures the optional local Docker stack. The hosted project is configured in the dashboard.
 
 ### Not implemented yet (intentionally)
 
-- Sign-in / Google OAuth (Phase 3)
-- Course, lesson, membership, and resource tables (Phase 4). The UI still uses mock data, and `src/features/courses/api.ts` is where the swap will happen.
-- Nothing in the app imports `src/lib/supabase.ts` yet.
-
-Note: generated `Insert`/`Update` types list every column, but database grants are stricter. Clients can only update `display_name` and `avatar_url`, and can't insert profiles at all.
+- Course, lesson, membership, invitation and resource tables (Phase 4). Course content is still mock data, and `src/features/courses/api.ts` is where the swap will happen.
+- **Access control beyond sign-in.** Any Google account that Google allows (see *Testing* mode above) can sign in and gets a profile. There's no private data yet beyond each user's own profile.

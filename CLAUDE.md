@@ -1,16 +1,16 @@
-# DevDoc
+# DevDock
 
-DevDoc is a private software-engineering teaching workspace for **one instructor and a small group of students** (single digits). It is not a public product. Optimize for clarity, low maintenance, and low hosting cost over scale.
-
-> Repo folder is named `DevDock-website`; the product name is **DevDoc**.
+DevDock is a private software-engineering teaching workspace for **one instructor and a small group of students** (single digits). It is not a public product. Optimize for clarity, low maintenance, and low hosting cost over scale.
 
 ## Current status
 
 **Phase 1 done: frontend shell.** React Router, Tailwind v4, shadcn/ui, and TanStack Query are installed. The app has a responsive sidebar layout, light/dark/system theme, and placeholder pages driven by **mock data** (`src/features/courses/mock-data.ts`). TipTap, draw.io, and Jitsi are not installed yet. **Add each piece only when a task needs it**, and don't build ahead.
 
-**Phase 2 done: Supabase foundation.** `@supabase/supabase-js`, a typed browser client (`src/lib/supabase.ts`), the `supabase/` CLI project, and the first migration (`profiles` + RLS + a sign-up trigger), **applied to the hosted project** (ref `ejqrrxxiatvvdiyxtvid`, linked via `supabase link`). Nothing in the app imports the client yet; the UI still runs on mock data with no credentials.
+**Phase 2 done: Supabase foundation.** `@supabase/supabase-js`, a typed browser client (`src/lib/supabase.ts`), the `supabase/` CLI project, and the first migration (`profiles` + RLS + a sign-up trigger), **applied to the hosted project** (ref `ejqrrxxiatvvdiyxtvid`, linked via `supabase link`).
 
-Explicitly **not yet**: sign-in / Google OAuth (Phase 3), course/lesson/member tables and replacing mock data (Phase 4).
+**Phase 3 done: Google sign-in** via Supabase Auth (PKCE). All app routes require a session, and the sidebar shows the signed-in user's profile. Sign-in verified end-to-end with a real Google account. The app now **requires** the Supabase env vars. Course content is still mock data.
+
+Explicitly **not yet**: course/lesson/member/invitation tables and replacing mock data (Phase 4). Current status and next steps: `docs/STATUS.md`.
 
 ## Target stack
 
@@ -61,9 +61,9 @@ Before calling a task done, run `npm run typecheck`, `npm run lint`, and `npm ru
 src/
   main.tsx           # providers: QueryClient → Theme → Tooltip → Router
   router.tsx         # all routes (createBrowserRouter, data mode)
-  layouts/           # AppLayout: sidebar + header + <Outlet/>
+  layouts/           # AppLayout (sidebar + header + <Outlet/>), app-loader.ts (auth guard + cache priming)
   routes/            # page components; routes/course/* for /courses/:courseId/*
-  features/<name>/   # feature-scoped components, types, api.ts, hooks
+  features/<name>/   # feature-scoped components, types, api.ts, hooks (auth/, courses/)
   components/ui/     # shadcn/ui generated components (don't hand-edit much)
   components/        # shared app components (AppSidebar, PageHeader, Theme*)
   hooks/             # shared hooks
@@ -76,7 +76,7 @@ supabase/
 
 ### Routing & data
 
-- Routes: `/app` (workspace home), `/courses/:courseId` (overview) plus `lessons`, `live`, `resources`, `members`, `settings`. `/` redirects to `/app`.
+- Routes: `/login`, `/auth/callback` (public), plus the authenticated layout (route id `app`): `/app` (workspace home), `/courses/:courseId` (overview) and `lessons`, `live`, `resources`, `members`, `settings`. `/` redirects to `/app`.
 - Course sidebar items are defined once in `src/features/courses/nav.ts`; the sidebar and breadcrumb both read it.
 - Data pattern: `features/<name>/api.ts` exports `queryOptions`. The layout route's `loader` primes the cache with `queryClient.ensureQueryData`, and components read with `useSuspenseQuery` (e.g. `useCurrentCourse()`). To move to Supabase, replace the fetcher bodies in `api.ts` and keep the query keys.
 - Avoid `Date.now()` in render (oxlint `react/purity`); capture it with `useState(Date.now)`.
@@ -84,8 +84,9 @@ supabase/
 ### UI
 
 - shadcn/ui uses the `radix-nova` style (`components.json`); add components with `npx shadcn@latest add <name>`. Class merging uses `cn()` from `@/lib/utils`, which re-exports shadcn's official `cn` package.
-- Theme: `.dark` class on `<html>`, set by `ThemeProvider` (localStorage key `devdoc-theme`) and by an inline script in `index.html` that prevents a theme flash on load. Use the semantic color tokens (`bg-background`, `text-muted-foreground`, …), never raw grays.
+- Theme: `.dark` class on `<html>`, set by `ThemeProvider` (localStorage key `devdock-theme`) and by an inline script in `index.html` that prevents a theme flash on load. Use the semantic color tokens (`bg-background`, `text-muted-foreground`, …), never raw grays.
 - Visual tone: developer workspace. Neutral palette, Geist Sans, and Geist Mono (`font-mono`) for codes, numbers, handles, and times.
+- **Brand:** the product is **DevDock**. Show the logo only through `LogoMark` / `LogoWordmark` in `src/components/Logo.tsx`; `LogoWordmark` switches to the light-text version in dark mode. Don't hand-edit files in `src/assets/brand/` or the favicons in `public/`; they're generated from `brand/source/` by `brand/build.py` (see `brand/README.md`).
 - `.oxlintrc.json` turns off two rules for generated shadcn files only. Don't widen that override to app code.
 
 ## Supabase
@@ -99,6 +100,18 @@ supabase/
 - **`updated_at`:** attach the shared `public.set_updated_at()` trigger to any table with that column.
 - **Profiles:** created by the `on_auth_user_created` trigger (security definer, tolerant of missing OAuth metadata), not by app code. Clients can read/update only their own row, and only `display_name`/`avatar_url`.
 - **Types:** `src/types/database.types.ts` is CLI-generated from the linked project. After each migration: `supabase db push`, then `npm run db:types`, then commit both. Never hand-write or hand-edit table types, and don't use `any` to get around missing types. Generated `Insert`/`Update` types ignore column grants, so the DB may still reject a write the types allow.
+
+## Authentication
+
+- **Supabase Auth with Google only** (no email/password, magic links or other providers unless asked). PKCE flow (`flowType: 'pkce'` in `src/lib/supabase.ts`); `redirectTo` is always `window.location.origin + '/auth/callback'`, never a hardcoded host.
+- **All auth calls live in `src/features/auth/api.ts`.** Components use the hooks in `features/auth/hooks.ts` (`useAuth`, `useCurrentProfile`, `useUserIdentity`, `useSignInWithGoogle`, `useSignOut`) and never import `supabase` directly.
+- **Route protection happens in loaders, not components.** Any new authenticated route goes *under* the `app` layout route, whose loader (`src/layouts/app-loader.ts`) calls `requireUser(request)` before anything else. Don't add `useEffect`-style redirect guards.
+- **Post-login destination:** `/login?next=` (validated by `safeNextPath`: same-site paths only). It's stored in sessionStorage across the Google round trip so the callback URL stays fixed.
+- **Identity changes** (sign-in/out in another tab, expired session) are handled once, in `watchAuthIdentity` (router.tsx): clear the query cache, then `router.revalidate()`. Never call Supabase APIs inside an `onAuthStateChange` callback (deadlock risk; defer with `setTimeout`).
+- **Profiles are created only by the DB trigger.** Don't add client-side profile inserts. If a profile is missing or fails to load, the UI falls back to Google metadata (`useUserIdentity`).
+- **Route guards are UX, not security.** Every data rule must be enforced by RLS. Don't pass user IDs from the client as proof of anything.
+- **Errors:** show friendly messages (`features/auth/errors.ts`), log the raw error with `console.error('[auth] …')`, and never render Supabase/Postgres error text.
+- **Adding a deployed environment:** add `<origin>/auth/callback` to Supabase → Authentication → URL Configuration → Redirect URLs, and the origin to Google's Authorized JavaScript origins. The Google client secret lives only in the Supabase dashboard.
 
 ## Environment & secrets
 
