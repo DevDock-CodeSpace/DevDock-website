@@ -537,7 +537,12 @@ Migration `20260925001632_add_workspace_invites.sql`: tested locally (28 checks)
   - The doc page shows its folder path, and Back returns to the folder.
   - Group → Docs lists workspace docs underneath, under "In workspaces".
 - **Browser tests** (`scratchpad/folders-test.mjs`, 27 checks): browsing, the URL, breadcrumbs, 3-level creation and the depth cap, new doc in a folder, the doc page path, Move to…, drag to a folder or breadcrumb, rename, delete with contents, member read-only, and the workspace tab. This also caught and fixed a duplicate React key.
-- **Open question for the product owner:** Resources vs Docs. Recommendation: drop the Resources tab and later add "file" and "link" items inside Docs folders.
+- **Resources retired** (decided with the product owner; migration `20260925085435_remove_resources_tool.sql`, applied):
+  - Deleted the enabled Resources rows (1 on hosted), and added the check `workspace_modules_no_resources`. The enum value stays, because Postgres can't drop one without rebuilding the type.
+  - `default_workspace_modules` no longer includes it (course: Learning, Docs, Diagrams, Exercises, Live; general: Docs, Diagrams, Live).
+  - The UI has no Resources tab, picker option or defaults, and stale rows are filtered out.
+  - Future idea: file and link items inside Docs folders.
+  - The older phase notes above still mention Resources as they were at the time.
 
 ## Current configuration (hosted)
 - **Supabase URL Configuration:** Site URL `http://localhost:5173`; Redirect URLs `http://localhost:5173/**`.
