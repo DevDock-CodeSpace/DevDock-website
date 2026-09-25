@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       documents: {
         Row: {
+          body: Json | null
           content: string
           created_at: string
           created_by: string | null
@@ -26,6 +27,7 @@ export type Database = {
           workspace_id: string | null
         }
         Insert: {
+          body?: Json | null
           content?: string
           created_at?: string
           created_by?: string | null
@@ -36,6 +38,7 @@ export type Database = {
           workspace_id?: string | null
         }
         Update: {
+          body?: Json | null
           content?: string
           created_at?: string
           created_by?: string | null
