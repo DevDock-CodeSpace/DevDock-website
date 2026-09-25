@@ -45,7 +45,7 @@ Live, Learning and the other tools are still placeholder pages. Current status a
 | Diagrams           | React Flow (`@xyflow/react`, MIT) | Own UI in DevDock's style (not an embed); stored as JSON in `diagrams.data`. Lazy-loaded with the diagram page |
 | Live sessions      | Jitsi Meet (embed)              | |
 | Code               | GitHub links                    | Link to repos/PRs; no GitHub API integration unless asked |
-| Hosting            | Vercel                          | Static SPA; `vercel.json` rewrites all paths to `index.html` |
+| Hosting            | Vercel                          | Static SPA; `vercel.json` rewrites every path except `/assets/*` to `index.html` (so a missing chunk is a real 404, not HTML) |
 
 ## Commands
 
@@ -135,6 +135,7 @@ supabase/
   - Layers: React Flow runs with `zIndexMode="manual"`. Containers sit below connectors, and connectors below shapes. `normalizeOrder()` keeps parents before children and sets the z-indexes, so call it after any reorder or reparent.
   - Undo is snapshot-based (`useHistory`). Call `snapshot()` *before* every change.
 - **Leaving or deleting** the current team or workspace: navigate away *first*, then invalidate (see `useExitTeam`). Otherwise the page crashes when its data disappears, or `/app` bounces back through the stale cache.
+- **Deploys and open tabs:** a tab opened before a deploy can't load the new build's lazy chunks. `lib/stale-build.ts` reloads once (`vite:preloadError`, plus `RouteErrorPage` as a fallback), guarded against loops. Route errors never show raw error text.
 - Avoid `Date.now()` in render (oxlint `react/purity`); capture it with `useState(Date.now)`.
 
 ### UI
