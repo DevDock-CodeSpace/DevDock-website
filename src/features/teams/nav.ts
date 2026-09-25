@@ -33,6 +33,13 @@ export const docsPath = (teamSlug: string, workspaceId?: string) =>
 export const docPath = (teamSlug: string, docId: string, workspaceId?: string) =>
   `${docsPath(teamSlug, workspaceId)}/${docId}`
 
+/** Diagrams list, in the team view or inside a workspace. */
+export const diagramsPath = (teamSlug: string, workspaceId?: string) =>
+  workspaceId ? `${workspacePath(teamSlug, workspaceId)}/diagrams` : `${teamPath(teamSlug)}/diagrams`
+/** One diagram, opened from the team view or from inside its workspace. */
+export const diagramPath = (teamSlug: string, diagramId: string, workspaceId?: string) =>
+  `${diagramsPath(teamSlug, workspaceId)}/${diagramId}`
+
 // ------------------------------------------------------------ team tools
 // Team-wide views of the same data a workspace tab shows. Future rows carry
 // team_id (required) + workspace_id (optional): null = team-wide, X = assigned
@@ -88,7 +95,7 @@ export const workspaceTabDefs: Record<
   learning: { title: 'Learning', icon: BookOpen, hint: 'Lessons and paths', soon: 'Lessons and learning paths will live here.' },
   issues: { title: 'Issues', icon: CircleDot, hint: 'Tasks and bugs', soon: 'Issues and tasks for this workspace will live here.' },
   docs: { title: 'Docs', icon: FileText, hint: 'Pages and notes', soon: 'Docs assigned to this workspace will live here.' },
-  diagrams: { title: 'Diagrams', icon: Workflow, hint: 'diagrams.net boards', soon: 'Diagrams assigned to this workspace will live here.' },
+  diagrams: { title: 'Diagrams', icon: Workflow, hint: 'Architecture and flow diagrams', soon: 'Diagrams assigned to this workspace will live here.' },
   exercises: { title: 'Exercises', icon: Shapes, hint: 'Practice and submissions', soon: 'Exercises and submissions will live here.' },
   github: { title: 'GitHub', icon: GitPullRequest, hint: 'Repos and pull requests', soon: 'Linked repositories and pull requests will show up here.' },
   resources: { title: 'Resources', icon: FolderGit2, hint: 'Links and files', soon: 'Links, repositories, and files will live here.' },

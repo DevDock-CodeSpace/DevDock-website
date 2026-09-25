@@ -14,6 +14,7 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
+import { diagramQuery } from '@/features/diagrams/api'
 import { documentQuery } from '@/features/docs/api'
 import { useCurrentTeam, useCurrentWorkspace } from '@/features/teams/hooks'
 import { getTeamNav, getWorkspaceTabs, teamPath, workspacePath, type NavItem } from '@/features/teams/nav'
@@ -56,8 +57,8 @@ function TeamBreadcrumb() {
   const { team } = useCurrentTeam()
   const { tools, members, settings } = getTeamNav(team.slug)
   const section = useSection([...tools, members, settings])
-  const doc = useDocCrumb()
-  return <Crumbs crumbs={[{ label: team.name, to: teamPath(team.slug) }, ...section, ...doc]} />
+  const item = useItemCrumb()
+  return <Crumbs crumbs={[{ label: team.name, to: teamPath(team.slug) }, ...section, ...item]} />
 }
 
 function WorkspaceBreadcrumb() {
@@ -68,27 +69,33 @@ function WorkspaceBreadcrumb() {
     ...getWorkspaceTabs(team.slug, workspace.id, workspace.modules),
     { title: 'Settings', to: `${base}/settings`, icon: getTeamNav(team.slug).settings.icon },
   ])
-  const doc = useDocCrumb()
+  const item = useItemCrumb()
   return (
     <Crumbs
       crumbs={[
         { label: team.name, to: teamPath(team.slug) },
         { label: workspace.title, to: workspacePath(team.slug, workspace.id) },
         ...section,
-        ...doc,
+        ...item,
       ]}
     />
   )
 }
 
-/** On a doc page, its title as the last crumb, but only where docLoader would show it (same team/workspace). */
-function useDocCrumb(): Crumb[] {
-  const { docId, workspaceId } = useParams()
+/**
+ * On a doc or diagram page, its title as the last crumb, but only where its
+ * loader would show it (same team/workspace).
+ */
+function useItemCrumb(): Crumb[] {
+  const { docId, diagramId, workspaceId } = useParams()
   const { pathname } = useLocation()
   const { team } = useCurrentTeam()
   const doc = useQuery({ ...documentQuery(docId ?? ''), enabled: docId !== undefined }).data
-  const belongs = doc && doc.team_id === team.id && (workspaceId === undefined || doc.workspace_id === workspaceId)
-  return docId && belongs ? [{ label: doc.title, to: pathname }] : []
+  const diagram = useQuery({ ...diagramQuery(diagramId ?? ''), enabled: diagramId !== undefined }).data
+  const item = docId ? doc : diagramId ? diagram : undefined
+  const belongs =
+    item && item.team_id === team.id && (workspaceId === undefined || item.workspace_id === workspaceId)
+  return belongs ? [{ label: item.title, to: pathname }] : []
 }
 
 /** The current non-index nav item as a crumb, if any. */
