@@ -1,5 +1,6 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { Settings } from 'lucide-react'
+import { useEffect } from 'react'
 import { Link, NavLink, Outlet } from 'react-router'
 import { AvatarStack } from '@/components/PersonRow'
 import { Button } from '@/components/ui/button'
@@ -7,6 +8,7 @@ import { useCurrentTeam, useCurrentWorkspace } from '@/features/teams/hooks'
 import { getWorkspaceTabs, workspacePath } from '@/features/teams/nav'
 import { workspaceRoleLabel, workspaceTypes } from '@/features/teams/permissions'
 import { workspaceMembersQuery } from '@/features/workspaces/api'
+import { rememberVisit } from '@/features/workspaces/recent'
 import { cn } from '@/lib/utils'
 
 /** Workspace header (type · your workspace role, title, leads) + horizontal feature tabs. */
@@ -17,6 +19,8 @@ export function WorkspaceLayout() {
   const leads = members.filter((m) => m.role === 'lead').flatMap((m) => (m.profile ? [m.profile] : []))
   const { label: typeLabel, icon: TypeIcon } = workspaceTypes[workspace.type]
   const base = workspacePath(team.slug, workspace.id)
+  // Recently opened workspaces float up in the sidebar.
+  useEffect(() => rememberVisit(team.id, workspace.id), [team.id, workspace.id])
 
   return (
     <>

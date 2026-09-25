@@ -188,3 +188,34 @@ export async function removeWorkspaceMember(workspaceId: string, userId: string)
   if (error) throw toDataError('remove the member', error)
   requireAffected(data, 'remove workspace member')
 }
+
+// ------------------------------------------------------------------ pins
+// Each person's pinned workspaces (private to them; RLS).
+
+export type WorkspacePin = { workspace_id: string; pinned_at: string }
+
+export const pinsQuery = (userId: string) =>
+  queryOptions({
+    queryKey: ['workspaces', 'pins', userId],
+    queryFn: async (): Promise<WorkspacePin[]> => {
+      const { data, error } = await supabase
+        .from('workspace_pins')
+        .select('workspace_id, pinned_at')
+        .eq('user_id', userId)
+        .order('pinned_at')
+      if (error) throw toDataError('load your pins', error)
+      return data
+    },
+  })
+
+/** user_id is the caller (database default). */
+export async function pinWorkspace(workspaceId: string) {
+  const { error } = await supabase.from('workspace_pins').insert({ workspace_id: workspaceId })
+  // Already pinned (e.g. in another tab) is fine.
+  if (error && error.code !== '23505') throw toDataError('pin it', error)
+}
+
+export async function unpinWorkspace(userId: string, workspaceId: string) {
+  const { error } = await supabase.from('workspace_pins').delete().eq('user_id', userId).eq('workspace_id', workspaceId)
+  if (error) throw toDataError('unpin it', error)
+}

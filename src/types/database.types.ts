@@ -819,6 +819,39 @@ export type Database = {
           },
         ]
       }
+      workspace_pins: {
+        Row: {
+          pinned_at: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          pinned_at?: string
+          user_id?: string
+          workspace_id: string
+        }
+        Update: {
+          pinned_at?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_pins_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspace_pins_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspaces: {
         Row: {
           created_at: string
