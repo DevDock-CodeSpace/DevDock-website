@@ -8,6 +8,7 @@ import { useCurrentWorkspace } from '@/features/teams/hooks'
 import { workspaceMembersQuery } from '@/features/workspaces/api'
 import { errorMessage } from '@/lib/errors'
 import {
+  createIssueBranch,
   cyclesQuery,
   issueKeys,
   labelsQuery,
@@ -37,12 +38,38 @@ export function useIssueContext() {
 type UpdateVars = { issue: Pick<Issue, 'id' | 'number'>; patch?: IssuePatch; labelIds?: string[] }
 
 /**
+ * Creates the issue's branch on GitHub (its repo, or the project's only one).
+ * Toasts the result; a no-op if the issue already has its branch.
+ */
+export function useCreateIssueBranch() {
+  const queryClient = useQueryClient()
+  const { workspace } = useCurrentWorkspace()
+  return useMutation({
+    mutationFn: (issue: Pick<Issue, 'id' | 'number'>) => createIssueBranch(issue.id),
+    onSuccess: ({ branch, created }) => {
+      if (created) toast.success(`Created branch ${branch.name}`)
+    },
+    onError: (error) => toast.error(errorMessage(error)),
+    onSettled: (_data, _error, issue) =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: issueKeys.branches(issue.id) }),
+        queryClient.invalidateQueries({ queryKey: issueKeys.activity(issue.id) }),
+        // The project's only repo may have become the issue's repo.
+        queryClient.invalidateQueries({ queryKey: issueKeys.detail(workspace.id, issue.number) }),
+        queryClient.invalidateQueries({ queryKey: issueKeys.workspace(workspace.id) }),
+      ]),
+  })
+}
+
+/**
  * Edits an issue (fields and/or labels) optimistically, like Linear: the list
  * and the issue page update at once, and roll back with a toast if the save fails.
+ * Moving an issue into In Progress also creates its branch, when the project has repos.
  */
 export function useUpdateIssue() {
   const queryClient = useQueryClient()
   const { workspace } = useCurrentWorkspace()
+  const createBranch = useCreateIssueBranch()
 
   return useMutation({
     mutationFn: async ({ issue, patch, labelIds }: UpdateVars) => {
@@ -76,6 +103,12 @@ export function useUpdateIssue() {
         queryClient.setQueryData(context.detailKey, context.previousDetail)
       }
       toast.error(errorMessage(error))
+    },
+    onSuccess: (_data, { issue, patch }, context) => {
+      const before =
+        context?.previousDetail?.status ?? context?.previousList?.find((i) => i.id === issue.id)?.status
+      const hasRepos = (queryClient.getQueryData(workspaceReposQuery(workspace.id).queryKey)?.length ?? 0) > 0
+      if (patch?.status === 'in_progress' && before !== 'in_progress' && hasRepos) createBranch.mutate(issue)
     },
     onSettled: (_data, _error, { issue }) => {
       void queryClient.invalidateQueries({ queryKey: issueKeys.workspace(workspace.id) })

@@ -87,7 +87,8 @@ export function RoleGuide({ type, myRole }: { type: TeamType; myRole: TeamRole }
         'Write its docs and diagrams, and organize folders',
         'Schedule its live sessions',
         'Delete issues, and manage labels and cycles',
-        'Link the group’s repositories to it, and unlink them',
+        'Link the group’s repositories to it, and set their branches',
+        'Move any issue to In Review or Done by hand (overriding GitHub)',
         ...(type === 'learning' ? ['Build the course in Learning and see the class’s progress'] : []),
       ],
     },
@@ -97,6 +98,7 @@ export function RoleGuide({ type, myRole }: { type: TeamType; myRole: TeamRole }
       can: [
         'Reads its docs and diagrams',
         'Creates and updates issues (including their repository), and comments',
+        'On issues in a connected repo, In Review and Done come from GitHub: open a PR, then merge it',
         ...(type === 'learning' ? ['Takes lessons and tracks their own progress'] : []),
       ],
     },

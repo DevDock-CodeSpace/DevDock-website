@@ -391,3 +391,8 @@ verify_jwt = false
 # Same as jaas-token: the function checks the caller itself.
 [functions.github]
 verify_jwt = false
+
+# GitHub calls this without a Supabase login; the function checks the
+# webhook signature (GITHUB_WEBHOOK_SECRET) instead.
+[functions.github-webhook]
+verify_jwt = false

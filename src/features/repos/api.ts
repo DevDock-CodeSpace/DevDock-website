@@ -77,21 +77,49 @@ export const teamReposQuery = (teamId: string) =>
     },
   })
 
+/**
+ * A repo as linked to one workspace, with that project's branch settings:
+ * new issue branches start from `base_branch` (null = the repo's default), and
+ * merging into one of `done_branches` marks issues Done (empty = the default).
+ */
+export type LinkedRepo = Repo & { base_branch: string | null; done_branches: string[] }
+
 /** The repos linked to one workspace, A–Z. */
 export const workspaceReposQuery = (workspaceId: string) =>
   queryOptions({
     queryKey: repoKeys.workspace(workspaceId),
-    queryFn: async (): Promise<Repo[]> => {
+    queryFn: async (): Promise<LinkedRepo[]> => {
       const { data, error } = await supabase
         .from('workspace_repos')
-        .select(`repo:repos!workspace_repos_repo_fkey(${REPO_COLUMNS})`)
+        .select(`base_branch, done_branches, repo:repos!workspace_repos_repo_fkey(${REPO_COLUMNS})`)
         .eq('workspace_id', workspaceId)
       if (error) throw toDataError('load repositories', error)
       return data
-        .map((l) => l.repo)
+        .map(({ repo, base_branch, done_branches }) => ({ ...repo, base_branch, done_branches }))
         .sort((a, b) => repoFullName(a).localeCompare(repoFullName(b), undefined, { sensitivity: 'base' }))
     },
   })
+
+/** A project's branch settings for one linked repo (workspace managers). */
+export async function updateRepoBranches(
+  workspaceId: string,
+  repoId: string,
+  settings: { baseBranch: string | null; doneBranches: string[] },
+) {
+  const { data, error } = await supabase
+    .from('workspace_repos')
+    .update({ base_branch: settings.baseBranch, done_branches: settings.doneBranches })
+    .eq('workspace_id', workspaceId)
+    .eq('repo_id', repoId)
+    .select('repo_id')
+  if (error) {
+    throw toDataError('save the branch settings', error, {
+      '42501': 'Only leads and group owners/admins can change branch settings.',
+      '23514': 'Branch names can’t contain spaces or ~^:?*[\\ (up to 10 done branches).',
+    })
+  }
+  requireAffected(data, 'update repo branches')
+}
 
 const repoErrors = {
   '42501': 'Only group owners and admins can add or remove repositories.',
@@ -181,11 +209,15 @@ const githubErrors: Record<string, string> = {
   state_invalid: 'That GitHub link expired or was already used. Start again from Group settings.',
   installation_denied: 'Your GitHub account can’t access that installation, so it wasn’t connected.',
   repo_not_found: 'The DevDock GitHub App can’t see that repository. Give it access on GitHub first.',
+  not_found: 'That no longer exists, or you don’t have access to it.',
+  no_repo: 'Set the issue’s repository first (this project has several).',
+  repo_not_connected: 'That repository isn’t connected to GitHub. Add it from GitHub in Group settings → Repositories.',
+  base_missing: 'The project’s base branch doesn’t exist on GitHub. Check the branch settings on the GitHub tab.',
   github_error: 'GitHub didn’t respond as expected. Please try again.',
 }
 
 /** Calls the `github` Edge Function, turning its error codes into friendly messages. */
-async function callGitHub<T>(action: string, body: Record<string, unknown>): Promise<T> {
+export async function callGitHub<T>(action: string, body: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.functions.invoke<T>('github', { body: { action, ...body } })
   if (error || !data) {
     let code: string | undefined
@@ -238,3 +270,11 @@ export async function disconnectGitHub(teamId: string, installationId: number) {
   if (error) throw toDataError('disconnect GitHub', error, { '42501': githubErrors.forbidden })
   requireAffected(data, 'disconnect github')
 }
+
+/** A connected repo's branches (for choosing base and done branches). */
+export const repoBranchesQuery = (repoId: string) =>
+  queryOptions({
+    queryKey: ['repos', 'branches', repoId] as const,
+    queryFn: () => callGitHub<{ defaultBranch: string; branches: string[] }>('branches', { repoId }),
+    staleTime: 30_000,
+  })

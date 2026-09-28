@@ -44,6 +44,23 @@ export const labelDotClass: Record<LabelColor, string> = {
 /** CAP-12 */
 export const issueIdentifier = (key: string, number: number) => `${key}-${number}`
 
+/**
+ * The git branch for an issue: dock/cap-12-add-login-page. The dock/ prefix
+ * groups DevDock's branches on GitHub; the github-webhook function finds the
+ * issue from the cap-12 part (and from the stored name). Same as branchName()
+ * in supabase/functions/github/index.ts.
+ */
+export function issueBranchName(key: string, number: number, title: string) {
+  const slug = title
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40)
+    .replace(/-+$/, '')
+  return `dock/${key.toLowerCase()}-${number}${slug ? `-${slug}` : ''}`
+}
+
 /** Linear's default order inside a group: urgent → low, then no priority; newest first. */
 export function compareIssues(a: Issue, b: Issue) {
   const rank = (p: IssuePriority) => (p === 0 ? 5 : p)
