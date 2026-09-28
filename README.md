@@ -199,7 +199,10 @@ Connecting a group to GitHub (Group settings → Repositories → **Connect GitH
    - **Homepage URL:** your DevDock origin, e.g. `http://localhost:5173`.
    - **Callback URL:** `http://localhost:5173/github/callback`. Add one per deployed origin later (up to 10).
    - Tick **Request user authorization (OAuth) during installation**. DevDock uses that one-time sign-in to check that the person connecting really has access to the installation.
-   - **Webhook:** untick *Active* for now. Phase 9c adds the webhook URL and secret.
+   - **Webhook:** tick *Active*.
+     - URL: `https://<project-ref>.supabase.co/functions/v1/github-webhook`
+     - Secret: a random value, also set as `GITHUB_WEBHOOK_SECRET` (step 4)
+     - Under **Subscribe to events**, tick **Pull request**. Installation events are always sent.
    - **Repository permissions:**
      - Contents: **Read and write** (9d creates branches; asking now avoids a re-approval later)
      - Pull requests: **Read-only**
@@ -215,6 +218,7 @@ Connecting a group to GitHub (Group settings → Repositories → **Connect GitH
    ```bash
    supabase secrets set GITHUB_APP_ID=<app id> GITHUB_CLIENT_ID=<client id> GITHUB_CLIENT_SECRET=<client secret>
    supabase secrets set GITHUB_APP_PRIVATE_KEY="$(cat github-app-pkcs8.pem)"
+   supabase secrets set GITHUB_WEBHOOK_SECRET=<the webhook secret>
    ```
    Then delete both `.pem` files.
 5. **Show the button:** set `VITE_GITHUB_APP_SLUG=<slug>` in `.env.local` (and in Vercel later), then restart `npm run dev`. The slug isn't a secret.

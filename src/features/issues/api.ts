@@ -1,4 +1,5 @@
 import { queryOptions } from '@tanstack/react-query'
+import { callGitHub } from '@/features/repos/api'
 import type { PersonProfile } from '@/features/teams/api'
 import { requireAffected, toDataError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
@@ -59,6 +60,10 @@ export type ActivityKind =
   | 'label_added'
   | 'label_removed'
   | 'repo'
+  | 'pr_linked'
+  | 'pr_merged'
+  | 'pr_closed'
+  | 'branch_created'
 
 /** One change to an issue, written by a database trigger. Values are text (ids for assignee/parent/cycle/repo). */
 export type IssueActivity = {
@@ -67,6 +72,8 @@ export type IssueActivity = {
   from_value: string | null
   to_value: string | null
   actor_id: string | null
+  /** 'github' when the change came from a GitHub webhook (no actor). */
+  via: 'github' | null
   created_at: string
   actor: PersonProfile
 }
@@ -102,6 +109,8 @@ const writeErrors = {
   '42501': 'You don’t have permission to change issues here.',
   '23514':
     'That change isn’t allowed. Assignees and repositories must belong to this workspace, and an issue can’t be its own sub-issue.',
+  // private.check_issue: the issue's repo is connected to GitHub.
+  DD001: 'In Review and Done are set by GitHub: open a pull request, then merge it. A lead can override.',
 }
 
 // ---------------------------------------------------------------- queries
@@ -114,6 +123,8 @@ export const issueKeys = {
   comments: (issueId: string) => ['issues', 'comments', issueId] as const,
   activity: (issueId: string) => ['issues', 'activity', issueId] as const,
   cycles: (workspaceId: string) => ['issues', 'cycles', workspaceId] as const,
+  pullRequests: (issueId: string) => ['issues', 'pull-requests', issueId] as const,
+  branches: (issueId: string) => ['issues', 'branches', issueId] as const,
 }
 
 /** Every issue in the workspace (small teams: one query, grouped and filtered client-side). */
@@ -207,7 +218,7 @@ export const activityQuery = (issueId: string) =>
     queryFn: async (): Promise<IssueActivity[]> => {
       const { data, error } = await supabase
         .from('issue_activity')
-        .select('id, kind, from_value, to_value, actor_id, created_at, actor:profiles!issue_activity_actor_id_fkey(display_name, avatar_url)')
+        .select('id, kind, from_value, to_value, actor_id, via, created_at, actor:profiles!issue_activity_actor_id_fkey(display_name, avatar_url)')
         .eq('issue_id', issueId)
         .order('created_at')
         .order('id')
@@ -215,6 +226,65 @@ export const activityQuery = (issueId: string) =>
       return data as IssueActivity[]
     },
   })
+
+/** A GitHub PR that mentions the issue; written only by the github-webhook Edge Function. */
+export type IssuePullRequest = {
+  id: string
+  number: number
+  title: string
+  url: string
+  state: 'draft' | 'open' | 'merged' | 'closed'
+  head_ref: string
+  author_login: string | null
+  updated_at: string
+  repo: { owner: string; name: string } | null
+}
+
+/** Open ones first, then newest. */
+export const pullRequestsQuery = (issueId: string) =>
+  queryOptions({
+    queryKey: issueKeys.pullRequests(issueId),
+    queryFn: async (): Promise<IssuePullRequest[]> => {
+      const { data, error } = await supabase
+        .from('issue_pull_requests')
+        .select('id, number, title, url, state, head_ref, author_login, updated_at, repo:repos(owner, name)')
+        .eq('issue_id', issueId)
+        .order('updated_at', { ascending: false })
+      if (error) throw toDataError('load pull requests', error)
+      const rank = (s: IssuePullRequest['state']) => (s === 'open' || s === 'draft' ? 0 : 1)
+      return (data as IssuePullRequest[]).sort((a, b) => rank(a.state) - rank(b.state))
+    },
+  })
+
+/** A branch DevDock created (or adopted) on GitHub for the issue. */
+export type IssueBranch = {
+  id: string
+  name: string
+  base: string
+  created_at: string
+  repo: { owner: string; name: string } | null
+}
+
+export const issueBranchesQuery = (issueId: string) =>
+  queryOptions({
+    queryKey: issueKeys.branches(issueId),
+    queryFn: async (): Promise<IssueBranch[]> => {
+      const { data, error } = await supabase
+        .from('issue_branches')
+        .select('id, name, base, created_at, repo:repos(owner, name)')
+        .eq('issue_id', issueId)
+        .order('created_at')
+      if (error) throw toDataError('load branches', error)
+      return data
+    },
+  })
+
+/**
+ * Creates the issue's branch on GitHub (the `github` Edge Function), in its
+ * repo or the project's only repo. Returns the existing one if it has one.
+ */
+export const createIssueBranch = (issueId: string) =>
+  callGitHub<{ branch: { name: string; base: string }; created: boolean }>('create_branch', { issueId })
 
 export const commentsQuery = (issueId: string) =>
   queryOptions({

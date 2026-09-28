@@ -14,9 +14,17 @@
 //   add_repo { teamId, githubRepoId } → { repo }
 //     Adds (or connects) that repo in the group (owners/admins only), after
 //     checking one of the group's installations can reach it.
+//   create_branch { issueId } → { branch, created }
+//     The issue's branch (wa-2-add-login) in its repo (or the project's only
+//     repo), from the project's base branch. Anyone who can see the issue
+//     (checked under their RLS). Adopts an existing branch of that name;
+//     does nothing if the issue already has one.
+//   branches { repoId } → { defaultBranch, branches }
+//     Branch names, for picking a project's base and "done" branches.
 //
 // Errors: 400 bad_request / state_invalid · 401 unauthorized · 403 forbidden /
-// installation_denied · 404 repo_not_found · 502 github_error · 503 not_configured
+// installation_denied · 404 repo_not_found / not_found · 409 no_repo /
+// repo_not_connected / base_missing · 502 github_error · 503 not_configured
 //
 // Secrets (set with `supabase secrets set`, never in the repo):
 //   GITHUB_APP_ID         the App's ID (or its Client ID)
@@ -291,6 +299,133 @@ async function addRepo(admin: SupabaseClient, config: AppConfig, userId: string,
   throw new HttpError(404, 'repo_not_found')
 }
 
+// ----------------------------------------------------------------- branches
+
+/** Same as issueBranchName() in src/features/issues/meta.ts: dock/wa-2-add-login-page. */
+function branchName(key: string, number: number, title: string) {
+  const slug = title
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40)
+    .replace(/-+$/, '')
+  return `dock/${key.toLowerCase()}-${number}${slug ? `-${slug}` : ''}`
+}
+
+const refPath = (branch: string) => branch.split('/').map(encodeURIComponent).join('/')
+
+type LinkedRepo = {
+  repo_id: string
+  base_branch: string | null
+  repos: { id: string; github_repo_id: number | null; installation_id: number | null } | null
+}
+
+/** A connected repo's full name and default branch, with a token for it. */
+async function connectedRepo(config: AppConfig, repo: { github_repo_id: number | null; installation_id: number | null } | null) {
+  if (!repo?.github_repo_id || !repo.installation_id) throw new HttpError(409, 'repo_not_connected')
+  const token = await installationToken(config, repo.installation_id)
+  const info = await github<{ full_name: string; default_branch: string }>(`/repositories/${repo.github_repo_id}`, token)
+  return { token, fullName: info.full_name, defaultBranch: info.default_branch }
+}
+
+async function createBranch(
+  admin: SupabaseClient,
+  asUser: SupabaseClient,
+  config: AppConfig,
+  userId: string,
+  body: Record<string, unknown>,
+) {
+  const { issueId } = body
+  if (!isUuid(issueId)) throw new HttpError(400, 'bad_request')
+
+  // Read as the caller: if RLS hides the issue, they can't branch it.
+  const { data: issue } = await asUser
+    .from('issues')
+    .select('id, workspace_id, number, title, repo_id, workspaces!issues_workspace_team_fkey(issue_key)')
+    .eq('id', issueId)
+    .maybeSingle()
+  if (!issue) throw new HttpError(404, 'not_found')
+  const { data: links } = await asUser
+    .from('workspace_repos')
+    .select('repo_id, base_branch, repos!workspace_repos_repo_fkey(id, github_repo_id, installation_id)')
+    .eq('workspace_id', issue.workspace_id)
+  const linked = (links ?? []) as unknown as LinkedRepo[]
+  const link = issue.repo_id ? linked.find((l) => l.repo_id === issue.repo_id) : linked.length === 1 ? linked[0] : undefined
+  if (!link) throw new HttpError(409, 'no_repo')
+
+  const { data: existing } = await admin
+    .from('issue_branches')
+    .select('name, base, sha')
+    .eq('issue_id', issue.id)
+    .eq('repo_id', link.repo_id)
+    .maybeSingle()
+  if (existing) return { branch: existing, created: false }
+
+  const { token, fullName, defaultBranch } = await connectedRepo(config, link.repos)
+  const base = link.base_branch ?? defaultBranch
+  const key = (issue.workspaces as unknown as { issue_key: string }).issue_key
+  const name = branchName(key, issue.number, issue.title)
+
+  const headers = {
+    Accept: 'application/vnd.github+json',
+    Authorization: `Bearer ${token}`,
+    'X-GitHub-Api-Version': '2022-11-28',
+    'User-Agent': 'DevDock',
+  }
+  const baseRef = await fetch(`https://api.github.com/repos/${fullName}/git/ref/heads/${refPath(base)}`, { headers })
+  if (baseRef.status === 404) throw new HttpError(409, 'base_missing')
+  if (!baseRef.ok) throw new HttpError(502, 'github_error')
+  const baseSha = ((await baseRef.json()) as { object: { sha: string } }).object.sha
+
+  let sha = baseSha
+  const created = await fetch(`https://api.github.com/repos/${fullName}/git/refs`, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ref: `refs/heads/${name}`, sha: baseSha }),
+  })
+  const adopted = created.status === 422
+  if (adopted) {
+    // Already exists on GitHub (made by hand, or an earlier try): use it.
+    const found = await github<{ object: { sha: string } }>(`/repos/${fullName}/git/ref/heads/${refPath(name)}`, token)
+    sha = found.object.sha
+  } else if (!created.ok) {
+    console.error('[github] creating branch failed', created.status, await created.text())
+    throw new HttpError(502, 'github_error')
+  }
+
+  const { error: saveError } = await admin.from('issue_branches').upsert(
+    { issue_id: issue.id, workspace_id: issue.workspace_id, repo_id: link.repo_id, name, base, sha, created_by: userId },
+    { onConflict: 'issue_id,repo_id', ignoreDuplicates: true },
+  )
+  if (saveError) {
+    console.error('[github] saving branch failed', saveError)
+    throw new HttpError(500, 'server_error')
+  }
+  // The project's only repo becomes the issue's repo (logged as the caller's change).
+  if (!issue.repo_id) await asUser.from('issues').update({ repo_id: link.repo_id }).eq('id', issue.id)
+  await admin
+    .from('issue_activity')
+    .insert({ issue_id: issue.id, workspace_id: issue.workspace_id, actor_id: userId, kind: 'branch_created', to_value: name })
+
+  return { branch: { name, base, sha }, created: !adopted }
+}
+
+async function listBranches(asUser: SupabaseClient, config: AppConfig, body: Record<string, unknown>) {
+  const { repoId } = body
+  if (!isUuid(repoId)) throw new HttpError(400, 'bad_request')
+  const { data: repo } = await asUser.from('repos').select('github_repo_id, installation_id').eq('id', repoId).maybeSingle()
+  if (!repo) throw new HttpError(404, 'not_found')
+  const { token, fullName, defaultBranch } = await connectedRepo(config, repo)
+  const branches: string[] = []
+  for (let page = 1; page <= 3; page++) {
+    const data = await github<{ name: string }[]>(`/repos/${fullName}/branches?per_page=100&page=${page}`, token)
+    branches.push(...data.map((b) => b.name))
+    if (data.length < 100) break
+  }
+  return { defaultBranch, branches }
+}
+
 // ------------------------------------------------------------------ server
 
 Deno.serve(async (req) => {
@@ -318,8 +453,13 @@ Deno.serve(async (req) => {
   if (userError || !userData.user) return json({ error: 'unauthorized' }, 401)
   const userId = userData.user.id
 
-  // Writes that clients may not make (installations, GitHub ids) go through
-  // the service role, after the checks in each action.
+  // Reads that decide access run as the caller, under RLS.
+  const asUser = createClient(url, Deno.env.get('SUPABASE_ANON_KEY')!, {
+    global: { headers: { Authorization: `Bearer ${accessToken}` } },
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+  // Writes that clients may not make (installations, GitHub ids, branches) go
+  // through the service role, after the checks in each action.
   const admin = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
@@ -332,6 +472,10 @@ Deno.serve(async (req) => {
         return json(await listRepos(admin, config, userId, body))
       case 'add_repo':
         return json(await addRepo(admin, config, userId, body))
+      case 'create_branch':
+        return json(await createBranch(admin, asUser, config, userId, body))
+      case 'branches':
+        return json(await listBranches(asUser, config, body))
       default:
         return json({ error: 'bad_request' }, 400)
     }

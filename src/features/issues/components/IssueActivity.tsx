@@ -3,6 +3,7 @@ import { LoaderCircle, MoreHorizontal } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { PersonAvatar } from '@/components/PersonRow'
+import { GitHubMark } from '@/features/repos/components/GitHubMark'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -113,13 +114,18 @@ export function IssueActivity({ issue }: { issue: IssueDetail }) {
   )
 }
 
-/** One history line: small avatar, "Priya changed status from Todo to In Progress", time. */
+/** One history line: small avatar, "Priya changed status from Todo to In Progress", time. GitHub for webhook changes. */
 function ActivityItem({ entry, now, text }: { entry: ActivityEntry; now: number; text: ReactNode }) {
+  const github = entry.via === 'github'
   return (
     <li className="flex items-center gap-2 pl-1 text-xs text-muted-foreground">
-      <PersonAvatar profile={entry.actor} className="size-4" />
+      {github ? (
+        <GitHubMark className="size-4 shrink-0 text-foreground" />
+      ) : (
+        <PersonAvatar profile={entry.actor} className="size-4" />
+      )}
       <span className="min-w-0">
-        <span className="font-medium text-foreground">{entry.actor?.display_name ?? 'Someone'}</span> {text}
+        <span className="font-medium text-foreground">{github ? 'GitHub' : (entry.actor?.display_name ?? 'Someone')}</span> {text}
       </span>
       <span aria-hidden>·</span>
       <time dateTime={entry.created_at} className="shrink-0">
@@ -188,6 +194,14 @@ function useDescribeActivity() {
         const name = repo ? repo.name : 'a removed repository'
         return to === null ? <>removed the issue from {strong(name)}</> : <>moved the issue to {strong(name)}</>
       }
+      case 'branch_created':
+        return <>created branch {strong(to)}</>
+      case 'pr_linked':
+        return <>linked pull request {strong(`#${to}`)}</>
+      case 'pr_merged':
+        return <>merged pull request {strong(`#${to}`)}</>
+      case 'pr_closed':
+        return <>closed pull request {strong(`#${to}`)} without merging</>
       case 'label_added':
         return <>added label {strong(to)}</>
       case 'label_removed':
