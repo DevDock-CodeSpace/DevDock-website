@@ -1,6 +1,6 @@
 # DevDock: project status
 
-_Last updated: 2026-09-28 (Phase 9b: connect a group to the DevDock GitHub App)_
+_Last updated: 2026-09-28 (Phase 9c/9d: branches on In Progress, PR webhooks, done branches)_
 
 A handoff for anyone (human or AI) planning the next phase. For conventions, see [CLAUDE.md](../CLAUDE.md); for setup, see [README.md](../README.md).
 
@@ -36,7 +36,8 @@ A private software-engineering teaching workspace for one instructor and a few s
 | 7: Doc folders (Dropbox-style, 3 levels) | 🟡 Migration applied to hosted project, types regenerated; RLS verified locally (36/36; docs 50/50, diagrams 55/55, issues 87/87 + 52/52 still pass); UI checked with mocked Supabase (27 browser checks, 2 clean runs) | `feat/doc-folders` |
 | 5d: Live sessions (Jitsi via JaaS, Google Calendar sync) | 🟡 Migration applied to hosted project, types regenerated; RLS verified locally (26/26); `jaas-token` Edge Function deployed (returns `not_configured` until JaaS secrets are set); UI checked with mocked Supabase/Google/Jitsi (37 browser checks); **not yet tried with real accounts or real JaaS keys** | `feat/live-sessions` (from `dev`) |
 | 9a: GitHub, part 1 (group repos, linked to projects; an issue's repo) | 🟡 Migration applied to hosted project, types regenerated; typecheck/lint/build pass; **no RLS test run yet, not clicked through with real accounts** | `GitHib-Integrations` |
-| 9b: GitHub, part 2 (GitHub App connection, repos picked from GitHub) | 🟡 Migration applied, types regenerated, `github` Edge Function deployed (returns `not_configured` until the App's secrets are set); typecheck/lint/build pass; **the App isn't created yet, so the real install flow is untested** | `GitHib-Integrations` |
+| 9b: GitHub, part 2 (GitHub App connection, repos picked from GitHub) | ✅ App created, secrets set; connect verified on prod (DevDock-CodeSpace installed, DevDock-website connected) | merged (PR #25) |
+| 9c/9d: GitHub, parts 3–4 (branch on In Progress; PR webhooks; per-project done branches) | 🟡 2 migrations applied, types regenerated; `github` and `github-webhook` deployed, webhook secret set; signatures verified (200/401); revised status rules tested on a real issue in rolled-back transactions; **create_branch and a real PR not yet tried (need a signed-in user and the App's webhook turned on)** | `feat/github-webhooks` |
 
 ### Phase 1: frontend shell
 - Collapsible sidebar (slide-out panel on mobile) with Overview, Lessons, Live Class, Resources, Members and Settings; a breadcrumb header; and a light/dark/system theme.
@@ -606,7 +607,38 @@ Migration `20260925001632_add_workspace_invites.sql`: tested locally (28 checks)
   - **`/github/callback`:** handles install, install *requested* (org approval pending) and settings *updated*.
   - The privacy page covers GitHub.
 - **To use it:** create the App and set the secrets (README → GitHub App setup).
-- **Next (planned):** 9c PR webhooks (opened → In Review, merged → Done); 9d In Progress creates the branch (`github_jobs` + worker); 9e deleting an issue can delete its branch (opt-in, SHA kept for restore). Branches are never deleted when an issue moves back.
+### Phase 9c: GitHub, part 3 (pull requests move issues)
+- **Migration** `20260928044322_github_pull_requests.sql`:
+  - **`issue_pull_requests`**: one row per issue × PR, holding state (draft/open/merged/closed), refs, author and url. Readable by workspace viewers. No client writes.
+  - **`github_webhook_deliveries`**: dedupe, service role only.
+  - **`issue_activity.via`** (`'github'`) and new kinds `pr_linked`/`pr_merged`/`pr_closed`.
+  - **`github_apply_pull_request()`** (service role only): records the PR, logs it, and moves the issue on a state *change*:
+    - draft: backlog/todo → In Progress
+    - open: → In Review
+    - back to draft or closed unmerged, with no other open PR: In Review → In Progress
+    - merged into the default branch, with no other open PR: → Done
+- **Rolled-back test on WA-2:** draft → In Progress, retry → no change, open → In Review, closed → In Progress, reopened → In Review, merged → Done. All steps are tagged `via github`.
+- **`github-webhook` Edge Function:**
+  - HMAC SHA-256 signature (constant-time compare), and a delivery dedupe (removed again on failure so GitHub can retry).
+  - Issue IDs are taken from the branch or title, or after fixes/closes/resolves in the body.
+  - Repos are matched by GitHub id plus the event's installation.
+  - Also handles uninstalls and repo access changes.
+- **UI:**
+  - The issue page gets a **Development** block: copy branch name (`wa-2-add-login`) and linked PRs with their state.
+  - Activity shows **GitHub** as the actor.
+- **Revised with the product owner** (migration `20260928115122_github_branches.sql`):
+  - **Drafts no longer move issues.**
+  - **Moving to In Progress creates the branch** (`issue_branches`; `github` function `create_branch`, called by the client after the status change, with a Create branch retry). This replaces the planned job queue with pg_net/pg_cron.
+  - **Merges count as Done only into the project's done branches** (`workspace_repos.done_branches`, set in Branch settings on the GitHub tab from the repo's real branches; default = the repo's default branch), and branches start from `workspace_repos.base_branch`.
+  - Rolled-back test: a draft leaves In Progress alone, opening a PR moves it to In Review, and merging into a non-done branch doesn't mark it Done.
+- **Follow-ups agreed with the product owner:**
+  - **Status lock** (migration `20260928140000_issue_status_lock.sql`): on issues with a connected repo, only GitHub or a lead / group owner / admin can set In Review or Done (SQLSTATE `DD001`). Rolled-back test with a real member: In Progress/Canceled/Todo allowed; In Review/Done blocked; GitHub open → merged works; reopening allowed; lead override allowed.
+  - **Branch names are now `dock/wa-2-add-login`.**
+  - **Webhook also matches the stored branch name**, which survives key renames.
+  - **A done-branch hint** in Branch settings.
+  - **Merged branches:** shown as merged, linking to the PR. GitHub deletes them via the repo setting (no DevDock code).
+  - **Known gap:** a member can clear an issue's Repo and then set Done by hand.
+- **Next (planned):** 9e deleting an issue can delete its branch (opt-in, SHA kept for restore). Branches are never deleted when an issue moves back.
 
 ## Current configuration (hosted)
 - **Supabase URL Configuration:** Site URL `http://localhost:5173`; Redirect URLs `http://localhost:5173/**`.

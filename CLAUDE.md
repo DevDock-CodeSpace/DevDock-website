@@ -36,7 +36,17 @@ DevDock is a private software-engineering teaching workspace for **one instructo
 
 **Phase 9b done (needs the App's keys to be used): GitHub App connection.** Group owners/admins install the DevDock GitHub App from Group settings. The `github` Edge Function verifies the install with GitHub (the one-time OAuth code proves the person can access that installation), then saves it to `github_installations`. After that, repos are picked from what the App can see. Setup: README → GitHub App setup.
 
-Next: 9c PR webhooks (opened → In Review, merged → Done), 9d In Progress creates the branch, 9e deleting an issue can delete its branch (opt-in). Branches are never deleted when an issue moves back.
+**Phase 9c/9d done: branches and PR webhooks (rules agreed with the product owner).**
+- **Branches:** moving an issue to **In Progress** creates its branch (`dock/wa-2-add-login`) on GitHub. It uses the `github` function's `create_branch`, called from `useUpdateIssue` through `useCreateIssueBranch`, and starts from the project's base branch. The issue page's **Development** block offers **Create branch** to retry.
+- **PR webhooks:** the `github-webhook` Edge Function moves issues:
+  - PR opened or ready for review → **In Review** (drafts don't move issues);
+  - closed without merging → back to In Progress;
+  - merged into one of the project's **done branches** (per linked repo, set on the GitHub tab; none = the default branch) → **Done**.
+- Activity shows "GitHub" as the actor.
+- **Status lock:** on issues whose repo is connected, only GitHub (`devdock.via = 'github'`) or workspace managers can set In Review or Done (`check_issue`, SQLSTATE `DD001`, message in `writeErrors`). Everyone can still reopen an issue or cancel it.
+- **Merged branches:** GitHub deletes them (the repo's "Automatically delete head branches" setting); the Development block shows them as merged and links to the PR.
+
+Next: 9e deleting an issue can delete its branch (opt-in). Branches are never deleted when an issue moves back.
 
 Exercises is still a placeholder page. Current status and next steps: `docs/STATUS.md`.
 
@@ -136,7 +146,18 @@ supabase/
   - `repos` belong to the group (`owner`/`name`, unique per group ignoring case); `workspace_repos` links them to projects (many-to-many, same group via composite FKs). Owners/admins add and remove repos; workspace managers link and unlink. Parse user input with `parseRepo`.
   - `issues.repo_id` must be a repo linked to the issue's workspace (`check_issue`). Unlinking clears it on that workspace's issues (`clear_unlinked_issue_repos` trigger), so invalidate `['issues']` too after unlink/delete. Changes are logged as activity kind `repo`.
   - Issue UIs read the workspace's linked repos from `useIssueContext().repos` and hide repo controls while there are none.
-  - **GitHub App** (`github` Edge Function, actions `connect`/`repos`/`add_repo`; client wrappers in `repos/api.ts`):
+  - **PR webhooks** (`github-webhook` Edge Function, `verify_jwt = false`, HMAC via `GITHUB_WEBHOOK_SECRET`, `github_webhook_deliveries` dedupe):
+    - Repos are matched by `github_repo_id` **and** the event's installation. Issues are found by key and number among the projects linked to that repo, **or** by the PR's head branch matching a stored `issue_branches.name` (so renaming a key doesn't break old branches).
+    - All DB work is one call to `github_apply_pull_request()` (service role only). It upserts `issue_pull_requests`, logs `pr_linked`/`pr_merged`/`pr_closed`, and moves the status. It sets `devdock.via = 'github'`, so `log_issue_activity` tags rows with `via`.
+    - Only a **change** in PR state moves an issue, so it never fights a manual status change.
+    - Also handles `installation.deleted` and `installation_repositories` (marks repos connected / not connected).
+    - Branch names come from `issueBranchName()` (`meta.ts`); the `github` function has a copy (`branchName`). Keep the two in sync.
+  - **Branches** (`issue_branches`, one per issue × repo; written only by the `github` function's `create_branch`):
+    - It reads the issue and links **as the caller** (RLS), uses the issue's repo or the project's only repo (and then sets it as the issue's repo), and starts from `workspace_repos.base_branch` or the default branch.
+    - It adopts a branch that already exists, and is idempotent.
+    - Branches are never deleted when an issue moves back.
+  - **Done branches:** `workspace_repos.done_branches` (up to 10; empty = the default branch; managers edit them in `RepoBranchSettingsDialog`, with names from the `branches` action). The webhook passes `p_merged_into_done` per project.
+  - **GitHub App** (`github` Edge Function, actions `connect`/`repos`/`add_repo`/`create_branch`/`branches`; client wrappers in `repos/api.ts`):
     - Only the function writes `github_installations`, `repos.github_repo_id` and `repos.installation_id`. Clients have no grants for them. It uses the service role *after* its own checks (owner/admin, and GitHub confirming access).
     - Connect flow: `rpc('start_github_connect')` returns a one-time state (30 min, tied to the person and group), then `github.com/apps/<slug>/installations/new?state=`, then `/github/callback` (`githubCallbackLoader`), then the function, then back to Group settings.
     - `installation_id` null means **Not connected** (added by name, or disconnected; the FK sets it null). Adding the same repo from GitHub connects the existing row.
@@ -204,7 +225,7 @@ supabase/
 ## Environment & secrets
 
 - Env vars live in `.env.local` (git-ignored). `.env.example` lists variable names only (no values) and is committed. Declare new `VITE_` vars in `src/env.d.ts` too.
-- Current vars: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, and optional `VITE_GITHUB_APP_SLUG` (public; hides Connect GitHub when unset). Live/JaaS keys (`JAAS_APP_ID`, `JAAS_KEY_ID`, `JAAS_PRIVATE_KEY`) and GitHub App keys (`GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY` as PKCS#8, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`) are **Edge Function secrets**, set with `supabase secrets set`, never `VITE_` vars.
+- Current vars: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, and optional `VITE_GITHUB_APP_SLUG` (public; hides Connect GitHub when unset). Live/JaaS keys (`JAAS_APP_ID`, `JAAS_KEY_ID`, `JAAS_PRIVATE_KEY`) and GitHub App keys (`GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY` as PKCS#8, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_WEBHOOK_SECRET`) are **Edge Function secrets**, set with `supabase secrets set`, never `VITE_` vars.
 - Only `VITE_`-prefixed vars reach the browser, and **everything in the bundle is public**. Never put a service-role/secret key or any other secret in a `VITE_` var or in client code.
 - Security must come from Supabase RLS policies, not client-side checks.
 

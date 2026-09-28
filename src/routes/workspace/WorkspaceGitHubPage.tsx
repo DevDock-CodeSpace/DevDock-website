@@ -14,10 +14,12 @@ import {
   repoUrl,
   teamReposQuery,
   workspaceReposQuery,
+  type LinkedRepo,
   type Repo,
 } from '@/features/repos/api'
 import { LinkRepoDialog } from '@/features/repos/components/LinkRepoDialog'
 import { NotConnectedBadge } from '@/features/repos/components/NotConnectedBadge'
+import { RepoBranchSettingsDialog } from '@/features/repos/components/RepoBranchSettingsDialog'
 import { useUnlinkRepo } from '@/features/repos/hooks'
 import { useCurrentTeam, useCurrentWorkspace } from '@/features/teams/hooks'
 import { issuesPath } from '@/features/teams/nav'
@@ -39,6 +41,7 @@ export function WorkspaceGitHubPage() {
   const issues = useQuery({ ...workspaceIssuesQuery(workspace.id), enabled: hasIssues }).data ?? []
   const unlink = useUnlinkRepo(workspace.id)
   const [confirm, setConfirm] = useState<Repo | null>(null)
+  const [settings, setSettings] = useState<LinkedRepo | null>(null)
 
   const openCount = (repoId: string) => issues.filter((i) => i.repo_id === repoId && !isClosed(i.status)).length
   const assignedCount = (repoId: string) => issues.filter((i) => i.repo_id === repoId).length
@@ -90,6 +93,12 @@ export function WorkspaceGitHubPage() {
                 </a>
                 {installations.length > 0 && repo.installation_id === null && <NotConnectedBadge />}
                 <span className="flex-1" />
+                <span
+                  className="hidden min-w-0 truncate font-mono text-[11px] text-muted-foreground md:block"
+                  title="Issue branches start from the first; merging into the done branches marks issues Done"
+                >
+                  from {repo.base_branch ?? 'default'} · done on {repo.done_branches.length ? repo.done_branches.join(', ') : 'default'}
+                </span>
                 {hasIssues && (
                   <Link
                     to={`${issuesPath(team.slug, workspace.id)}?repo=${repo.id}`}
@@ -106,6 +115,7 @@ export function WorkspaceGitHubPage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      <DropdownMenuItem onSelect={() => setSettings(repo)}>Branch settings…</DropdownMenuItem>
                       <DropdownMenuItem variant="destructive" onSelect={() => setConfirm(repo)}>
                         Unlink from {workspace.title}
                       </DropdownMenuItem>
@@ -118,6 +128,14 @@ export function WorkspaceGitHubPage() {
         </ul>
       )}
 
+      {settings && (
+        <RepoBranchSettingsDialog
+          key={settings.id}
+          workspaceId={workspace.id}
+          repo={settings}
+          onOpenChange={(open) => !open && setSettings(null)}
+        />
+      )}
       <ConfirmDialog
         open={confirm !== null}
         onOpenChange={(open) => !open && setConfirm(null)}

@@ -280,6 +280,24 @@ export type Database = {
           },
         ]
       }
+      github_webhook_deliveries: {
+        Row: {
+          delivery_id: string
+          event: string
+          received_at: string
+        }
+        Insert: {
+          delivery_id: string
+          event: string
+          received_at?: string
+        }
+        Update: {
+          delivery_id?: string
+          event?: string
+          received_at?: string
+        }
+        Relationships: []
+      }
       issue_activity: {
         Row: {
           actor_id: string | null
@@ -289,6 +307,7 @@ export type Database = {
           issue_id: string
           kind: string
           to_value: string | null
+          via: string | null
           workspace_id: string
         }
         Insert: {
@@ -299,6 +318,7 @@ export type Database = {
           issue_id: string
           kind: string
           to_value?: string | null
+          via?: string | null
           workspace_id: string
         }
         Update: {
@@ -309,6 +329,7 @@ export type Database = {
           issue_id?: string
           kind?: string
           to_value?: string | null
+          via?: string | null
           workspace_id?: string
         }
         Relationships: [
@@ -325,6 +346,64 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "issues"
             referencedColumns: ["id", "workspace_id"]
+          },
+        ]
+      }
+      issue_branches: {
+        Row: {
+          base: string
+          created_at: string
+          created_by: string | null
+          id: string
+          issue_id: string
+          name: string
+          repo_id: string
+          sha: string
+          workspace_id: string
+        }
+        Insert: {
+          base: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          issue_id: string
+          name: string
+          repo_id: string
+          sha: string
+          workspace_id: string
+        }
+        Update: {
+          base?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          issue_id?: string
+          name?: string
+          repo_id?: string
+          sha?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "issue_branches_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "issue_branches_issue_fkey"
+            columns: ["issue_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "issues"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "issue_branches_repo_id_fkey"
+            columns: ["repo_id"]
+            isOneToOne: false
+            referencedRelation: "repos"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -472,6 +551,75 @@ export type Database = {
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      issue_pull_requests: {
+        Row: {
+          author_login: string | null
+          base_ref: string
+          created_at: string
+          github_pr_id: number
+          head_ref: string
+          id: string
+          issue_id: string
+          merged_at: string | null
+          number: number
+          repo_id: string
+          state: string
+          title: string
+          updated_at: string
+          url: string
+          workspace_id: string
+        }
+        Insert: {
+          author_login?: string | null
+          base_ref: string
+          created_at?: string
+          github_pr_id: number
+          head_ref: string
+          id?: string
+          issue_id: string
+          merged_at?: string | null
+          number: number
+          repo_id: string
+          state: string
+          title: string
+          updated_at?: string
+          url: string
+          workspace_id: string
+        }
+        Update: {
+          author_login?: string | null
+          base_ref?: string
+          created_at?: string
+          github_pr_id?: number
+          head_ref?: string
+          id?: string
+          issue_id?: string
+          merged_at?: string | null
+          number?: number
+          repo_id?: string
+          state?: string
+          title?: string
+          updated_at?: string
+          url?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "issue_pull_requests_issue_fkey"
+            columns: ["issue_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "issues"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "issue_pull_requests_repo_id_fkey"
+            columns: ["repo_id"]
+            isOneToOne: false
+            referencedRelation: "repos"
             referencedColumns: ["id"]
           },
         ]
@@ -1064,19 +1212,25 @@ export type Database = {
       }
       workspace_repos: {
         Row: {
+          base_branch: string | null
           created_at: string
+          done_branches: string[]
           repo_id: string
           team_id: string
           workspace_id: string
         }
         Insert: {
+          base_branch?: string | null
           created_at?: string
+          done_branches?: string[]
           repo_id: string
           team_id: string
           workspace_id: string
         }
         Update: {
+          base_branch?: string | null
           created_at?: string
+          done_branches?: string[]
           repo_id?: string
           team_id?: string
           workspace_id?: string
@@ -1164,6 +1318,22 @@ export type Database = {
       default_workspace_modules: {
         Args: { workspace_type: Database["public"]["Enums"]["workspace_type"] }
         Returns: Database["public"]["Enums"]["workspace_module"][]
+      }
+      github_apply_pull_request: {
+        Args: {
+          p_author_login: string
+          p_base_ref: string
+          p_github_pr_id: number
+          p_head_ref: string
+          p_issue_id: string
+          p_merged_into_done: boolean
+          p_number: number
+          p_repo_id: string
+          p_state: string
+          p_title: string
+          p_url: string
+        }
+        Returns: string
       }
       join_team: { Args: { invite_code: string }; Returns: string }
       live_session_invitees: {
