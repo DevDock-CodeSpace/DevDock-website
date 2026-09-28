@@ -23,6 +23,8 @@ export type Issue = {
   assignee_id: string | null
   parent_id: string | null
   cycle_id: string | null
+  /** A repo linked to the workspace (like a label), or null. */
+  repo_id: string | null
   estimate: number | null
   due_date: string | null
   completed_at: string | null
@@ -56,8 +58,9 @@ export type ActivityKind =
   | 'due_date'
   | 'label_added'
   | 'label_removed'
+  | 'repo'
 
-/** One change to an issue, written by a database trigger. Values are text (ids for assignee/parent/cycle). */
+/** One change to an issue, written by a database trigger. Values are text (ids for assignee/parent/cycle/repo). */
 export type IssueActivity = {
   id: number
   kind: ActivityKind
@@ -81,13 +84,13 @@ export type IssueComment = {
 
 /** Fields the UI can change on an existing issue (column grants allow exactly these). */
 export type IssuePatch = Partial<
-  Pick<Issue, 'title' | 'status' | 'priority' | 'assignee_id' | 'parent_id' | 'cycle_id' | 'estimate' | 'due_date'> & {
+  Pick<Issue, 'title' | 'status' | 'priority' | 'assignee_id' | 'parent_id' | 'cycle_id' | 'repo_id' | 'estimate' | 'due_date'> & {
     description: Json | null
   }
 >
 
 const ISSUE_COLUMNS =
-  'id, workspace_id, number, title, status, priority, assignee_id, parent_id, cycle_id, estimate, due_date, completed_at, created_by, created_at, updated_at, issue_label_links(label_id)'
+  'id, workspace_id, number, title, status, priority, assignee_id, parent_id, cycle_id, repo_id, estimate, due_date, completed_at, created_by, created_at, updated_at, issue_label_links(label_id)'
 
 type IssueRow = Omit<Issue, 'labelIds' | 'priority'> & { priority: number; issue_label_links: { label_id: string }[] }
 
@@ -97,7 +100,8 @@ function toIssue({ issue_label_links, priority, ...row }: IssueRow): Issue {
 
 const writeErrors = {
   '42501': 'You don’t have permission to change issues here.',
-  '23514': 'That change isn’t allowed. Assignees must be in this workspace, and an issue can’t be its own sub-issue.',
+  '23514':
+    'That change isn’t allowed. Assignees and repositories must belong to this workspace, and an issue can’t be its own sub-issue.',
 }
 
 // ---------------------------------------------------------------- queries
@@ -237,6 +241,7 @@ export type NewIssue = {
   assigneeId?: string | null
   parentId?: string | null
   cycleId?: string | null
+  repoId?: string | null
   labelIds?: string[]
 }
 
@@ -251,6 +256,7 @@ export async function createIssue(input: NewIssue): Promise<{ id: string; number
     assignee_id: input.assigneeId ?? null,
     parent_id: input.parentId ?? null,
     cycle_id: input.cycleId ?? null,
+    repo_id: input.repoId ?? null,
   }
   // Generated types can't see the insert trigger that fills team_id and number.
   const { data, error } = await supabase

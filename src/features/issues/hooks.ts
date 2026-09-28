@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { useAuth } from '@/features/auth/hooks'
+import { workspaceReposQuery } from '@/features/repos/api'
 import { useCurrentWorkspace } from '@/features/teams/hooks'
 import { workspaceMembersQuery } from '@/features/workspaces/api'
 import { errorMessage } from '@/lib/errors'
@@ -20,7 +21,7 @@ import { readFilters, writeFilters, type IssueFilters } from './filters'
 
 /**
  * What issue screens need about the current workspace: its members (assignees),
- * labels, cycles, and whether the caller manages it (delete issues, manage labels and cycles).
+ * labels, cycles, linked repos, and whether the caller manages it (delete issues, manage labels and cycles).
  * `canManage` mirrors private.can_manage_workspace() for showing UI only.
  */
 export function useIssueContext() {
@@ -29,7 +30,8 @@ export function useIssueContext() {
   const members = useSuspenseQuery(workspaceMembersQuery(workspace.id)).data
   const labels = useSuspenseQuery(labelsQuery(workspace.id)).data
   const cycles = useSuspenseQuery(cyclesQuery(workspace.id)).data
-  return { workspace, members, labels, cycles, canManage: can.canEdit, userId: user.id }
+  const repos = useSuspenseQuery(workspaceReposQuery(workspace.id)).data
+  return { workspace, members, labels, cycles, repos, canManage: can.canEdit, userId: user.id }
 }
 
 type UpdateVars = { issue: Pick<Issue, 'id' | 'number'>; patch?: IssuePatch; labelIds?: string[] }
