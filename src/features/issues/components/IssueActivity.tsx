@@ -131,7 +131,7 @@ function ActivityItem({ entry, now, text }: { entry: ActivityEntry; now: number;
 
 /** Turns an activity row into words, resolving ids to names from what's already loaded. */
 function useDescribeActivity() {
-  const { workspace, members, cycles } = useIssueContext()
+  const { workspace, members, cycles, repos } = useIssueContext()
   const issues = useSuspenseQuery(workspaceIssuesQuery(workspace.id)).data
   const person = (id: string | null) =>
     members.find((m) => m.user_id === id)?.profile?.display_name ?? 'a former member'
@@ -183,6 +183,11 @@ function useDescribeActivity() {
         return to === null ? 'removed the estimate' : <>set the estimate to {strong(`${to} ${to === '1' ? 'point' : 'points'}`)}</>
       case 'due_date':
         return to === null ? 'removed the due date' : <>set the due date to {strong(formatShortDate(to))}</>
+      case 'repo': {
+        const repo = repos.find((r) => r.id === (to ?? from))
+        const name = repo ? repo.name : 'a removed repository'
+        return to === null ? <>removed the issue from {strong(name)}</> : <>moved the issue to {strong(name)}</>
+      }
       case 'label_added':
         return <>added label {strong(to)}</>
       case 'label_removed':

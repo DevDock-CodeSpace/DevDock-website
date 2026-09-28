@@ -62,6 +62,7 @@ export function RoleGuide({ type, myRole }: { type: TeamType; myRole: TeamRole }
         `Create, edit and delete ${nouns}, and choose who’s in each and who leads it`,
         `See and manage every ${noun}, even ones they haven’t joined`,
         'Write group-wide docs and diagrams, schedule group-wide live sessions, and change group settings',
+        'Add and remove the group’s GitHub repositories',
       ],
     },
     {
@@ -86,6 +87,7 @@ export function RoleGuide({ type, myRole }: { type: TeamType; myRole: TeamRole }
         'Write its docs and diagrams, and organize folders',
         'Schedule its live sessions',
         'Delete issues, and manage labels and cycles',
+        'Link the group’s repositories to it, and unlink them',
         ...(type === 'learning' ? ['Build the course in Learning and see the class’s progress'] : []),
       ],
     },
@@ -94,7 +96,7 @@ export function RoleGuide({ type, myRole }: { type: TeamType; myRole: TeamRole }
       who: type === 'learning' ? 'Takes the course' : `Works in the ${noun}`,
       can: [
         'Reads its docs and diagrams',
-        'Creates and updates issues, and comments',
+        'Creates and updates issues (including their repository), and comments',
         ...(type === 'learning' ? ['Takes lessons and tracks their own progress'] : []),
       ],
     },

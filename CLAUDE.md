@@ -30,7 +30,15 @@ DevDock is a private software-engineering teaching workspace for **one instructo
 
 **Phase 5d done: Live sessions (Jitsi via JaaS).** A `live_sessions` table (same scope and RLS rules as `documents`) for scheduled video calls. The `@jitsi/react-sdk` `JaaSMeeting` is embedded and lazy-loaded; the room is only reachable with a short-lived RS256 JaaS JWT minted by the `jaas-token` Edge Function (which re-checks access under RLS and a moderator flag). Scheduling a session can create a Google Calendar event that invites everyone in the audience, using the organizer's Google token (re-obtained through OAuth about once an hour, since there's no server to hold a refresh token). Team → Live and Workspace → Live lists, a session page with Join/edit/cancel/calendar sync, and an embedded call.
 
-Learning and the other tools are still placeholder pages. Current status and next steps: `docs/STATUS.md`.
+**Phase 8 done: Learning** (modules → lessons → progress).
+
+**Phase 9a done: GitHub repos, part 1** (no GitHub API yet). Repos belong to the group and are linked to any number of projects. An issue can point at one repo linked to its project (like a label), so moving an issue into a repo never changes its number. Group settings → Repositories, the project's GitHub tab, and a Repo property, filter and chip on issues. 
+
+**Phase 9b done (needs the App's keys to be used): GitHub App connection.** Group owners/admins install the DevDock GitHub App from Group settings. The `github` Edge Function verifies the install with GitHub (the one-time OAuth code proves the person can access that installation), then saves it to `github_installations`. After that, repos are picked from what the App can see. Setup: README → GitHub App setup.
+
+Next: 9c PR webhooks (opened → In Review, merged → Done), 9d In Progress creates the branch, 9e deleting an issue can delete its branch (opt-in). Branches are never deleted when an issue moves back.
+
+Exercises is still a placeholder page. Current status and next steps: `docs/STATUS.md`.
 
 ## Target stack
 
@@ -46,7 +54,7 @@ Learning and the other tools are still placeholder pages. Current status and nex
 | Rich text / notes  | TipTap v3 (+ lowlight/highlight.js) | Dropbox Paper look; MIT extensions only (drag handle pulls in yjs as a peer dep). Lazy-loaded with the doc page |
 | Diagrams           | React Flow (`@xyflow/react`, MIT) | Own UI in DevDock's style (not an embed); stored as JSON in `diagrams.data`. Lazy-loaded with the diagram page |
 | Live sessions      | Jitsi Meet via JaaS (8x8) — `@jitsi/react-sdk` embed | Room token minted server-side by the `jaas-token` Edge Function (RS256, `jose`); domain is `8x8.vc`, config from JaaS secrets. Lazy-loaded with the session page |
-| Code               | GitHub links                    | Link to repos/PRs; no GitHub API integration unless asked |
+| Code               | GitHub App + `repos`            | Group repos linked to projects. A GitHub App connects them (the `github` Edge Function); webhooks and branches come in 9c–9e |
 | Hosting            | Vercel                          | Static SPA; `vercel.json` rewrites every path except `/assets/*` to `index.html` (so a missing chunk is a real 404, not HTML) |
 
 ## Commands
@@ -83,7 +91,7 @@ src/
   router.tsx         # all routes (createBrowserRouter, data mode)
   layouts/           # AppLayout (team shell: sidebar + header + <Suspense><Outlet/>), app-loader.ts (auth guard)
   routes/            # page components: team/* (under /t/:teamSlug) and workspace/* (under …/w/:workspaceId)
-  features/<name>/   # feature-scoped components, types, api.ts, hooks (auth/, teams/, workspaces/, docs/, diagrams/, issues/)
+  features/<name>/   # feature-scoped components, types, api.ts, hooks (auth/, teams/, workspaces/, docs/, diagrams/, issues/, repos/, …)
   components/ui/     # shadcn/ui generated components (don't hand-edit much)
   components/        # shared app components (AppSidebar, PageHeader, Theme*)
   hooks/             # shared hooks
@@ -101,6 +109,7 @@ supabase/
   - Authenticated (under route id `app`):
     - `/app` redirects to the last-used team, or to `/onboarding` when the user has none.
     - `/onboarding`
+    - `/github/callback` (back from installing the GitHub App).
     - `/t/:teamSlug` (the team's workspaces), plus `members` and `settings`.
     - `/t/:teamSlug/w/:workspaceId` (overview), plus `members` and `settings`; every other feature tab is `:tab`, checked against the workspace type in `WorkspaceTabPage`.
   - `/` redirects to `/app`.
@@ -122,7 +131,16 @@ supabase/
 - **Data pattern:** `features/<name>/api.ts` exports `queryOptions` and mutation functions.
   - Loaders prime what the shell needs with `ensureQueryData`. Pages read with `useSuspenseQuery`; `AppLayout` has a Suspense boundary, so pages may also load secondary data that way.
   - Errors go through `lib/errors.ts` (`toDataError`, `requireAffected`), because RLS makes forbidden UPDATE/DELETE return 0 rows, not an error. Show them with `toast.error(errorMessage(e))`.
-- **Query keys:** `['teams', …]`, `['workspaces', …]`, `['documents', …]`, `['diagrams', …]` and `['issues', …]` (built by `issueKeys`); invalidate by prefix after mutations.
+- **Query keys:** `['teams', …]`, `['workspaces', …]`, `['documents', …]`, `['diagrams', …]`, `['issues', …]` (built by `issueKeys`) and `['repos', …]` (`repoKeys`); invalidate by prefix after mutations.
+- **Repos** (`features/repos/`; route `…/w/:id/github`, `WorkspaceGitHubPage`; Group settings → `TeamReposSection`):
+  - `repos` belong to the group (`owner`/`name`, unique per group ignoring case); `workspace_repos` links them to projects (many-to-many, same group via composite FKs). Owners/admins add and remove repos; workspace managers link and unlink. Parse user input with `parseRepo`.
+  - `issues.repo_id` must be a repo linked to the issue's workspace (`check_issue`). Unlinking clears it on that workspace's issues (`clear_unlinked_issue_repos` trigger), so invalidate `['issues']` too after unlink/delete. Changes are logged as activity kind `repo`.
+  - Issue UIs read the workspace's linked repos from `useIssueContext().repos` and hide repo controls while there are none.
+  - **GitHub App** (`github` Edge Function, actions `connect`/`repos`/`add_repo`; client wrappers in `repos/api.ts`):
+    - Only the function writes `github_installations`, `repos.github_repo_id` and `repos.installation_id`. Clients have no grants for them. It uses the service role *after* its own checks (owner/admin, and GitHub confirming access).
+    - Connect flow: `rpc('start_github_connect')` returns a one-time state (30 min, tied to the person and group), then `github.com/apps/<slug>/installations/new?state=`, then `/github/callback` (`githubCallbackLoader`), then the function, then back to Group settings.
+    - `installation_id` null means **Not connected** (added by name, or disconnected; the FK sets it null). Adding the same repo from GitHub connects the existing row.
+    - Disconnecting only forgets the installation in DevDock; uninstalling happens on GitHub (Manage link).
 - **Docs editor** (`features/docs/editor/`, page body `features/docs/components/DocView.tsx`, lazy-loaded by `routes/DocPage.tsx`):
   - Extensions are listed in `extensions.ts`, and the typography lives in `styles.ts` as Tailwind classes (no global CSS).
   - `documents.body` (TipTap JSON) is the source of truth; `content` is a plain-text copy written with it.
@@ -186,7 +204,7 @@ supabase/
 ## Environment & secrets
 
 - Env vars live in `.env.local` (git-ignored). `.env.example` lists variable names only (no values) and is committed. Declare new `VITE_` vars in `src/env.d.ts` too.
-- Current vars: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`. (Live/JaaS keys — `JAAS_APP_ID`, `JAAS_KEY_ID`, `JAAS_PRIVATE_KEY` — are **Edge Function secrets**, set with `supabase secrets set`, never `VITE_` vars.)
+- Current vars: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, and optional `VITE_GITHUB_APP_SLUG` (public; hides Connect GitHub when unset). Live/JaaS keys (`JAAS_APP_ID`, `JAAS_KEY_ID`, `JAAS_PRIVATE_KEY`) and GitHub App keys (`GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY` as PKCS#8, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`) are **Edge Function secrets**, set with `supabase secrets set`, never `VITE_` vars.
 - Only `VITE_`-prefixed vars reach the browser, and **everything in the bundle is public**. Never put a service-role/secret key or any other secret in a `VITE_` var or in client code.
 - Security must come from Supabase RLS policies, not client-side checks.
 

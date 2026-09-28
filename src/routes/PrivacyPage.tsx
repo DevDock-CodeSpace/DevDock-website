@@ -3,7 +3,7 @@ import { Link } from 'react-router'
 import { LogoMark, LogoWordmark } from '@/components/Logo'
 import { ThemeToggle } from '@/components/ThemeToggle'
 
-const UPDATED = 'September 25, 2026'
+const UPDATED = 'September 28, 2026'
 
 /**
  * Public privacy policy at /privacy (no sign-in needed; linked from the login
@@ -48,11 +48,24 @@ export function PrivacyPage() {
           <ul>
             <li>groups, workspaces and who belongs to them, with their roles;</li>
             <li>docs (including images you add to them) and diagrams;</li>
-            <li>issues, comments, labels and cycles, and a history of changes made to issues.</li>
+            <li>issues, comments, labels and cycles, and a history of changes made to issues;</li>
+            <li>the GitHub repositories your group uses (their names and GitHub ids) and which projects use them.</li>
           </ul>
           <p>
             This content is only visible to people in your group or workspace, according to their role (for example,
             workspace content is visible to that workspace’s members and the group’s owners and admins).
+          </p>
+        </Section>
+
+        <Section title="If your group connects GitHub">
+          <p>
+            A group owner or admin can connect the DevDock GitHub app. On GitHub, they choose which repositories it may
+            see, and DevDock can only reach those. DevDock stores the GitHub account or organization it was installed
+            on.
+          </p>
+          <p>
+            While connecting, GitHub asks the person connecting to sign in, so DevDock can check they really have access
+            to that installation. DevDock uses that GitHub sign-in once and doesn’t keep it.
           </p>
         </Section>
 
@@ -73,7 +86,10 @@ export function PrivacyPage() {
               <strong>Vercel</strong>: hosts the website;
             </li>
             <li>
-              <strong>Google</strong>: the “Sign in with Google” step.
+              <strong>Google</strong>: the “Sign in with Google” step;
+            </li>
+            <li>
+              <strong>GitHub</strong>: only if your group connects it, for the repositories it was given access to.
             </li>
           </ul>
           <p>

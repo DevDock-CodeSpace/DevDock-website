@@ -202,6 +202,84 @@ export type Database = {
           },
         ]
       }
+      github_connect_states: {
+        Row: {
+          created_at: string
+          state: string
+          team_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          state?: string
+          team_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          state?: string
+          team_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "github_connect_states_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "github_connect_states_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      github_installations: {
+        Row: {
+          account_login: string
+          account_type: string
+          connected_by: string | null
+          created_at: string
+          installation_id: number
+          team_id: string
+        }
+        Insert: {
+          account_login: string
+          account_type: string
+          connected_by?: string | null
+          created_at?: string
+          installation_id: number
+          team_id: string
+        }
+        Update: {
+          account_login?: string
+          account_type?: string
+          connected_by?: string | null
+          created_at?: string
+          installation_id?: number
+          team_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "github_installations_connected_by_fkey"
+            columns: ["connected_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "github_installations_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       issue_activity: {
         Row: {
           actor_id: string | null
@@ -412,6 +490,7 @@ export type Database = {
           number: number
           parent_id: string | null
           priority: number
+          repo_id: string | null
           status: Database["public"]["Enums"]["issue_status"]
           team_id: string
           title: string
@@ -431,6 +510,7 @@ export type Database = {
           number: number
           parent_id?: string | null
           priority?: number
+          repo_id?: string | null
           status?: Database["public"]["Enums"]["issue_status"]
           team_id: string
           title: string
@@ -450,6 +530,7 @@ export type Database = {
           number?: number
           parent_id?: string | null
           priority?: number
+          repo_id?: string | null
           status?: Database["public"]["Enums"]["issue_status"]
           team_id?: string
           title?: string
@@ -483,6 +564,13 @@ export type Database = {
             columns: ["parent_id"]
             isOneToOne: false
             referencedRelation: "issues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "issues_repo_id_fkey"
+            columns: ["repo_id"]
+            isOneToOne: false
+            referencedRelation: "repos"
             referencedColumns: ["id"]
           },
           {
@@ -707,6 +795,61 @@ export type Database = {
         }
         Relationships: []
       }
+      repos: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          github_repo_id: number | null
+          id: string
+          installation_id: number | null
+          name: string
+          owner: string
+          team_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          github_repo_id?: number | null
+          id?: string
+          installation_id?: number | null
+          name: string
+          owner: string
+          team_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          github_repo_id?: number | null
+          id?: string
+          installation_id?: number | null
+          name?: string
+          owner?: string
+          team_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "repos_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "repos_installation_fkey"
+            columns: ["team_id", "installation_id"]
+            isOneToOne: false
+            referencedRelation: "github_installations"
+            referencedColumns: ["team_id", "installation_id"]
+          },
+          {
+            foreignKeyName: "repos_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       team_invites: {
         Row: {
           code: string
@@ -919,6 +1062,42 @@ export type Database = {
           },
         ]
       }
+      workspace_repos: {
+        Row: {
+          created_at: string
+          repo_id: string
+          team_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          repo_id: string
+          team_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          repo_id?: string
+          team_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_repos_repo_fkey"
+            columns: ["repo_id", "team_id"]
+            isOneToOne: false
+            referencedRelation: "repos"
+            referencedColumns: ["id", "team_id"]
+          },
+          {
+            foreignKeyName: "workspace_repos_workspace_fkey"
+            columns: ["workspace_id", "team_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id", "team_id"]
+          },
+        ]
+      }
       workspaces: {
         Row: {
           created_at: string
@@ -1016,6 +1195,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      start_github_connect: { Args: { p_team_id: string }; Returns: string }
     }
     Enums: {
       issue_status:

@@ -387,3 +387,7 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 # with asymmetric JWT signing keys; the gateway check is off.
 [functions.jaas-token]
 verify_jwt = false
+
+# Same as jaas-token: the function checks the caller itself.
+[functions.github]
+verify_jwt = false

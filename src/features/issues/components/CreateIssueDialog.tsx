@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronRight, CircleUserRound, IterationCw, LoaderCircle, Tag } from 'lucide-react'
+import { ChevronRight, CircleUserRound, GitBranch, IterationCw, LoaderCircle, Tag } from 'lucide-react'
 import { useState, type ComponentProps, type FormEvent, type ReactNode } from 'react'
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
@@ -17,6 +17,7 @@ import { AssigneePicker } from './AssigneePicker'
 import { CyclePicker } from './CyclePicker'
 import { LabelChip } from './LabelChip'
 import { LabelPicker } from './LabelPicker'
+import { RepoPicker } from './RepoPicker'
 import { PriorityIcon } from './PriorityIcon'
 import { PriorityPicker } from './PriorityPicker'
 import { StatusIcon } from './StatusIcon'
@@ -38,8 +39,8 @@ type CreateIssueDialogProps = {
   onOpenChange: (open: boolean) => void
   /** Starting status (e.g. the list group or board column it was opened from). */
   status?: IssueStatus
-  /** Creates a sub-issue of this issue. */
-  parent?: Pick<Issue, 'id' | 'number' | 'title'>
+  /** Creates a sub-issue of this issue (starting in the same repo). */
+  parent?: Pick<Issue, 'id' | 'number' | 'title' | 'repo_id'>
   /** Starting cycle (e.g. opened from a cycle's page). */
   cycleId?: string | null
 }
@@ -53,7 +54,7 @@ export function CreateIssueDialog({
   cycleId: initialCycle = null,
 }: CreateIssueDialogProps) {
   const { team } = useCurrentTeam()
-  const { workspace, members, labels, cycles, canManage, userId } = useIssueContext()
+  const { workspace, members, labels, cycles, repos, canManage, userId } = useIssueContext()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
 
@@ -64,6 +65,7 @@ export function CreateIssueDialog({
   const [assigneeId, setAssigneeId] = useState<string | null>(null)
   const [labelIds, setLabelIds] = useState<string[]>([])
   const [cycleId, setCycleId] = useState<string | null>(initialCycle)
+  const [repoId, setRepoId] = useState<string | null>(parent?.repo_id ?? null)
 
   const reset = () => {
     setTitle('')
@@ -73,6 +75,7 @@ export function CreateIssueDialog({
     setAssigneeId(null)
     setLabelIds([])
     setCycleId(initialCycle)
+    setRepoId(parent?.repo_id ?? null)
   }
 
   const create = useMutation({
@@ -86,6 +89,7 @@ export function CreateIssueDialog({
         assigneeId,
         parentId: parent?.id ?? null,
         cycleId,
+        repoId,
         labelIds,
       }),
     onSuccess: async ({ number }) => {
@@ -108,6 +112,7 @@ export function CreateIssueDialog({
   const assignee = members.find((m) => m.user_id === assigneeId)
   const chosenLabels = labels.filter((l) => labelIds.includes(l.id))
   const cycle = cycles.find((c) => c.id === cycleId)
+  const repo = repos.find((r) => r.id === repoId)
 
   return (
     <Dialog
@@ -198,6 +203,14 @@ export function CreateIssueDialog({
                   {cycle ? cycleTitle(cycle) : 'Cycle'}
                 </Chip>
               </CyclePicker>
+            )}
+            {repos.length > 0 && (
+              <RepoPicker value={repoId} repos={repos} onChange={setRepoId}>
+                <Chip>
+                  <GitBranch className="size-3.5 text-muted-foreground" />
+                  {repo ? repo.name : 'Repository'}
+                </Chip>
+              </RepoPicker>
             )}
           </div>
           <div className="flex items-center justify-between gap-3 border-t px-5 py-3">

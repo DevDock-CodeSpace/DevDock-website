@@ -1,5 +1,5 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
-import { CalendarDays, CircleUserRound, Gauge, GitPullRequestArrow, IterationCw, Tag, X } from 'lucide-react'
+import { CalendarDays, CircleUserRound, Gauge, GitBranch, GitPullRequestArrow, IterationCw, Tag, X } from 'lucide-react'
 import { useRef, useState, type ComponentProps, type ReactNode } from 'react'
 import { PersonAvatar } from '@/components/PersonRow'
 import { formatDate, localDateISO, timeAgo } from '@/lib/format'
@@ -16,6 +16,7 @@ import { LabelPicker } from './LabelPicker'
 import { Picker } from './Picker'
 import { PriorityIcon } from './PriorityIcon'
 import { PriorityPicker } from './PriorityPicker'
+import { RepoPicker } from './RepoPicker'
 import { StatusIcon } from './StatusIcon'
 import { StatusPicker } from './StatusPicker'
 
@@ -36,12 +37,13 @@ export function IssueProperties({
   menu: MenuKind | null
   onMenuChange: (menu: MenuKind | null) => void
 }) {
-  const { workspace, members, labels, cycles, canManage, userId } = useIssueContext()
+  const { workspace, members, labels, cycles, repos, canManage, userId } = useIssueContext()
   const menuFor = (kind: MenuKind) => ({
     open: menu === kind,
     onOpenChange: (open: boolean) => onMenuChange(open ? kind : null),
   })
   const cycle = cycles.find((c) => c.id === issue.cycle_id)
+  const repo = repos.find((r) => r.id === issue.repo_id)
   const issues = useSuspenseQuery(workspaceIssuesQuery(workspace.id)).data
   const update = useUpdateIssue()
   const [now] = useState(Date.now)
@@ -144,6 +146,17 @@ export function IssueProperties({
           </Value>
         </CyclePicker>
       </Row>
+      {/* Only where repos are linked (a repo_id always is, so this covers it too). */}
+      {repos.length > 0 && (
+        <Row label="Repo">
+          <RepoPicker value={issue.repo_id} repos={repos} onChange={(repo_id) => update.mutate({ issue, patch: { repo_id } })}>
+            <Value muted={!repo}>
+              <GitBranch className="size-4" />
+              <span className="truncate">{repo ? repo.name : 'No repository'}</span>
+            </Value>
+          </RepoPicker>
+        </Row>
+      )}
       <Row label="Estimate">
         <Picker
           placeholder="Set estimate…"

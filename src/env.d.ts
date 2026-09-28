@@ -3,6 +3,8 @@
 interface ImportMetaEnv {
   readonly VITE_SUPABASE_URL?: string
   readonly VITE_SUPABASE_PUBLISHABLE_KEY?: string
+  /** The DevDock GitHub App's public slug (github.com/apps/<slug>). Optional. */
+  readonly VITE_GITHUB_APP_SLUG?: string
 }
 
 interface ImportMeta {
