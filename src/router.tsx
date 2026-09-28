@@ -7,12 +7,14 @@ import { docLoader } from '@/features/docs/loaders'
 import { cycleLoader, issueLoader } from '@/features/issues/loaders'
 import { lessonLoader } from '@/features/learning/loaders'
 import { liveSessionLoader } from '@/features/live/loaders'
+import { githubCallbackLoader } from '@/features/repos/loaders'
 import { appIndexLoader, onboardingLoader, teamLoader, workspaceLoader } from '@/features/teams/loaders'
 import { AppLayout } from '@/layouts/AppLayout'
 import { APP_ROUTE_ID, appLoader } from '@/layouts/app-loader'
 import { queryClient } from '@/lib/query-client'
 import { DiagramPage } from '@/routes/DiagramPage'
 import { DocPage } from '@/routes/DocPage'
+import { GitHubCallbackPage } from '@/routes/GitHubCallbackPage'
 import { LiveSessionPage } from '@/routes/LiveSessionPage'
 import { LoginPage } from '@/routes/LoginPage'
 import { NotFoundPage, RouteErrorPage } from '@/routes/NotFoundPage'
@@ -27,6 +29,7 @@ import { TeamSettingsPage } from '@/routes/team/TeamSettingsPage'
 import { TeamWorkspacesPage } from '@/routes/team/TeamWorkspacesPage'
 import { WorkspaceDiagramsPage } from '@/routes/workspace/WorkspaceDiagramsPage'
 import { WorkspaceDocsPage } from '@/routes/workspace/WorkspaceDocsPage'
+import { WorkspaceGitHubPage } from '@/routes/workspace/WorkspaceGitHubPage'
 import { IssueCyclePage } from '@/routes/workspace/IssueCyclePage'
 import { IssueCyclesPage } from '@/routes/workspace/IssueCyclesPage'
 import { IssuePage } from '@/routes/workspace/IssuePage'
@@ -71,6 +74,13 @@ export const router = createBrowserRouter([
       // Redirects to the last/first team, or /onboarding when there are none.
       { path: 'app', loader: appIndexLoader, element: <AuthLoading /> },
       { path: 'onboarding', loader: onboardingLoader, element: <OnboardingPage /> },
+      // Back from installing the DevDock GitHub App (verified by the github Edge Function).
+      {
+        path: 'github/callback',
+        loader: githubCallbackLoader,
+        element: <GitHubCallbackPage />,
+        hydrateFallbackElement: <AuthLoading label="Connecting GitHub…" />,
+      },
       {
         // Must be a team member (teamLoader). Renders the sidebar shell.
         path: 't/:teamSlug',
@@ -150,7 +160,13 @@ export const router = createBrowserRouter([
                       { path: ':sessionId', loader: liveSessionLoader, element: <LiveSessionPage /> },
                     ],
                   },
-                  // Feature tabs that don't exist yet (Exercises, GitHub); checked against the enabled tools.
+                  {
+                    // The repos linked to this project (group repos; issues point at them).
+                    path: 'github',
+                    element: <WorkspaceToolGate tool="github" />,
+                    children: [{ index: true, element: <WorkspaceGitHubPage /> }],
+                  },
+                  // Feature tabs that don't exist yet (Exercises); checked against the enabled tools.
                   { path: ':tab', element: <WorkspaceTabPage /> },
                 ],
               },

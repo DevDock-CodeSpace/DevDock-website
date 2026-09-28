@@ -1,6 +1,6 @@
 # DevDock: project status
 
-_Last updated: 2026-09-25 (Phase 5d: live sessions via JaaS + Google Calendar)_
+_Last updated: 2026-09-28 (Phase 9b: connect a group to the DevDock GitHub App)_
 
 A handoff for anyone (human or AI) planning the next phase. For conventions, see [CLAUDE.md](../CLAUDE.md); for setup, see [README.md](../README.md).
 
@@ -8,7 +8,7 @@ A handoff for anyone (human or AI) planning the next phase. For conventions, see
 
 A private software-engineering teaching workspace for one instructor and a few students. It's not a public product: optimize for clarity, low maintenance and low hosting cost. Repo folder `DevDock-website`. Default branch `prod`.
 
-**Stack:** React 19 + TypeScript (strict) + Vite, React Router 7 (data mode), Tailwind v4, shadcn/ui, TanStack Query, and Supabase (Postgres, Auth, RLS). TipTap (docs), React Flow (diagrams) and Jitsi via JaaS (live sessions) are in. Planned: GitHub links, Vercel hosting.
+**Stack:** React 19 + TypeScript (strict) + Vite, React Router 7 (data mode), Tailwind v4, shadcn/ui, TanStack Query, and Supabase (Postgres, Auth, RLS). TipTap (docs), React Flow (diagrams) and Jitsi via JaaS (live sessions) are in. GitHub repos can be linked to projects (no GitHub API yet). Planned: GitHub App automation, Vercel hosting.
 
 ## Phases
 
@@ -35,6 +35,8 @@ A private software-engineering teaching workspace for one instructor and a few s
 | 8: Learning (modules → lessons, progress) | 🟡 Migration applied to hosted project, types regenerated; RLS verified locally (50/50, all other suites still pass); UI checked with mocked Supabase (31 browser checks, 2 clean runs) | `feat/learning` |
 | 7: Doc folders (Dropbox-style, 3 levels) | 🟡 Migration applied to hosted project, types regenerated; RLS verified locally (36/36; docs 50/50, diagrams 55/55, issues 87/87 + 52/52 still pass); UI checked with mocked Supabase (27 browser checks, 2 clean runs) | `feat/doc-folders` |
 | 5d: Live sessions (Jitsi via JaaS, Google Calendar sync) | 🟡 Migration applied to hosted project, types regenerated; RLS verified locally (26/26); `jaas-token` Edge Function deployed (returns `not_configured` until JaaS secrets are set); UI checked with mocked Supabase/Google/Jitsi (37 browser checks); **not yet tried with real accounts or real JaaS keys** | `feat/live-sessions` (from `dev`) |
+| 9a: GitHub, part 1 (group repos, linked to projects; an issue's repo) | 🟡 Migration applied to hosted project, types regenerated; typecheck/lint/build pass; **no RLS test run yet, not clicked through with real accounts** | `GitHib-Integrations` |
+| 9b: GitHub, part 2 (GitHub App connection, repos picked from GitHub) | 🟡 Migration applied, types regenerated, `github` Edge Function deployed (returns `not_configured` until the App's secrets are set); typecheck/lint/build pass; **the App isn't created yet, so the real install flow is untested** | `GitHib-Integrations` |
 
 ### Phase 1: frontend shell
 - Collapsible sidebar (slide-out panel on mobile) with Overview, Lessons, Live Class, Resources, Members and Settings; a breadcrumb header; and a light/dark/system theme.
@@ -569,6 +571,42 @@ Migration `20260925001632_add_workspace_invites.sql`: tested locally (28 checks)
   - **Class progress** (leads): a person × module grid (done/total, highlighted when complete), overall %, and when they last finished a lesson. Students come first by progress, then leads.
 - **Browser tests** (`scratchpad/learning-test.mjs`, 31 checks, 2 clean runs): building a course from scratch, autosave, reordering and moving, delete, the Class progress order, student read-only and progress flows (including the user_id left to the DB), the 404s, and the tool being off. Folders (27) and Issues (99) suites still pass.
 - **Shared:** `NameDialog` (moved from docs' FolderNameDialog) is used by folders and Learning.
+
+### Phase 9a: GitHub, part 1 (repos)
+- **Model agreed with the product owner:** issues stay owned by the project (workspace). A repo belongs to the **group**, can be linked to **any number of projects** (a shared `api` repo serves the web and mobile projects), and an issue can point at **one** repo linked to its project, like a label. "Moving" an issue into a repo sets `issues.repo_id`, so its `CAP-12` number, links and history never change.
+- **Migration** `20260928025657_repos_and_issue_repo.sql`:
+  - **`repos`**: `team_id`, `owner`, `name` (GitHub's name rules as check constraints; unique per group, case-insensitive), `created_by`.
+  - **`workspace_repos`**: PK `(workspace_id, repo_id)`, plus `team_id` in both composite FKs so a link can't cross groups.
+  - **`issues.repo_id`** (nullable, `on delete set null`), with insert/update column grants. `check_issue` now also requires the repo to be linked to the issue's workspace.
+  - **Unlinking:** the `clear_unlinked_issue_repos` trigger clears `repo_id` on that workspace's issues. Deleting a repo clears it everywhere (FK).
+  - **Activity:** new kind `repo` (ids in from/to), logged by `log_issue_activity`.
+  - **RLS:** group members read repos; owners/admins add and remove them. Workspace viewers read links; workspace managers link and unlink.
+- **UI:**
+  - **Group settings → Repositories:** every repo and the projects using it. Owners/admins add (`owner/name`, a github.com URL or an SSH remote; parsed by `parseRepo`) and remove (confirmed).
+  - **Project → GitHub tab** (`WorkspaceGitHubPage`, was a placeholder): linked repos with open-issue counts (linking to `issues?repo=`), **Link repository** (pick a group repo, or type one; owners/admins can add a new one that way), and Unlink (confirmed, says how many issues lose it).
+  - **Issues:** a Repo property on the issue page, a Repository chip in New issue (sub-issues start in the parent's repo), the repo name on list rows, a Repository filter facet (`?repo=`), and "moved the issue to api" in Activity. All of it is hidden while no repo is linked.
+  - `RoleGuide` lists the new permissions.
+- **Not in this part:** a bulk "Set repository" action (there's no multi-select in the issue list yet), and any GitHub API use.
+### Phase 9b: GitHub, part 2 (connecting the GitHub App)
+- **Migration** `20260928030917_github_installations.sql`:
+  - **`github_installations`** (`team_id`, `installation_id`, `account_login`, `account_type`, `connected_by`). Members read; owners/admins delete (disconnect). There are no client insert/update grants.
+  - **`repos.github_repo_id`** (unique per group) and **`repos.installation_id`**, with a composite FK to the installation, `on delete set null (installation_id)`. Not client-writable.
+  - **`github_connect_states`** (RLS on, no policies, service role only) and **`start_github_connect(team)`** (owners/admins), which returns a one-time state.
+- **`github` Edge Function** (`verify_jwt = false`; checks the caller itself like `jaas-token`):
+  - `connect`:
+    - consumes the state (same person, at most 30 min old, one use) and re-checks owner/admin;
+    - exchanges the OAuth code and confirms the installation is in the person's `/user/installations`, so a forged `installation_id` is refused;
+    - saves the installation and connects existing repos by GitHub id, or by name for ones typed in earlier.
+  - `repos` lists what the group's installations can reach; `add_repo` adds or connects one after checking an installation can reach it. Both are for owners/admins.
+  - Uses an App JWT (RS256, `jose`) and short-lived installation tokens. The person's GitHub token is used once and not stored.
+- **UI:**
+  - **Group settings → Repositories:** the connection ("Connected to acme", Manage on GitHub, Disconnect) and **Connect GitHub**, which is hidden until `VITE_GITHUB_APP_SLUG` is set.
+  - **Adding repos:** once connected, repos are added from GitHub (filterable, marks private ones) and "Not connected" marks repos the App can't reach. Before connecting, repos are still added by name.
+  - **Project → Link repository:** owners/admins pick straight from GitHub.
+  - **`/github/callback`:** handles install, install *requested* (org approval pending) and settings *updated*.
+  - The privacy page covers GitHub.
+- **To use it:** create the App and set the secrets (README → GitHub App setup).
+- **Next (planned):** 9c PR webhooks (opened → In Review, merged → Done); 9d In Progress creates the branch (`github_jobs` + worker); 9e deleting an issue can delete its branch (opt-in, SHA kept for restore). Branches are never deleted when an issue moves back.
 
 ## Current configuration (hosted)
 - **Supabase URL Configuration:** Site URL `http://localhost:5173`; Redirect URLs `http://localhost:5173/**`.

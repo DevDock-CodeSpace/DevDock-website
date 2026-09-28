@@ -121,7 +121,7 @@ export const workspaceTabDefs: Record<
   docs: { title: 'Docs', icon: FileText, hint: 'Pages and notes', soon: 'Docs assigned to this workspace will live here.' },
   diagrams: { title: 'Diagrams', icon: Workflow, hint: 'Architecture and flow diagrams', soon: 'Diagrams assigned to this workspace will live here.' },
   exercises: { title: 'Exercises', icon: Shapes, hint: 'Practice and submissions', soon: 'Exercises and submissions will live here.' },
-  github: { title: 'GitHub', icon: GitPullRequest, hint: 'Repos and pull requests', soon: 'Linked repositories and pull requests will show up here.' },
+  github: { title: 'GitHub', icon: GitPullRequest, hint: 'Linked repositories' },
   live: { title: 'Live', icon: Video, hint: 'Video sessions (Jitsi)' },
   members: { title: 'Members', icon: Users },
 }

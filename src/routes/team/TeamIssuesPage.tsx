@@ -9,7 +9,7 @@ import { useAuth } from '@/features/auth/hooks'
 import { teamIssuesQuery, type TeamIssue } from '@/features/issues/api'
 import { PriorityIcon } from '@/features/issues/components/PriorityIcon'
 import { StatusIcon } from '@/features/issues/components/StatusIcon'
-import { applyFilters, ISSUE_TABS, readTab } from '@/features/issues/filters'
+import { applyFilters, ISSUE_TABS, NO_FILTERS, readTab } from '@/features/issues/filters'
 import { compareIssues, isClosed, issueIdentifier, STATUS_ORDER, statusLabel } from '@/features/issues/meta'
 import { useCurrentTeam } from '@/features/teams/hooks'
 import { issuePath, teamIssuesPath } from '@/features/teams/nav'
@@ -17,7 +17,6 @@ import { timeAgo } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 const ALL = 'all'
-const noFilters = { status: [], priority: [], assignee: [], label: [], cycle: [] }
 
 /**
  * Group → Issues (development groups): issues from every project you can see,
@@ -41,7 +40,7 @@ export function TeamIssuesPage() {
     a.title.localeCompare(b.title),
   )
   const scoped = project === ALL ? all : all.filter((i) => i.workspace.id === project)
-  const issues = applyFilters(scoped, tab, noFilters, { userId: user.id, currentCycleId: undefined }) as TeamIssue[]
+  const issues = applyFilters(scoped, tab, NO_FILTERS, { userId: user.id, currentCycleId: undefined }) as TeamIssue[]
   const open = issues.filter((i) => !isClosed(i.status)).length
 
   const tabHref = (id: string) => {

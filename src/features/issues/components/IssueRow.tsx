@@ -1,4 +1,4 @@
-import { CircleUserRound, IterationCw } from 'lucide-react'
+import { CircleUserRound, GitBranch, IterationCw } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { PersonAvatar } from '@/components/PersonRow'
@@ -24,16 +24,17 @@ const iconButton =
 
 /**
  * One list row, like Linear's: priority · ID · status · title · sub-issue
- * progress … labels · due date · assignee · created. The whole row opens the
+ * progress … cycle · repo · labels · due date · assignee · created. The whole row opens the
  * issue (a stretched title link); priority, status and assignee are menus.
  * Hover or j/k focuses it for keyboard shortcuts.
  */
 export function IssueRow({ issue, subIssues }: { issue: Issue; subIssues?: { done: number; total: number } }) {
   const { team } = useCurrentTeam()
-  const { workspace, members, labels, cycles, userId } = useIssueContext()
+  const { workspace, members, labels, cycles, repos, userId } = useIssueContext()
   const update = useUpdateIssue()
   const nav = useRowNav(issue.id)
   const cycle = cycles.find((c) => c.id === issue.cycle_id)
+  const repo = repos.find((r) => r.id === issue.repo_id)
   const [today] = useState(() => localDateISO(new Date()))
   const assignee = members.find((m) => m.user_id === issue.assignee_id)
   const issueLabels = labels.filter((l) => issue.labelIds.includes(l.id))
@@ -89,6 +90,15 @@ export function IssueRow({ issue, subIssues }: { issue: Issue; subIssues?: { don
         <span className="hidden shrink-0 items-center gap-1 font-mono text-[11px] text-muted-foreground lg:flex" title={cycleTitle(cycle)}>
           <IterationCw className="size-3" />
           {cycle.number}
+        </span>
+      )}
+      {repo && (
+        <span
+          className="hidden max-w-32 shrink-0 items-center gap-1 font-mono text-[11px] text-muted-foreground lg:flex"
+          title={`Repository: ${repo.owner}/${repo.name}`}
+        >
+          <GitBranch className="size-3 shrink-0" />
+          <span className="truncate">{repo.name}</span>
         </span>
       )}
       <span className="hidden items-center gap-1 md:flex">

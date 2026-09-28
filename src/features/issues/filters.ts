@@ -2,7 +2,7 @@ import type { Issue, IssuePriority, IssueStatus } from './api'
 import { STATUS_ORDER } from './meta'
 
 // Issue list filters, kept in the URL so a filtered view can be shared or
-// bookmarked: ?tab=active&status=todo,in_review&assignee=me&label=<id>&cycle=current
+// bookmarked: ?tab=active&status=todo,in_review&assignee=me&label=<id>&cycle=current&repo=<id>
 
 export type IssueTab = 'all' | 'active' | 'backlog' | 'mine'
 
@@ -13,12 +13,14 @@ export const ISSUE_TABS: { id: IssueTab; label: string }[] = [
   { id: 'mine', label: 'My issues' },
 ]
 
-export type FilterFacet = 'status' | 'priority' | 'assignee' | 'label' | 'cycle'
+export type FilterFacet = 'status' | 'priority' | 'assignee' | 'label' | 'cycle' | 'repo'
 
-/** Selected values per facet. assignee: user ids, "me" or "none"; cycle: ids, "current" or "none". */
+/** Selected values per facet. assignee: user ids, "me" or "none"; cycle: ids, "current" or "none"; repo: ids or "none". */
 export type IssueFilters = Record<FilterFacet, string[]>
 
-export const FACETS: FilterFacet[] = ['status', 'priority', 'assignee', 'label', 'cycle']
+export const FACETS: FilterFacet[] = ['status', 'priority', 'assignee', 'label', 'cycle', 'repo']
+
+export const NO_FILTERS: IssueFilters = { status: [], priority: [], assignee: [], label: [], cycle: [], repo: [] }
 
 export const facetLabel: Record<FilterFacet, string> = {
   status: 'Status',
@@ -26,6 +28,7 @@ export const facetLabel: Record<FilterFacet, string> = {
   assignee: 'Assignee',
   label: 'Labels',
   cycle: 'Cycle',
+  repo: 'Repository',
 }
 
 export function readTab(params: URLSearchParams): IssueTab {
@@ -41,6 +44,7 @@ export function readFilters(params: URLSearchParams): IssueFilters {
     assignee: list('assignee'),
     label: list('label'),
     cycle: list('cycle'),
+    repo: list('repo'),
   }
 }
 
@@ -86,7 +90,8 @@ export function applyFilters(
         c === 'none'
           ? issue.cycle_id === null
           : issue.cycle_id !== null && issue.cycle_id === (c === 'current' ? context.currentCycleId : c),
-      )
+      ) &&
+      match('repo', (r) => (r === 'none' ? issue.repo_id === null : issue.repo_id === r))
     )
   })
 }

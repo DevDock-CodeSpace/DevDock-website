@@ -190,6 +190,35 @@ The app always sends `redirectTo = window.location.origin + '/auth/callback'`, s
 
 `supabase/config.toml` only configures the optional local Docker stack. The hosted project is configured in the dashboard.
 
+## GitHub App setup
+
+Connecting a group to GitHub (Group settings → Repositories → **Connect GitHub**) uses a GitHub App that you own. The `github` Edge Function holds its keys. Until they're set, the button is hidden and repos can only be added by name.
+
+1. **Create the App:** GitHub → Settings → Developer settings → GitHub Apps → **New GitHub App**. For an org, create it under the org's settings instead.
+   - **Name:** anything unique, e.g. `DevDock-<you>`. Its URL slug (`github.com/apps/<slug>`) is used below.
+   - **Homepage URL:** your DevDock origin, e.g. `http://localhost:5173`.
+   - **Callback URL:** `http://localhost:5173/github/callback`. Add one per deployed origin later (up to 10).
+   - Tick **Request user authorization (OAuth) during installation**. DevDock uses that one-time sign-in to check that the person connecting really has access to the installation.
+   - **Webhook:** untick *Active* for now. Phase 9c adds the webhook URL and secret.
+   - **Repository permissions:**
+     - Contents: **Read and write** (9d creates branches; asking now avoids a re-approval later)
+     - Pull requests: **Read-only**
+     - Metadata: Read-only (automatic)
+   - **Where can this GitHub App be installed:** *Only on this account* if all repos live there; otherwise *Any account*.
+2. **After creating it:**
+   - Note the **App ID** and **Client ID**.
+   - **Generate a new client secret**.
+   - **Generate a private key**, which downloads a `.pem` file.
+3. **Convert the key to PKCS#8** (GitHub's is PKCS#1):
+   `openssl pkcs8 -topk8 -inform PEM -outform PEM -nocrypt -in <downloaded>.pem -out github-app-pkcs8.pem`
+4. **Set the Edge Function secrets** (never `VITE_` vars):
+   ```bash
+   supabase secrets set GITHUB_APP_ID=<app id> GITHUB_CLIENT_ID=<client id> GITHUB_CLIENT_SECRET=<client secret>
+   supabase secrets set GITHUB_APP_PRIVATE_KEY="$(cat github-app-pkcs8.pem)"
+   ```
+   Then delete both `.pem` files.
+5. **Show the button:** set `VITE_GITHUB_APP_SLUG=<slug>` in `.env.local` (and in Vercel later), then restart `npm run dev`. The slug isn't a secret.
+
 ### Not implemented yet (intentionally)
 
 - Lessons, resources and live sessions (no tables yet; the pages are placeholders).

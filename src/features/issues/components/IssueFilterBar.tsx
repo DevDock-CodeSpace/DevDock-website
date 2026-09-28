@@ -1,4 +1,4 @@
-import { CircleUserRound, IterationCw, ListFilter, Tag, X } from 'lucide-react'
+import { CircleUserRound, GitBranch, IterationCw, ListFilter, Tag, X } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { PersonAvatar } from '@/components/PersonRow'
 import { Button } from '@/components/ui/button'
@@ -14,7 +14,7 @@ import {
 import { cn } from '@/lib/utils'
 import type { IssuePriority, IssueStatus } from '../api'
 import { cycleTitle } from '../cycles'
-import { FACETS, facetLabel, hasFilters, type FilterFacet, type IssueFilters } from '../filters'
+import { FACETS, facetLabel, hasFilters, NO_FILTERS, type FilterFacet, type IssueFilters } from '../filters'
 import { useIssueContext } from '../hooks'
 import { labelDotClass, PRIORITY_ORDER, priorityLabel, STATUS_ORDER, statusLabel } from '../meta'
 import { Picker, type PickerOption } from './Picker'
@@ -27,11 +27,12 @@ const facetIcon: Record<FilterFacet, ReactNode> = {
   assignee: <CircleUserRound className="size-3.5" />,
   label: <Tag className="size-3.5" />,
   cycle: <IterationCw className="size-3.5" />,
+  repo: <GitBranch className="size-3.5" />,
 }
 
 /** The values a facet can take, with labels and icons (menus and chips share them). */
 function useFacetOptions(): Record<FilterFacet, PickerOption[]> {
-  const { members, labels, cycles, userId } = useIssueContext()
+  const { members, labels, cycles, repos, userId } = useIssueContext()
   return {
     status: STATUS_ORDER.map((s: IssueStatus) => ({ value: s, label: statusLabel[s], icon: <StatusIcon status={s} /> })),
     priority: PRIORITY_ORDER.map((p: IssuePriority) => ({
@@ -64,6 +65,14 @@ function useFacetOptions(): Record<FilterFacet, PickerOption[]> {
         icon: <IterationCw className="size-3.5 text-muted-foreground" />,
       })),
     ],
+    // No repos linked: the facet isn't offered.
+    repo:
+      repos.length === 0
+        ? []
+        : [
+            { value: 'none', label: 'No repository', icon: <GitBranch className="size-3.5 text-muted-foreground" /> },
+            ...repos.map((r) => ({ value: r.id, label: r.name, icon: <GitBranch className="size-3.5 text-muted-foreground" /> })),
+          ],
   }
 }
 
@@ -165,7 +174,7 @@ export function IssueFilterBar({ filters, onChange, open, onOpenChange, hideFace
       {hasFilters(filters) && (
         <button
           type="button"
-          onClick={() => onChange(() => ({ status: [], priority: [], assignee: [], label: [], cycle: [] }))}
+          onClick={() => onChange(() => NO_FILTERS)}
           className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
         >
           Clear
