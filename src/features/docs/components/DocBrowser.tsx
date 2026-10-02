@@ -39,7 +39,10 @@ type DocBrowserProps = {
   workspaceId: string | null
   docs: DocSummary[]
   folders: DocFolder[]
+  /** Delete/move docs and manage folders (writers). */
   canWrite: boolean
+  /** Create docs here (everyone who can edit docs in this scope). */
+  canCreate: boolean
   docHref: (doc: DocSummary) => string
   /** Shown when the top level is empty. */
   empty: ReactNode
@@ -47,11 +50,11 @@ type DocBrowserProps = {
 
 /**
  * Dropbox-style docs browser for one scope: folders (3 levels deep) and docs,
- * a breadcrumb path, and for writers: new folder/doc here, rename/delete
- * folders, move docs (menu or drag onto a folder or a breadcrumb).
+ * a breadcrumb path, a new doc here for editors, and for writers: new folder,
+ * rename/delete folders, move docs (menu or drag onto a folder or a breadcrumb).
  * The open folder is in the URL (?folder=<id>).
  */
-export function DocBrowser({ teamId, workspaceId, docs, folders, canWrite, docHref, empty }: DocBrowserProps) {
+export function DocBrowser({ teamId, workspaceId, docs, folders, canWrite, canCreate, docHref, empty }: DocBrowserProps) {
   const queryClient = useQueryClient()
   const [params, setParams] = useSearchParams()
   const [now] = useState(Date.now)
@@ -158,20 +161,27 @@ export function DocBrowser({ teamId, workspaceId, docs, folders, canWrite, docHr
           })}
           <span className="ml-2 font-mono text-xs text-muted-foreground">{subfolders.length + here.length}</span>
         </nav>
-        {canWrite && (
+        {(canWrite || canCreate) && (
           <div className="flex items-center gap-2">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                {/* span: tooltips need a hoverable element even when the button is disabled */}
-                <span tabIndex={canNest ? -1 : 0}>
-                  <Button size="sm" variant="outline" disabled={!canNest} onClick={() => setNaming({ mode: 'create' })}>
-                    <FolderPlus /> New folder
-                  </Button>
-                </span>
-              </TooltipTrigger>
-              {!canNest && <TooltipContent>Folders can be nested {MAX_FOLDER_DEPTH} levels deep</TooltipContent>}
-            </Tooltip>
-            <CreateDocDialog workspaceId={workspaceId ?? undefined} folderId={current?.id ?? null} />
+            {canWrite && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  {/* span: tooltips need a hoverable element even when the button is disabled */}
+                  <span tabIndex={canNest ? -1 : 0}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={!canNest}
+                      onClick={() => setNaming({ mode: 'create' })}
+                    >
+                      <FolderPlus /> New folder
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {!canNest && <TooltipContent>Folders can be nested {MAX_FOLDER_DEPTH} levels deep</TooltipContent>}
+              </Tooltip>
+            )}
+            {canCreate && <CreateDocDialog workspaceId={workspaceId ?? undefined} folderId={current?.id ?? null} />}
           </div>
         )}
       </div>

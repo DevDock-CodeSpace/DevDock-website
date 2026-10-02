@@ -3,7 +3,7 @@ import { lazy, Suspense } from 'react'
 import { useParams } from 'react-router'
 import { Skeleton } from '@/components/ui/skeleton'
 import { documentQuery } from '@/features/docs/api'
-import { useCanWriteDocs } from '@/features/docs/hooks'
+import { useCanEditDocs, useCanWriteDocs } from '@/features/docs/hooks'
 
 // The editor (TipTap + highlight.js) is only downloaded when a doc is opened.
 const DocView = lazy(() => import('@/features/docs/components/DocView'))
@@ -16,14 +16,15 @@ const DocView = lazy(() => import('@/features/docs/components/DocView'))
 export function DocPage() {
   const { docId = '' } = useParams()
   const doc = useSuspenseQuery(documentQuery(docId)).data
-  const canWrite = useCanWriteDocs()(doc?.workspace_id ?? null)
+  const canEdit = useCanEditDocs()(doc?.workspace_id ?? null)
+  const canDelete = useCanWriteDocs()(doc?.workspace_id ?? null)
 
   if (!doc) {
     return <p className="py-16 text-center text-sm text-muted-foreground">This doc doesn’t exist anymore.</p>
   }
   return (
     <Suspense fallback={<DocSkeleton />}>
-      <DocView key={doc.id} doc={doc} canWrite={canWrite} />
+      <DocView key={doc.id} doc={doc} canEdit={canEdit} canDelete={canDelete} />
     </Suspense>
   )
 }
