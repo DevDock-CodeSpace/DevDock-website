@@ -43,10 +43,10 @@ function initialContent(body: Json | null): JSONContent | null {
 
 /**
  * The doc page body (lazy-loaded with the editor): Paper-style title + rich
- * editor for writers, the same rendering read-only for everyone else.
- * Writers' changes autosave; leaving flushes the save first.
+ * editor for anyone who can edit, the same rendering read-only for everyone else.
+ * Edits autosave; leaving flushes the save first.
  */
-export default function DocView({ doc, canWrite }: { doc: Doc; canWrite: boolean }) {
+export default function DocView({ doc, canEdit, canDelete }: { doc: Doc; canEdit: boolean; canDelete: boolean }) {
   const { workspaceId } = useParams()
   const { team } = useCurrentTeam()
   const queryClient = useQueryClient()
@@ -154,15 +154,15 @@ export default function DocView({ doc, canWrite }: { doc: Doc; canWrite: boolean
   const extensions = useMemo(
     () =>
       docExtensions({
-        editable: canWrite,
+        editable: canEdit,
         onImageFiles: (editor, files, pos) => void insertImages(editor, files, pos),
       }),
-    [canWrite, insertImages],
+    [canEdit, insertImages],
   )
   const editor = useEditor({
     extensions,
     content: initialContent(doc.body),
-    editable: canWrite,
+    editable: canEdit,
     immediatelyRender: true,
     editorProps: { attributes: { class: docContentClass, 'aria-label': 'Document content' } },
     onUpdate: () => markChanged(),
@@ -174,7 +174,7 @@ export default function DocView({ doc, canWrite }: { doc: Doc; canWrite: boolean
   // ---------------------------------------------------- leaving the page
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
-      canWrite &&
+      canEdit &&
       !leaving.current &&
       version.current !== savedVersion.current &&
       currentLocation.pathname !== nextLocation.pathname,
@@ -217,7 +217,7 @@ export default function DocView({ doc, canWrite }: { doc: Doc; canWrite: boolean
   const onKeyDown = (event: KeyboardEvent) => {
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
       event.preventDefault()
-      if (canWrite) flush().catch((error: unknown) => toast.error(errorMessage(error), { id: 'doc-save' }))
+      if (canEdit) flush().catch((error: unknown) => toast.error(errorMessage(error), { id: 'doc-save' }))
     }
   }
 
@@ -247,23 +247,25 @@ export default function DocView({ doc, canWrite }: { doc: Doc; canWrite: boolean
             </>
           )}
         </div>
-        {canWrite && (
+        {canEdit && (
           <div className="flex shrink-0 items-center gap-2">
             <SaveIndicator status={status} />
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Delete doc"
-              className="text-muted-foreground hover:text-destructive"
-              onClick={() => setConfirmDelete(true)}
-            >
-              <Trash2 />
-            </Button>
+            {canDelete && (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Delete doc"
+                className="text-muted-foreground hover:text-destructive"
+                onClick={() => setConfirmDelete(true)}
+              >
+                <Trash2 />
+              </Button>
+            )}
           </div>
         )}
       </div>
 
-      {canWrite ? (
+      {canEdit ? (
         <textarea
           ref={titleField}
           value={title}
@@ -294,7 +296,7 @@ export default function DocView({ doc, canWrite }: { doc: Doc; canWrite: boolean
         <span>{doc.author?.display_name ?? 'Former member'}</span>
         <span aria-hidden>·</span>
         <span>Updated {timeAgo(doc.updated_at, now)}</span>
-        {!canWrite && (
+        {!canEdit && (
           <>
             <span aria-hidden>·</span>
             <span>View only</span>
@@ -302,7 +304,7 @@ export default function DocView({ doc, canWrite }: { doc: Doc; canWrite: boolean
         )}
       </p>
 
-      {editor && canWrite && (
+      {editor && canEdit && (
         <>
           <FormatBubble editor={editor} />
           <InsertMenu editor={editor} onPickImage={() => fileInput.current?.click()} />
