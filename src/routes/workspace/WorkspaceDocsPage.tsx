@@ -3,17 +3,18 @@ import { ArrowRight } from 'lucide-react'
 import { Link } from 'react-router'
 import { foldersQuery, workspaceDocsQuery } from '@/features/docs/api'
 import { DocBrowser } from '@/features/docs/components/DocBrowser'
-import { useCanWriteDocs } from '@/features/docs/hooks'
+import { useCanEditDocs, useCanWriteDocs } from '@/features/docs/hooks'
 import { useCurrentTeam, useCurrentWorkspace } from '@/features/teams/hooks'
 import { docPath, docsPath } from '@/features/teams/nav'
 
 /** Workspace → Docs: this workspace's folders and docs (WorkspaceToolGate checks the tool is on). */
 export function WorkspaceDocsPage() {
   const { team } = useCurrentTeam()
-  const { workspace, can } = useCurrentWorkspace()
+  const { workspace } = useCurrentWorkspace()
   const docs = useSuspenseQuery(workspaceDocsQuery(workspace.id)).data
   const folders = useSuspenseQuery(foldersQuery(team.id, workspace.id)).data
   const canWrite = useCanWriteDocs()(workspace.id)
+  const canEdit = useCanEditDocs()(workspace.id)
 
   return (
     <>
@@ -31,11 +32,14 @@ export function WorkspaceDocsPage() {
         docs={docs}
         folders={folders}
         canWrite={canWrite}
+        canCreate={canEdit}
         docHref={(doc) => docPath(team.slug, doc.id, workspace.id)}
         empty={
-          can.canEdit
+          canWrite
             ? 'No docs in this workspace yet. Create a doc or a folder.'
-            : 'No docs in this workspace yet. The workspace lead can add some.'
+            : canEdit
+              ? 'No docs in this workspace yet. Create the first one.'
+              : 'No docs in this workspace yet.'
         }
       />
     </>

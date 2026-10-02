@@ -61,7 +61,7 @@ export function RoleGuide({ type, myRole }: { type: TeamType; myRole: TeamRole }
         'Invite people with invite codes, and remove members',
         `Create, edit and delete ${nouns}, and choose who’s in each and who leads it`,
         `See and manage every ${noun}, even ones they haven’t joined`,
-        'Write group-wide docs and diagrams, schedule group-wide live sessions, and change group settings',
+        'Write group-wide diagrams, delete group-wide docs and organize their folders, schedule group-wide live sessions, and change group settings',
         'Add and remove the group’s GitHub repositories',
       ],
     },
@@ -71,7 +71,7 @@ export function RoleGuide({ type, myRole }: { type: TeamType; myRole: TeamRole }
       who: who.member,
       can: [
         `Sees only the ${nouns} they’ve been added to`,
-        'Reads group-wide docs and diagrams',
+        'Reads group-wide diagrams, and creates and edits group-wide docs',
         `What they can do inside a ${noun} depends on their role there (below)`,
         'Can leave the group at any time',
       ],
@@ -84,7 +84,7 @@ export function RoleGuide({ type, myRole }: { type: TeamType; myRole: TeamRole }
       who: who.lead,
       can: [
         `Change the ${noun}’s settings and tools, and add or remove its members`,
-        'Write its docs and diagrams, and organize folders',
+        'Write its diagrams, delete its docs, and organize doc folders',
         'Schedule its live sessions',
         'Delete issues, and manage labels and cycles',
         'Link the group’s repositories to it, and set their branches',
@@ -96,7 +96,7 @@ export function RoleGuide({ type, myRole }: { type: TeamType; myRole: TeamRole }
       title: 'Member',
       who: type === 'learning' ? 'Takes the course' : `Works in the ${noun}`,
       can: [
-        'Reads its docs and diagrams',
+        'Creates and edits its docs, and reads its diagrams',
         'Creates and updates issues (including their repository), and comments',
         'On issues in a connected repo, In Review and Done come from GitHub: open a PR, then merge it',
         ...(type === 'learning' ? ['Takes lessons and tracks their own progress'] : []),

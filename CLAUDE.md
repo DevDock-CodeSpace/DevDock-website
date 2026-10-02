@@ -174,7 +174,8 @@ supabase/
   - Access: managers edit the outline; everyone in the workspace reads it. You mark and unmark only your own progress; managers read everyone's (Class progress).
   - `useLearning()` gives the outline in reading order, your done set and the next lesson.
 - **Doc folders** (`doc_folders`, `features/docs/{folders.ts,components/DocBrowser.tsx}`):
-  - Folders are per scope (group-wide or one workspace), nest **at most 3 levels** (DB trigger sets `depth`), and use the documents access rules.
+  - **Access:** everyone who can read docs in a scope creates and edits them, including inside folders (`private.can_edit_document`, `useCanEditDocs`). Deleting docs, moving them between folders (checked in `check_document_folder`) and managing folders stay with writers: group owners/admins and workspace leads (`private.can_write_document`, `useCanWriteDocs`, which Diagrams and Live also use).
+  - Folders are per scope (group-wide or one workspace), nest **at most 3 levels** (DB trigger sets `depth`), and use the writer rules.
   - The open folder is `?folder=<id>`; `documents.folder_id` must be in the doc's scope (trigger).
   - Delete folders with `deleteFolder()`, which deletes the docs inside first so their Storage images go too; subfolders cascade.
 - **Diagram editor** (`features/diagrams/editor/`, page body `features/diagrams/components/DiagramView.tsx`, lazy-loaded by `routes/DiagramPage.tsx`):
@@ -182,7 +183,7 @@ supabase/
   - Layers: React Flow runs with `zIndexMode="manual"`. Containers sit below connectors, and connectors below shapes. `normalizeOrder()` keeps parents before children and sets the z-indexes, so call it after any reorder or reparent.
   - Undo is snapshot-based (`useHistory`). Call `snapshot()` *before* every change.
 - **Live sessions** (`features/live/`, routes `…/live` (`TeamLivePage`/`WorkspaceLivePage`) and `…/live/:sessionId` (`LiveSessionPage`, `liveSessionLoader`)):
-  - Same scope model and RLS as docs (writers = group owners/admins and workspace leads; everyone in the audience reads and joins). `room_name` is never sent to the browser.
+  - Same scope model as docs, with docs' writer rules for every write (writers = group owners/admins and workspace leads; everyone in the audience reads and joins). `room_name` is never sent to the browser.
   - The embedded call (`JitsiRoom`, lazy) only mounts after `fetchJaasToken()` returns a token from the `jaas-token` Edge Function, which re-checks access and the moderator flag (`public.can_moderate_live_session`) and enforces the join window (15 min before → 1 h after). `time.ts` mirrors that window for the UI.
   - Google Calendar sync (`calendar.ts`) uses the organizer's Google token (`features/auth/google-calendar.ts`, sessionStorage, ~55 min). With no token, the change is queued and the organizer goes through OAuth once (`connectGoogleCalendar`, `calendar.events` scope); `useCalendarQueue()` finishes it on return. Events are created/patched/deleted with `sendUpdates=all`; `live_sessions.calendar_event_id` links the two.
   - Query keys `['live', …]`; invalidate the `['live']` prefix after any write. `useCanWriteLive` mirrors docs write access (UI only).
