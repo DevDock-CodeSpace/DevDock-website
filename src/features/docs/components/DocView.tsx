@@ -7,12 +7,15 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { Link, useBlocker, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
+import { OthersTypingAlert } from '@/components/OthersTypingAlert'
 import { PersonAvatar } from '@/components/PersonRow'
 import { Button } from '@/components/ui/button'
 import { useCurrentTeam } from '@/features/teams/hooks'
+import { useOthersTyping } from '@/hooks/use-others-typing'
 import { docsPath } from '@/features/teams/nav'
 import type { Json } from '@/types/database.types'
 import { errorMessage } from '@/lib/errors'
+import { sameJson } from '@/lib/json'
 import { timeAgo } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import {
@@ -24,6 +27,7 @@ import {
   uploadDocImage,
   type Doc,
 } from '../api'
+import { adoptContent } from '../editor/adopt'
 import { docExtensions } from '../editor/extensions'
 import { folderPath } from '../folders'
 import { FormatBubble } from '../editor/FormatBubble'
@@ -83,6 +87,8 @@ export default function DocView({ doc, canEdit, canDelete }: { doc: Doc; canEdit
   const inflight = useRef<Promise<void>>(Promise.resolve())
   const leaving = useRef(false)
   const editorRef = useRef<Editor | null>(null)
+  // What the server has, as far as this view knows (the last load, save, or adopted change).
+  const synced = useRef({ title: doc.title, body: doc.body })
 
   const save = useCallback(async () => {
     const editor = editorRef.current
@@ -103,6 +109,9 @@ export default function DocView({ doc, canEdit, canDelete }: { doc: Doc; canEdit
       throw error
     }
     savedVersion.current = target
+    synced.current = { title: nextTitle, body }
+    // A refetch that started before this save still carries the old body: drop it.
+    void queryClient.cancelQueries({ queryKey: documentQuery(doc.id).queryKey, exact: true })
     // Keep the cached doc in sync without refetching the (possibly large) body.
     queryClient.setQueryData(documentQuery(doc.id).queryKey, (old) =>
       old ? { ...old, title: nextTitle, body, content, updated_at: new Date().toISOString() } : old,
@@ -120,14 +129,16 @@ export default function DocView({ doc, canEdit, canDelete }: { doc: Doc; canEdit
     return run
   }, [save])
 
+  const { others, markTyping } = useOthersTyping(`doc:${doc.id}`, canEdit)
   const markChanged = useCallback(() => {
     version.current += 1
+    markTyping()
     setStatus('pending')
     window.clearTimeout(timer.current)
     timer.current = window.setTimeout(() => {
       flush().catch((error: unknown) => toast.error(errorMessage(error), { id: 'doc-save' }))
     }, AUTOSAVE_MS)
-  }, [flush])
+  }, [flush, markTyping])
 
   useEffect(() => () => window.clearTimeout(timer.current), [])
 
@@ -170,6 +181,18 @@ export default function DocView({ doc, canEdit, canDelete }: { doc: Doc; canEdit
   useEffect(() => {
     editorRef.current = editor
   }, [editor])
+
+  // A doc that changed on the server (someone else, another tab) replaces what's
+  // shown here, unless there are unsaved edits.
+  useEffect(() => {
+    if (version.current !== savedVersion.current) return
+    const sameBody = sameJson(doc.body, synced.current.body)
+    if (sameBody && doc.title === synced.current.title) return
+    synced.current = { title: doc.title, body: doc.body }
+    titleRef.current = doc.title
+    setTitle(doc.title)
+    if (!sameBody && editor) adoptContent(editor, doc.body)
+  }, [doc.title, doc.body, editor])
 
   // ---------------------------------------------------- leaving the page
   const blocker = useBlocker(
@@ -332,6 +355,7 @@ export default function DocView({ doc, canEdit, canDelete }: { doc: Doc; canEdit
           />
         </>
       )}
+      <OthersTypingAlert names={others} />
       <EditorContent editor={editor} className="pb-[30vh]" />
 
       <ConfirmDialog

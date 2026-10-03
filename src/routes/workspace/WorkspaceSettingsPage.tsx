@@ -64,6 +64,7 @@ function DetailsSection() {
       return Promise.all([
         queryClient.invalidateQueries({ queryKey: workspaceQuery(workspace.id).queryKey }),
         queryClient.invalidateQueries({ queryKey: ['workspaces', 'team', team.id] }),
+        queryClient.invalidateQueries({ queryKey: ['issues', 'team'] }),
       ])
     },
     onError: (error) => toast.error(errorMessage(error)),

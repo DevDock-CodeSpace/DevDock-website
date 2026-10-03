@@ -2,23 +2,26 @@ import { useQueryClient } from '@tanstack/react-query'
 import type { JSONContent } from '@tiptap/core'
 import { EditorContent, useEditor } from '@tiptap/react'
 import { ArrowLeft, ArrowRight, Check, ChevronRight } from 'lucide-react'
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { toast } from 'sonner'
+import { OthersTypingAlert } from '@/components/OthersTypingAlert'
 import { Button } from '@/components/ui/button'
+import { adoptContent } from '@/features/docs/editor/adopt'
 import { docExtensions } from '@/features/docs/editor/extensions'
 import { FormatBubble } from '@/features/docs/editor/FormatBubble'
 import { InsertMenu } from '@/features/docs/editor/InsertMenu'
 import { docContentClass } from '@/features/docs/editor/styles'
 import { useCurrentTeam } from '@/features/teams/hooks'
 import { learningPath, lessonPath } from '@/features/teams/nav'
+import { useOthersTyping } from '@/hooks/use-others-typing'
+import { AUTOSAVE_MS, useSaveOnExit } from '@/hooks/use-save-on-exit'
 import { errorMessage } from '@/lib/errors'
+import { sameJson } from '@/lib/json'
 import { cn } from '@/lib/utils'
 import type { Json } from '@/types/database.types'
 import { learningKeys, updateLesson, type Lesson } from '../api'
 import { useLearning, useToggleDone } from '../hooks'
-
-const AUTOSAVE_MS = 800
 
 function initialContent(body: Json | null): JSONContent | null {
   if (body && typeof body === 'object' && !Array.isArray(body) && body.type === 'doc') return body as JSONContent
@@ -44,43 +47,71 @@ export default function LessonView({ lesson }: { lesson: Lesson }) {
   const isDone = done.has(lesson.id)
 
   // ------------------------------------------------------------ saving (managers)
+  // Saves run one after another (an older one can't land on top of a newer one), and
+  // the cached lesson gets the text as soon as a save starts, so coming back shows it.
   const [status, setStatus] = useState<'saved' | 'pending' | 'saving' | 'error'>('saved')
   const pending = useRef<{ title?: string; body?: Json | null }>({})
   const timer = useRef<number | undefined>(undefined)
-  const save = useMemo(
-    () => async () => {
-      const patch = pending.current
-      if (Object.keys(patch).length === 0) return
-      pending.current = {}
-      setStatus('saving')
-      try {
-        await updateLesson(lesson.id, patch)
-        setStatus('saved')
-        queryClient.setQueryData<Lesson | null>(learningKeys.lesson(lesson.id), (old) =>
-          old ? { ...old, ...patch, title: patch.title?.trim() ?? old.title } : old,
-        )
-        if (patch.title !== undefined) void queryClient.invalidateQueries({ queryKey: learningKeys.lessons(workspace.id) })
-      } catch (error) {
-        setStatus('error')
-        toast.error(errorMessage(error), { id: 'lesson-save' })
-      }
-    },
-    [lesson.id, queryClient, workspace.id],
+  const saving = useRef(false)
+  const inflight = useRef<Promise<void>>(Promise.resolve())
+  const mounted = useRef(true)
+  // What the server has, as far as this view knows (the last load, save, or adopted change).
+  const synced = useRef<{ title: string; body: Json | null }>({ title: lesson.title, body: lesson.body })
+  const setCached = useCallback(
+    (patch: { title?: string; body?: Json | null }) =>
+      queryClient.setQueryData<Lesson | null>(learningKeys.lesson(lesson.id), (old) => (old ? { ...old, ...patch } : old)),
+    [lesson.id, queryClient],
   )
+  const save = useCallback(async () => {
+    const patch = pending.current
+    if (Object.keys(patch).length === 0) return
+    pending.current = {}
+    saving.current = true
+    setStatus('saving')
+    try {
+      await updateLesson(lesson.id, patch)
+      const saved = patch.title === undefined ? patch : { ...patch, title: patch.title.trim() }
+      synced.current = { ...synced.current, ...saved }
+      // A refetch that started before this save still carries the old text: drop it.
+      void queryClient.cancelQueries({ queryKey: learningKeys.lesson(lesson.id), exact: true })
+      setCached(saved)
+      setStatus(Object.keys(pending.current).length === 0 ? 'saved' : 'pending')
+      if (patch.title !== undefined) void queryClient.invalidateQueries({ queryKey: learningKeys.lessons(workspace.id) })
+    } catch (error) {
+      // Keep the text for the next attempt (the next edit, or leaving the lesson).
+      pending.current = { ...patch, ...pending.current }
+      // Nobody is left to retry: the cache goes back to what the server has.
+      if (!mounted.current) setCached(synced.current)
+      setStatus('error')
+      toast.error(errorMessage(error), { id: 'lesson-save' })
+    } finally {
+      saving.current = false
+    }
+  }, [lesson.id, queryClient, setCached, workspace.id])
+  const flush = useCallback(() => {
+    window.clearTimeout(timer.current)
+    const patch = pending.current
+    if (Object.keys(patch).length === 0) return
+    setCached(patch.title === undefined ? patch : { ...patch, title: patch.title.trim() })
+    inflight.current = inflight.current.then(save)
+  }, [save, setCached])
+  const { others, markTyping } = useOthersTyping(`lesson:${lesson.id}`, canManage)
   const queue = (patch: { title?: string; body?: Json | null }) => {
     pending.current = { ...pending.current, ...patch }
+    markTyping()
     setStatus('pending')
     window.clearTimeout(timer.current)
-    timer.current = window.setTimeout(() => void save(), AUTOSAVE_MS)
+    timer.current = window.setTimeout(flush, AUTOSAVE_MS)
   }
   // Send any unsaved change when leaving the lesson.
-  useEffect(
-    () => () => {
-      window.clearTimeout(timer.current)
-      void save()
-    },
-    [save],
-  )
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+      flush()
+    }
+  }, [flush])
+  useSaveOnExit(() => Object.keys(pending.current).length > 0 || saving.current, flush)
 
   // ------------------------------------------------------------ title
   const [title, setTitle] = useState(lesson.title)
@@ -111,6 +142,17 @@ export default function LessonView({ lesson }: { lesson: Lesson }) {
     },
     onUpdate: ({ editor }) => queue({ body: editor.isEmpty ? null : (editor.getJSON() as Json) }),
   })
+
+  // A lesson that changed on the server (the instructor editing it, another tab)
+  // replaces what's shown here, unless there are unsaved edits.
+  useEffect(() => {
+    if (Object.keys(pending.current).length > 0 || saving.current) return
+    const sameBody = sameJson(lesson.body, synced.current.body)
+    if (sameBody && lesson.title === synced.current.title) return
+    synced.current = { title: lesson.title, body: lesson.body }
+    setTitle(lesson.title)
+    if (!sameBody && editor) adoptContent(editor, lesson.body)
+  }, [lesson.title, lesson.body, editor])
 
   return (
     <div className="max-w-[760px]">
@@ -164,6 +206,7 @@ export default function LessonView({ lesson }: { lesson: Lesson }) {
         <h1 className="mb-6 text-3xl leading-tight font-bold tracking-tight">{lesson.title}</h1>
       )}
 
+      <OthersTypingAlert names={others} />
       {editor && canManage && (
         <>
           <FormatBubble editor={editor} />
