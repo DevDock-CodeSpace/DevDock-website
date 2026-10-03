@@ -133,6 +133,7 @@ supabase/
   - `number`, `team_id` and `created_by` are set by DB triggers (`private.issue_counters`). The assignee-is-a-member, same-workspace-parent and no-loop rules are enforced by the `check_issue` trigger.
   - Labels on an issue are replaced with `rpc('set_issue_labels')`.
   - Field edits go through `useUpdateIssue()` (optimistic, rolls back with a toast). Pickers use the searchable `Picker` popover.
+  - The issue page's title and description save themselves (`hooks/use-save-on-exit.ts`): while typing, on leaving the issue, and when the tab is hidden or closed. `useUpdateIssue` runs saves one at a time (mutation `scope`); `IssueDescription` queues its own saves, writes the cache when a save starts, and takes a changed server description only when nothing is unsaved.
   - `useIssueContext().canManage` mirrors `private.can_manage_workspace` (UI only).
   - Cycles live under `…/issues/cycles[/:cycleNumber]` (`cycleLoader`). Numbering and the no-overlap rule are enforced by the `prepare_issue_cycle` trigger; `rpc('move_open_issues')` rolls open issues over.
   - `issue_activity` is written only by triggers (`log_issue_activity`, `log_issue_label_activity`); clients can only read it. Don't add client-side activity writes.
@@ -142,6 +143,11 @@ supabase/
   - Loaders prime what the shell needs with `ensureQueryData`. Pages read with `useSuspenseQuery`; `AppLayout` has a Suspense boundary, so pages may also load secondary data that way.
   - Errors go through `lib/errors.ts` (`toDataError`, `requireAffected`), because RLS makes forbidden UPDATE/DELETE return 0 rows, not an error. Show them with `toast.error(errorMessage(e))`.
 - **Query keys:** `['teams', …]`, `['workspaces', …]`, `['documents', …]`, `['diagrams', …]`, `['issues', …]` (built by `issueKeys`) and `['repos', …]` (`repoKeys`); invalidate by prefix after mutations.
+- **Live updates** (`lib/realtime.ts`, started by `useRealtimeSync` in `AppLayout`):
+  - Supabase Realtime sends row changes (checked against RLS); the client only uses the **table name** and invalidates the query prefixes in `AFFECTS`. A new table needs an entry there **and** a migration adding it to the `supabase_realtime` publication. `live_sessions`, `team_invites`, `profiles` and the GitHub install tables are left out on purpose.
+  - Invalidation waits while a mutation is running, and everything is invalidated after a reconnect. Queries also refetch on window focus when older than `staleTime`.
+  - Editors (issue description, docs, lessons, diagrams) keep a `synced` copy of what the server has: they take a changed server version only when nothing is unsaved (TipTap editors through `adoptContent` in `features/docs/editor/adopt.ts`), and after a save they cancel in-flight fetches of their own row before writing the cache. Keep both rules in any new editor. Two people typing in the same text at once is still last-write-wins, so each editor shows `OthersTypingAlert` (names from `useOthersTyping`, Realtime Presence in `lib/presence.ts`; only people who can edit join).
+  - `useCurrentTeam`/`useCurrentWorkspace` throw a 404-shaped error when the group or workspace disappears while open.
 - **Repos** (`features/repos/`; route `…/w/:id/github`, `WorkspaceGitHubPage`; Group settings → `TeamReposSection`):
   - `repos` belong to the group (`owner`/`name`, unique per group ignoring case); `workspace_repos` links them to projects (many-to-many, same group via composite FKs). Owners/admins add and remove repos; workspace managers link and unlink. Parse user input with `parseRepo`.
   - `issues.repo_id` must be a repo linked to the issue's workspace (`check_issue`). Unlinking clears it on that workspace's issues (`clear_unlinked_issue_repos` trigger), so invalidate `['issues']` too after unlink/delete. Changes are logged as activity kind `repo`.
