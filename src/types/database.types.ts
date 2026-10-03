@@ -564,6 +564,7 @@ export type Database = {
           head_ref: string
           id: string
           issue_id: string
+          landed_ref: string | null
           merged_at: string | null
           number: number
           repo_id: string
@@ -581,6 +582,7 @@ export type Database = {
           head_ref: string
           id?: string
           issue_id: string
+          landed_ref?: string | null
           merged_at?: string | null
           number: number
           repo_id: string
@@ -598,6 +600,7 @@ export type Database = {
           head_ref?: string
           id?: string
           issue_id?: string
+          landed_ref?: string | null
           merged_at?: string | null
           number?: number
           repo_id?: string
@@ -1334,6 +1337,16 @@ export type Database = {
           p_url: string
         }
         Returns: string
+      }
+      github_promote_merged: {
+        Args: {
+          p_from_ref: string
+          p_into_done: boolean
+          p_repo_id: string
+          p_to_ref: string
+          p_workspace_id: string
+        }
+        Returns: number[]
       }
       join_team: { Args: { invite_code: string }; Returns: string }
       live_session_invitees: {

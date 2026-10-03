@@ -41,7 +41,8 @@ DevDock is a private software-engineering teaching workspace for **one instructo
 - **PR webhooks:** the `github-webhook` Edge Function moves issues:
   - PR opened or ready for review → **In Review** (drafts don't move issues);
   - closed without merging → back to In Progress;
-  - merged into one of the project's **done branches** (per linked repo, set on the GitHub tab; none = the default branch) → **Done**.
+  - merged into one of the project's **done branches** (per linked repo, set on the GitHub tab; none = the default branch) → **Done**;
+  - merged into another branch (feature → `dev`) → the PR is **tracked** (`issue_pull_requests.landed_ref`). When that branch is merged onwards by a later PR (`dev` → `prod`), the tracked PRs move with it, and their issues become **Done** once they reach a done branch.
 - Activity shows "GitHub" as the actor.
 - **Status lock:** on issues whose repo is connected, only GitHub (`devdock.via = 'github'`) or workspace managers can set In Review or Done (`check_issue`, SQLSTATE `DD001`, message in `writeErrors`). Everyone can still reopen an issue or cancel it.
 - **Merged branches:** GitHub deletes them (the repo's "Automatically delete head branches" setting); the Development block shows them as merged and links to the PR.
@@ -156,6 +157,7 @@ supabase/
     - Repos are matched by `github_repo_id` **and** the event's installation. Issues are found by key and number among the projects linked to that repo, **or** by the PR's head branch matching a stored `issue_branches.name` (so renaming a key doesn't break old branches).
     - All DB work is one call to `github_apply_pull_request()` (service role only). It upserts `issue_pull_requests`, logs `pr_linked`/`pr_merged`/`pr_closed`, and moves the status. It sets `devdock.via = 'github'`, so `log_issue_activity` tags rows with `via`.
     - Only a **change** in PR state moves an issue, so it never fights a manual status change.
+    - **Tracking:** when a merged PR's head branch is in the same repo and isn't a done branch, the webhook calls `github_promote_merged()` per project. It moves `landed_ref` from the head branch to the base branch on that project's merged PRs, and marks their issues Done if the base is a done branch. It skips issues that are done or canceled, have another PR open, or whose status a person changed after the merge. Direct pushes (no PR) aren't tracked.
     - Also handles `installation.deleted` and `installation_repositories` (marks repos connected / not connected).
     - Branch names come from `issueBranchName()` (`meta.ts`); the `github` function has a copy (`branchName`). Keep the two in sync.
   - **Branches** (`issue_branches`, one per issue × repo; written only by the `github` function's `create_branch`):

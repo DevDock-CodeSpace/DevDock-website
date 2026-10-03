@@ -11,6 +11,10 @@
 //                  move the issue (public.github_apply_pull_request). "Done"
 //                  = merged into one of that project's done branches
 //                  (workspace_repos.done_branches; none = the default branch).
+//                  A merged PR also carries along the PRs merged into its head
+//                  branch earlier (feature → dev, then dev → main): those are
+//                  tracked on to the new branch, and their issues become Done
+//                  when it is a done branch (public.github_promote_merged).
 //   installation   deleted → the group(s) lose that connection.
 //   installation_repositories
 //                  repos added/removed from the App on GitHub → mark them
@@ -33,7 +37,7 @@ type PullRequest = {
   state: 'open' | 'closed'
   draft?: boolean
   merged?: boolean
-  head: { ref: string }
+  head: { ref: string; repo: { id: number } | null }
   base: { ref: string; repo: Repo }
   user: { login: string } | null
 }
@@ -113,6 +117,22 @@ async function onPullRequest(admin: SupabaseClient, payload: Record<string, unkn
       const key = link.workspaces?.issue_key
       const doneBranches = link.done_branches.length > 0 ? link.done_branches : [defaultBranch]
       const mergedIntoDone = state === 'merged' && doneBranches.includes(pr.base.ref)
+
+      // This PR's head branch (same repo, not a fork) just got merged: the work
+      // merged into it earlier moves on with it. A done branch merged back
+      // (main → dev) carries nothing: that work is already finished.
+      if (action === 'closed' && state === 'merged' && pr.head.repo?.id === pr.base.repo.id && !doneBranches.includes(pr.head.ref)) {
+        const { data: released, error: promoteError } = await admin.rpc('github_promote_merged', {
+          p_repo_id: repo.id,
+          p_workspace_id: link.workspace_id,
+          p_from_ref: pr.head.ref,
+          p_to_ref: pr.base.ref,
+          p_into_done: mergedIntoDone,
+        })
+        if (promoteError) throw promoteError
+        for (const number of (released as number[] | null) ?? []) moved.push(`${key ?? '?'}-${number} → done`)
+      }
+
       const numbers = mentions.filter((m) => m.key === key).map((m) => m.number)
       const storedIds = (stored ?? []).filter((b) => b.workspace_id === link.workspace_id).map((b) => b.issue_id)
       if (!key || (numbers.length === 0 && storedIds.length === 0)) continue

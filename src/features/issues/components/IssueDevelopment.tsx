@@ -108,7 +108,7 @@ export function IssueDevelopment({ issue }: { issue: IssueDetail }) {
                   href={pr.url}
                   target="_blank"
                   rel="noreferrer"
-                  title={`${label}${pr.repo ? ` · ${pr.repo.owner}/${pr.repo.name}` : ''}${pr.author_login ? ` · by ${pr.author_login}` : ''}`}
+                  title={`${label}${pr.state === 'merged' && pr.landed_ref ? ` · now in ${pr.landed_ref}` : ''}${pr.repo ? ` · ${pr.repo.owner}/${pr.repo.name}` : ''}${pr.author_login ? ` · by ${pr.author_login}` : ''}`}
                   className="flex min-w-0 items-start gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
                 >
                   <Icon className={cn('mt-0.5 size-4 shrink-0', className)} aria-label={label} />
@@ -116,6 +116,7 @@ export function IssueDevelopment({ issue }: { issue: IssueDetail }) {
                     <span className="block truncate">{pr.title}</span>
                     <span className="block truncate font-mono text-[11px] text-muted-foreground">
                       {pr.repo?.name ?? 'repo'}#{pr.number}
+                      {pr.state === 'merged' && pr.landed_ref && ` · in ${pr.landed_ref}`}
                     </span>
                   </span>
                 </a>
