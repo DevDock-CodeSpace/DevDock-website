@@ -235,6 +235,8 @@ export type IssuePullRequest = {
   url: string
   state: 'draft' | 'open' | 'merged' | 'closed'
   head_ref: string
+  /** For merged PRs: the branch the work has reached so far (it moves on when that branch is merged). */
+  landed_ref: string | null
   author_login: string | null
   updated_at: string
   repo: { owner: string; name: string } | null
@@ -247,7 +249,7 @@ export const pullRequestsQuery = (issueId: string) =>
     queryFn: async (): Promise<IssuePullRequest[]> => {
       const { data, error } = await supabase
         .from('issue_pull_requests')
-        .select('id, number, title, url, state, head_ref, author_login, updated_at, repo:repos(owner, name)')
+        .select('id, number, title, url, state, head_ref, landed_ref, author_login, updated_at, repo:repos(owner, name)')
         .eq('issue_id', issueId)
         .order('updated_at', { ascending: false })
       if (error) throw toDataError('load pull requests', error)
