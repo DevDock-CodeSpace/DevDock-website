@@ -72,6 +72,9 @@ export function useUpdateIssue() {
   const createBranch = useCreateIssueBranch()
 
   return useMutation({
+    // One save at a time per workspace, in the order they were made, so an older
+    // edit can't land on top of a newer one (optimistic updates still apply at once).
+    scope: { id: `issues:${workspace.id}` },
     mutationFn: async ({ issue, patch, labelIds }: UpdateVars) => {
       if (patch && Object.keys(patch).length > 0) await updateIssue(issue.id, patch)
       if (labelIds) await setIssueLabels(issue.id, labelIds)
@@ -100,7 +103,12 @@ export function useUpdateIssue() {
     onError: (error, _vars, context) => {
       if (context) {
         queryClient.setQueryData(context.listKey, context.previousList)
-        queryClient.setQueryData(context.detailKey, context.previousDetail)
+        // The description saves itself (IssueDescription); don't undo it here.
+        queryClient.setQueryData<IssueDetail | null>(context.detailKey, (current) =>
+          context.previousDetail && current
+            ? { ...context.previousDetail, description: current.description }
+            : context.previousDetail,
+        )
       }
       toast.error(errorMessage(error))
     },
@@ -113,6 +121,8 @@ export function useUpdateIssue() {
     onSettled: (_data, _error, { issue }) => {
       void queryClient.invalidateQueries({ queryKey: issueKeys.workspace(workspace.id) })
       void queryClient.invalidateQueries({ queryKey: issueKeys.detail(workspace.id, issue.number) })
+      // The group-wide Issues page.
+      void queryClient.invalidateQueries({ queryKey: ['issues', 'team'] })
       void queryClient.invalidateQueries({ queryKey: issueKeys.activity(issue.id) })
     },
   })

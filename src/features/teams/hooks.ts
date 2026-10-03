@@ -6,6 +6,14 @@ import { myTeamsQuery } from './api'
 import { teamPath } from './nav'
 import { teamPermissions, workspacePermissions } from './permissions'
 
+/**
+ * The loaders checked access when the page opened, but live updates can take it
+ * away while it's open (the group or workspace was deleted, or the user removed).
+ * Thrown while rendering, this has the shape of a route error response, so
+ * RouteErrorPage shows the same 404 the loader would have.
+ */
+const gone = (message: string) => ({ status: 404, statusText: 'Not Found', internal: false, data: message })
+
 /** All of the user's team memberships (for the switcher). */
 export function useMyTeams() {
   const { user } = useAuth()
@@ -16,7 +24,7 @@ export function useMyTeams() {
 export function useCurrentTeam() {
   const { teamSlug } = useParams()
   const membership = useMyTeams().find((m) => m.team.slug === teamSlug)
-  if (!membership) throw new Error('useCurrentTeam must be used under /t/:teamSlug')
+  if (!membership) throw gone('Group not found, or you’re not a member.')
   return { team: membership.team, role: membership.role, can: teamPermissions(membership.role) }
 }
 
@@ -27,7 +35,7 @@ export function useCurrentWorkspace() {
   const { team, role: teamRole } = useCurrentTeam()
   const workspace = useSuspenseQuery(workspaceQuery(workspaceId ?? '')).data
   const myRoles = useSuspenseQuery(myWorkspaceRolesQuery(team.id, user.id)).data
-  if (!workspace) throw new Error('useCurrentWorkspace must be used under a loaded workspace route')
+  if (!workspace) throw gone('Workspace not found, or you don’t have access to it.')
   const workspaceRole = myRoles[workspace.id]
   return { workspace, workspaceRole, can: workspacePermissions(teamRole, workspaceRole) }
 }

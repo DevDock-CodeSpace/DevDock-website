@@ -34,7 +34,11 @@ export function IssueSettingsSection() {
   const saveKey = useMutation({
     mutationFn: () => updateIssueKey(workspace.id, key),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['workspaces', workspace.id] })
+      // The key is part of every issue's ID: the sidebar/home lists and the group-wide Issues page show it too.
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['workspaces'] }),
+        queryClient.invalidateQueries({ queryKey: ['issues', 'team'] }),
+      ])
       toast.success(`Issues are now ${key}-1, ${key}-2, …`)
     },
     onError: (error) => toast.error(errorMessage(error)),
@@ -42,7 +46,15 @@ export function IssueSettingsSection() {
   const keyValid = KEY_PATTERN.test(key)
 
   const [newName, setNewName] = useState('')
-  const refreshLabels = () => queryClient.invalidateQueries({ queryKey: issueKeys.labels(workspace.id) })
+  // Issues carry their label ids, so a deleted label has to leave the issue lists too.
+  const refreshLabels = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: issueKeys.labels(workspace.id) }),
+      queryClient.invalidateQueries({ queryKey: issueKeys.workspace(workspace.id) }),
+      queryClient.invalidateQueries({ queryKey: ['issues', 'detail', workspace.id] }),
+      queryClient.invalidateQueries({ queryKey: ['issues', 'team'] }),
+    ])
+  }
   const addLabel = useMutation({
     mutationFn: () => createLabel(workspace.id, newName, LABEL_COLORS[(labels.length + 1) % LABEL_COLORS.length]),
     onSuccess: async () => {

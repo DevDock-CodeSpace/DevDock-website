@@ -124,6 +124,17 @@ function Editor({ initial, readOnly, onChange, fullscreen, onFullscreen }: Diagr
     lastSaved.current = text
   }, [nodes, edges, onChange])
 
+  // A newer version from the server (only passed when nothing here is unsaved):
+  // show it in place, keeping the viewport, without reporting it as an edit.
+  const shown = useRef(initial)
+  useEffect(() => {
+    if (shown.current === initial) return
+    shown.current = initial
+    lastSaved.current = JSON.stringify(serialize(initial))
+    setNodes(initial.nodes)
+    setEdges(initial.edges)
+  }, [initial])
+
   // ------------------------------------------------------------ geometry
   const rectOf = useCallback(
     (id: string): Rect | null => {

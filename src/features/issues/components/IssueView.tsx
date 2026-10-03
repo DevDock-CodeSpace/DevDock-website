@@ -1,12 +1,13 @@
 import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { ArrowLeft, ChevronRight, Trash2 } from 'lucide-react'
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { Button } from '@/components/ui/button'
 import { useCurrentTeam } from '@/features/teams/hooks'
 import { issuePath, issuesPath } from '@/features/teams/nav'
+import { AUTOSAVE_MS, useSaveOnExit } from '@/hooks/use-save-on-exit'
 import { errorMessage } from '@/lib/errors'
 import { deleteIssue, issueKeys, workspaceIssuesQuery, type IssueDetail } from '../api'
 import { useIssueContext, useUpdateIssue } from '../hooks'
@@ -50,7 +51,15 @@ export default function IssueView({ issue }: { issue: IssueDetail }) {
   })
 
   // ------------------------------------------------------------ title
+  // Saved while typing, on blur, and when leaving the issue (like Linear).
   const [title, setTitle] = useState(issue.title)
+  const [editingTitle, setEditingTitle] = useState(false)
+  // A title that changed elsewhere (or a save that was rolled back) shows up here, unless it's being edited.
+  const [shownTitle, setShownTitle] = useState(issue.title)
+  if (shownTitle !== issue.title) {
+    setShownTitle(issue.title)
+    if (!editingTitle) setTitle(issue.title)
+  }
   const titleField = useRef<HTMLTextAreaElement>(null)
   useLayoutEffect(() => {
     const el = titleField.current
@@ -58,11 +67,32 @@ export default function IssueView({ issue }: { issue: IssueDetail }) {
     el.style.height = 'auto'
     el.style.height = `${el.scrollHeight}px`
   }, [title])
+  const draft = useRef<string | undefined>(undefined) // typed, not saved yet
+  const titleTimer = useRef<number | undefined>(undefined)
+  const titleAtFocus = useRef(issue.title)
   const commitTitle = () => {
-    const next = title.trim()
-    if (!next) setTitle(issue.title)
-    else if (next !== issue.title) update.mutate({ issue, patch: { title: next } })
+    window.clearTimeout(titleTimer.current)
+    const next = draft.current?.trim()
+    draft.current = undefined
+    // An empty title is never saved; the field goes back to the saved one on blur.
+    if (!next || next === issue.title) return undefined
+    update.mutate({ issue, patch: { title: next } })
+    return next
   }
+  const latestCommit = useRef(commitTitle)
+  useEffect(() => {
+    latestCommit.current = commitTitle
+  })
+  useEffect(
+    () => () => {
+      latestCommit.current()
+    },
+    [],
+  )
+  useSaveOnExit(
+    () => !!draft.current?.trim() && draft.current.trim() !== issue.title,
+    () => latestCommit.current(),
+  )
 
   // ------------------------------------------------------------ delete
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -125,15 +155,32 @@ export default function IssueView({ issue }: { issue: IssueDetail }) {
           maxLength={300}
           aria-label="Title"
           placeholder="Issue title"
-          onChange={(e) => setTitle(e.target.value.replace(/\n/g, ' '))}
-          onBlur={commitTitle}
+          onChange={(e) => {
+            const next = e.target.value.replace(/\n/g, ' ')
+            setTitle(next)
+            draft.current = next
+            window.clearTimeout(titleTimer.current)
+            titleTimer.current = window.setTimeout(() => latestCommit.current(), AUTOSAVE_MS)
+          }}
+          onFocus={() => {
+            setEditingTitle(true)
+            titleAtFocus.current = issue.title
+          }}
+          onBlur={() => {
+            // Show what is saved (or being saved); a failed save rolls it back.
+            const saving = commitTitle()
+            setEditingTitle(false)
+            setTitle(saving ?? issue.title)
+          }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               e.preventDefault()
               e.currentTarget.blur()
             }
             if (e.key === 'Escape') {
-              setTitle(issue.title)
+              // Undo this edit, including what was already saved while typing.
+              draft.current = titleAtFocus.current
+              setTitle(titleAtFocus.current)
               e.currentTarget.blur()
             }
           }}

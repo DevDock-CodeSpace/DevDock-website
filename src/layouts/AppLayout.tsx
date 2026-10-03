@@ -24,6 +24,7 @@ import { issueIdentifier } from '@/features/issues/meta'
 import { useCurrentTeam, useCurrentWorkspace } from '@/features/teams/hooks'
 import { getTeamNav, getWorkspaceTabs, teamPath, workspacePath, type NavItem } from '@/features/teams/nav'
 import { workspaceQuery } from '@/features/workspaces/api'
+import { useRealtimeSync } from '@/hooks/use-realtime-sync'
 
 // The shadcn sidebar writes its open/collapsed state to this cookie but doesn't read it back.
 const sidebarStartsOpen = () => !document.cookie.includes('sidebar_state=false')
@@ -31,6 +32,7 @@ const sidebarStartsOpen = () => !document.cookie.includes('sidebar_state=false')
 /** Team shell: sidebar + header + page. Rendered for /t/:teamSlug/*. */
 export function AppLayout() {
   const { workspaceId } = useParams()
+  useRealtimeSync()
   return (
     <LiveCallProvider>
       <SidebarProvider defaultOpen={sidebarStartsOpen()}>

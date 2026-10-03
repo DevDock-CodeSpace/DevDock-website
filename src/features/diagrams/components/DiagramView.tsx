@@ -4,11 +4,14 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { Link, useBlocker, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
+import { OthersTypingAlert } from '@/components/OthersTypingAlert'
 import { Button } from '@/components/ui/button'
 import { DocScope } from '@/features/docs/components/DocScope'
 import { useCurrentTeam } from '@/features/teams/hooks'
+import { useOthersTyping } from '@/hooks/use-others-typing'
 import { diagramsPath } from '@/features/teams/nav'
 import { errorMessage } from '@/lib/errors'
+import { sameJson } from '@/lib/json'
 import { timeAgo } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { Json } from '@/types/database.types'
@@ -33,7 +36,7 @@ export default function DiagramView({ diagram, canWrite }: { diagram: Diagram; c
   const navigate = useNavigate()
   const [now] = useState(Date.now)
   const backTo = diagramsPath(team.slug, workspaceId)
-  const [initial] = useState(() => parse(diagram.data))
+  const [initial, setInitial] = useState(() => parse(diagram.data))
 
   // ------------------------------------------------------------ autosave
   const [title, setTitle] = useState(diagram.title)
@@ -45,6 +48,8 @@ export default function DiagramView({ diagram, canWrite }: { diagram: Diagram; c
   const timer = useRef<number | undefined>(undefined)
   const inflight = useRef<Promise<void>>(Promise.resolve())
   const leaving = useRef(false)
+  // What the server has, as far as this view knows (the last load, save, or adopted change).
+  const synced = useRef({ title: diagram.title, data: diagram.data })
 
   const save = useCallback(async () => {
     const target = version.current
@@ -63,6 +68,9 @@ export default function DiagramView({ diagram, canWrite }: { diagram: Diagram; c
       throw error
     }
     savedVersion.current = target
+    synced.current = { title: nextTitle, data }
+    // A refetch that started before this save still carries the old diagram: drop it.
+    void queryClient.cancelQueries({ queryKey: diagramQuery(diagram.id).queryKey, exact: true })
     queryClient.setQueryData(diagramQuery(diagram.id).queryKey, (old) =>
       old ? { ...old, title: nextTitle, data, updated_at: new Date().toISOString() } : old,
     )
@@ -79,14 +87,16 @@ export default function DiagramView({ diagram, canWrite }: { diagram: Diagram; c
     return run
   }, [save])
 
+  const { others, markTyping } = useOthersTyping(`diagram:${diagram.id}`, canWrite)
   const markChanged = useCallback(() => {
     version.current += 1
+    markTyping()
     setStatus('pending')
     window.clearTimeout(timer.current)
     timer.current = window.setTimeout(() => {
       flush().catch((error: unknown) => toast.error(errorMessage(error), { id: 'diagram-save' }))
     }, AUTOSAVE_MS)
-  }, [flush])
+  }, [flush, markTyping])
 
   const onChange = useCallback(
     (data: Json) => {
@@ -98,6 +108,21 @@ export default function DiagramView({ diagram, canWrite }: { diagram: Diagram; c
   )
 
   useEffect(() => () => window.clearTimeout(timer.current), [])
+
+  // A diagram that changed on the server (someone else, another tab) replaces
+  // what's shown here, unless there are unsaved edits.
+  useEffect(() => {
+    if (version.current !== savedVersion.current) return
+    const sameData = sameJson(diagram.data, synced.current.data)
+    if (sameData && diagram.title === synced.current.title) return
+    // Already on the canvas (our own save coming back): leave the editor alone.
+    const shown = sameData || sameJson(diagram.data, dataRef.current)
+    synced.current = { title: diagram.title, data: diagram.data }
+    titleRef.current = diagram.title
+    dataRef.current = diagram.data
+    setTitle(diagram.title)
+    if (!shown) setInitial(parse(diagram.data))
+  }, [diagram.title, diagram.data])
 
   useEffect(() => {
     if (!canWrite) return
@@ -240,6 +265,7 @@ export default function DiagramView({ diagram, canWrite }: { diagram: Diagram; c
         <h1 className="mb-4 truncate text-2xl font-semibold tracking-tight">{diagram.title}</h1>
       )}
 
+      <OthersTypingAlert names={others} />
       <div
         ref={frame}
         style={fullscreen ? undefined : { height }}
