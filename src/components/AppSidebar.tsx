@@ -63,6 +63,7 @@ export function AppSidebar() {
         <SidebarGroup className="pb-0">
           <SidebarMenu>
             <NavLinkItem item={nav.home} onNavigate={close} />
+            <NavLinkItem item={nav.messages} onNavigate={close} />
             {nav.tools.map((item) => (
               <NavLinkItem key={item.id} item={item} onNavigate={close} />
             ))}
