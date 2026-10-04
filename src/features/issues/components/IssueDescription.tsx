@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 import type { JSONContent } from '@tiptap/core'
-import { EditorContent, useEditor } from '@tiptap/react'
+import { EditorContent, useEditor, type Editor } from '@tiptap/react'
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { toast } from 'sonner'
 import { OthersTypingAlert } from '@/components/OthersTypingAlert'
@@ -15,7 +15,9 @@ import { errorMessage } from '@/lib/errors'
 import { sameJson } from '@/lib/json'
 import { cn } from '@/lib/utils'
 import type { Json } from '@/types/database.types'
+import { IMAGE_TYPES } from '@/features/docs/api'
 import { issueKeys, updateIssue, type IssueDetail } from '../api'
+import { uploadIssueImage } from '../images'
 
 function initialContent(body: Json | null): JSONContent | null {
   if (body && typeof body === 'object' && !Array.isArray(body) && body.type === 'doc') return body as JSONContent
@@ -24,7 +26,8 @@ function initialContent(body: Json | null): JSONContent | null {
 
 /**
  * The issue description: the Docs editor (headings, lists, checklists, code,
- * formatting toolbar, "+" menu) without images. Saves itself like Linear:
+ * formatting toolbar, "+" menu), with pasted, dropped or picked images
+ * (screenshots). Saves itself like Linear:
  * while typing, when leaving the issue, and when the tab is hidden or closed.
  * The cached issue gets the text as soon as a save starts, so reopening the
  * issue shows it even before the server has answered.
@@ -87,9 +90,32 @@ export function IssueDescription({ issue }: { issue: IssueDetail }) {
   }, [flush])
   useSaveOnExit(() => pending.current !== undefined || saving.current, flush)
 
+  // ------------------------------------------------------------ images
+  const fileInput = useRef<HTMLInputElement>(null)
+  const insertImages = useCallback(
+    async (editor: Editor, files: File[], pos?: number) => {
+      for (const file of files) {
+        const toastId = toast.loading('Uploading image…')
+        try {
+          const path = await uploadIssueImage(issue.workspace_id, file)
+          editor.chain().focus().insertDocImage({ path, alt: file.name }, pos).run()
+          toast.dismiss(toastId)
+        } catch (error) {
+          toast.error(errorMessage(error), { id: toastId })
+        }
+      }
+    },
+    [issue.workspace_id],
+  )
+
   const extensions = useMemo(
-    () => docExtensions({ editable: true, placeholder: 'Add a description… (press + for headings, lists, code)' }),
-    [],
+    () =>
+      docExtensions({
+        editable: true,
+        placeholder: 'Add a description… (paste a screenshot, or press + for headings, lists, code)',
+        onImageFiles: (editor, files, pos) => void insertImages(editor, files, pos),
+      }),
+    [insertImages],
   )
   const editor = useEditor({
     extensions,
@@ -125,7 +151,19 @@ export function IssueDescription({ issue }: { issue: IssueDetail }) {
       {editor && (
         <>
           <FormatBubble editor={editor} />
-          <InsertMenu editor={editor} />
+          <InsertMenu editor={editor} onPickImage={() => fileInput.current?.click()} />
+          <input
+            ref={fileInput}
+            type="file"
+            accept={IMAGE_TYPES.join(',')}
+            multiple
+            hidden
+            onChange={(e) => {
+              const files = Array.from(e.target.files ?? [])
+              e.target.value = ''
+              if (files.length) void insertImages(editor, files)
+            }}
+          />
         </>
       )}
       <OthersTypingAlert names={others} />

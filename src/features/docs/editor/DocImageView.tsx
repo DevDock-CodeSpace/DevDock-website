@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { NodeViewWrapper, type ReactNodeViewProps } from '@tiptap/react'
-import { AlignCenter, AlignLeft, ImageOff } from 'lucide-react'
+import { AlignCenter, AlignLeft, ImageOff, X } from 'lucide-react'
 import { docImageUrlQuery } from '@/features/docs/api'
 import { cn } from '@/lib/utils'
 import type { ImageAlign, ImageWidth } from './DocImage'
@@ -11,8 +11,11 @@ const widths: Record<ImageWidth, { label: string; className: string }> = {
   full: { label: 'L', className: 'w-full' },
 }
 
-/** Renders a doc image from a signed URL; when selected (and editable) shows size/align controls. */
-export function DocImageView({ node, updateAttributes, selected, editor }: ReactNodeViewProps) {
+/**
+ * Renders a doc image from a signed URL. While editable, a remove button sits
+ * at its top right (on hover, or with the size/align controls once selected).
+ */
+export function DocImageView({ node, updateAttributes, deleteNode, selected, editor }: ReactNodeViewProps) {
   const path = typeof node.attrs.path === 'string' ? node.attrs.path : ''
   const width = (node.attrs.width as ImageWidth) in widths ? (node.attrs.width as ImageWidth) : 'full'
   const align: ImageAlign = node.attrs.align === 'left' ? 'left' : 'center'
@@ -21,7 +24,7 @@ export function DocImageView({ node, updateAttributes, selected, editor }: React
 
   return (
     <NodeViewWrapper className={cn('my-5 flex', align === 'center' ? 'justify-center' : 'justify-start')}>
-      <figure className={cn('relative', widths[width].className)} data-drag-handle>
+      <figure className={cn('group/image relative', widths[width].className)} data-drag-handle>
         {url.data ? (
           <img
             src={url.data}
@@ -35,6 +38,19 @@ export function DocImageView({ node, updateAttributes, selected, editor }: React
           </div>
         ) : (
           <div className="aspect-video w-full animate-pulse rounded-[3px] bg-muted" />
+        )}
+
+        {editor.isEditable && !selected && (
+          <button
+            type="button"
+            contentEditable={false}
+            aria-label="Remove image"
+            title="Remove image"
+            onClick={deleteNode}
+            className="absolute top-2 right-2 flex size-7 items-center justify-center rounded-md bg-foreground text-background opacity-0 shadow-lg transition-opacity group-hover/image:opacity-100 hover:bg-foreground/85 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none"
+          >
+            <X className="size-4" />
+          </button>
         )}
 
         {editing && (
@@ -77,6 +93,16 @@ export function DocImageView({ node, updateAttributes, selected, editor }: React
                 </button>
               </>
             )}
+            <span className="mx-1 h-4 w-px bg-background/25" aria-hidden />
+            <button
+              type="button"
+              aria-label="Remove image"
+              title="Remove image"
+              onClick={deleteNode}
+              className="flex size-7 items-center justify-center rounded hover:bg-background/15"
+            >
+              <X className="size-4" />
+            </button>
           </div>
         )}
       </figure>
