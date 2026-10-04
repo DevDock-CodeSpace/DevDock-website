@@ -1,17 +1,19 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronRight, CircleUserRound, GitBranch, IterationCw, LoaderCircle, Tag } from 'lucide-react'
-import { useState, type ComponentProps, type FormEvent, type ReactNode } from 'react'
+import { ChevronRight, CircleUserRound, GitBranch, ImagePlus, IterationCw, LoaderCircle, Tag, X } from 'lucide-react'
+import { useEffect, useRef, useState, type ComponentProps, type FormEvent, type ReactNode } from 'react'
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { PersonAvatar } from '@/components/PersonRow'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
+import { IMAGE_TYPES, imageProblem } from '@/features/docs/api'
 import { useCurrentTeam } from '@/features/teams/hooks'
 import { issuePath } from '@/features/teams/nav'
 import type { Json } from '@/types/database.types'
 import { createIssue, issueKeys, type Issue, type IssuePriority, type IssueStatus } from '../api'
 import { cycleTitle } from '../cycles'
 import { useIssueContext } from '../hooks'
+import { imageNode, removeIssueImages, uploadIssueImage } from '../images'
 import { issueIdentifier, priorityLabel, statusLabel } from '../meta'
 import { AssigneePicker } from './AssigneePicker'
 import { CyclePicker } from './CyclePicker'
@@ -23,16 +25,24 @@ import { PriorityPicker } from './PriorityPicker'
 import { StatusIcon } from './StatusIcon'
 import { StatusPicker } from './StatusPicker'
 
-/** Plain text → a TipTap doc (one paragraph per line), the format descriptions are stored in. */
-function textToDoc(text: string): Json | null {
-  if (!text.trim()) return null
-  return {
-    type: 'doc',
-    content: text.split('\n').map((line) =>
-      line ? { type: 'paragraph', content: [{ type: 'text', text: line }] } : { type: 'paragraph' },
-    ),
-  }
+/**
+ * Plain text (one paragraph per line) followed by the attached images → a
+ * TipTap doc, the format descriptions are stored in.
+ */
+function toDoc(text: string, images: Json[]): Json | null {
+  const paragraphs: Json[] = text.trim()
+    ? text.split('\n').map((line) =>
+        line ? { type: 'paragraph', content: [{ type: 'text', text: line }] } : { type: 'paragraph' },
+      )
+    : []
+  if (paragraphs.length === 0 && images.length === 0) return null
+  return { type: 'doc', content: [...paragraphs, ...images] }
 }
+
+/** An image chosen in the dialog; uploaded when the issue is created. */
+type Attachment = { id: string; file: File; preview: string }
+
+const MAX_ATTACHMENTS = 10
 
 type CreateIssueDialogProps = {
   open: boolean
@@ -67,7 +77,46 @@ export function CreateIssueDialog({
   const [cycleId, setCycleId] = useState<string | null>(initialCycle)
   const [repoId, setRepoId] = useState<string | null>(parent?.repo_id ?? null)
 
+  // Screenshots: pasted, dropped or picked. They're only uploaded on Create,
+  // so cancelling leaves nothing behind.
+  const [attachments, setAttachments] = useState<Attachment[]>([])
+  const fileInput = useRef<HTMLInputElement>(null)
+  const addImages = (files: File[]) => {
+    const images = files.filter((file) => file.type.startsWith('image/'))
+    if (images.length === 0) return false
+    const problem = images.map(imageProblem).find((p) => p !== null)
+    if (problem) toast.error(problem)
+    const room = MAX_ATTACHMENTS - attachments.length
+    const accepted = images.filter((file) => imageProblem(file) === null).slice(0, Math.max(0, room))
+    if (accepted.length < images.filter((file) => imageProblem(file) === null).length) {
+      toast.error(`An issue can start with at most ${MAX_ATTACHMENTS} images. Add more on the issue page.`)
+    }
+    setAttachments((current) => [
+      ...current,
+      ...accepted.map((file) => ({ id: crypto.randomUUID(), file, preview: URL.createObjectURL(file) })),
+    ])
+    return true
+  }
+  const removeAttachment = (id: string) =>
+    setAttachments((current) => {
+      current.filter((a) => a.id === id).forEach((a) => URL.revokeObjectURL(a.preview))
+      return current.filter((a) => a.id !== id)
+    })
+  // Release the previews when the dialog goes away.
+  const latestAttachments = useRef(attachments)
+  useEffect(() => {
+    latestAttachments.current = attachments
+  })
+  useEffect(
+    () => () => {
+      latestAttachments.current.forEach((a) => URL.revokeObjectURL(a.preview))
+    },
+    [],
+  )
+
   const reset = () => {
+    attachments.forEach((a) => URL.revokeObjectURL(a.preview))
+    setAttachments([])
     setTitle('')
     setDescription('')
     setStatus(initialStatus)
@@ -79,19 +128,31 @@ export function CreateIssueDialog({
   }
 
   const create = useMutation({
-    mutationFn: () =>
-      createIssue({
-        workspaceId: workspace.id,
-        title,
-        description: textToDoc(description),
-        status,
-        priority,
-        assigneeId,
-        parentId: parent?.id ?? null,
-        cycleId,
-        repoId,
-        labelIds,
-      }),
+    mutationFn: async () => {
+      const paths: string[] = []
+      try {
+        for (const { file } of attachments) paths.push(await uploadIssueImage(workspace.id, file))
+        return await createIssue({
+          workspaceId: workspace.id,
+          title,
+          description: toDoc(
+            description,
+            paths.map((path, i) => imageNode(path, attachments[i].file.name)),
+          ),
+          status,
+          priority,
+          assigneeId,
+          parentId: parent?.id ?? null,
+          cycleId,
+          repoId,
+          labelIds,
+        })
+      } catch (error) {
+        // Nothing points at the uploaded images: take them back.
+        await removeIssueImages(paths)
+        throw error
+      }
+    },
     onSuccess: async ({ number }) => {
       await queryClient.invalidateQueries({ queryKey: issueKeys.all })
       const id = issueIdentifier(workspace.issue_key, number)
@@ -128,6 +189,18 @@ export function CreateIssueDialog({
           onKeyDown={(e) => {
             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit()
           }}
+          onPaste={(e) => {
+            // A pasted screenshot becomes an attachment. Text pastes as usual, including from
+            // apps that also put a picture of the text on the clipboard (spreadsheets, Word).
+            if (e.clipboardData.getData('text/plain')) return
+            if (addImages(Array.from(e.clipboardData.files))) e.preventDefault()
+          }}
+          onDragOver={(e) => {
+            if (e.dataTransfer.types.includes('Files')) e.preventDefault()
+          }}
+          onDrop={(e) => {
+            if (addImages(Array.from(e.dataTransfer.files))) e.preventDefault()
+          }}
         >
           <div className="flex items-center gap-1.5 px-5 pt-4 text-xs text-muted-foreground">
             <span className="rounded border px-1.5 py-0.5 font-mono">{workspace.issue_key}</span>
@@ -150,10 +223,43 @@ export function CreateIssueDialog({
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Add description…"
+              placeholder="Add description… (paste or drop a screenshot)"
               aria-label="Description"
               rows={4}
               className="mt-2 w-full resize-none bg-transparent text-sm outline-none placeholder:text-muted-foreground/60"
+            />
+            {attachments.length > 0 && (
+              <ul aria-label="Attached images" className="mb-3 flex flex-wrap gap-2">
+                {attachments.map((a) => (
+                  <li key={a.id} className="group relative">
+                    <img
+                      src={a.preview}
+                      alt={a.file.name}
+                      title={a.file.name}
+                      className="h-16 w-24 rounded-md border object-cover"
+                    />
+                    <button
+                      type="button"
+                      aria-label={`Remove ${a.file.name}`}
+                      onClick={() => removeAttachment(a.id)}
+                      className="absolute -top-1.5 -right-1.5 flex size-5 items-center justify-center rounded-full border bg-background text-muted-foreground shadow-sm hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <input
+              ref={fileInput}
+              type="file"
+              accept={IMAGE_TYPES.join(',')}
+              multiple
+              hidden
+              onChange={(e) => {
+                addImages(Array.from(e.target.files ?? []))
+                e.target.value = ''
+              }}
             />
           </div>
           <div className="flex flex-wrap items-center gap-1.5 px-5 pb-4">
@@ -212,6 +318,10 @@ export function CreateIssueDialog({
                 </Chip>
               </RepoPicker>
             )}
+            <Chip onClick={() => fileInput.current?.click()} title="Attach a screenshot (or paste / drop it)">
+              <ImagePlus className="size-3.5 text-muted-foreground" />
+              Image
+            </Chip>
           </div>
           <div className="flex items-center justify-between gap-3 border-t px-5 py-3">
             <p role="alert" className="min-w-0 truncate text-sm text-destructive">
