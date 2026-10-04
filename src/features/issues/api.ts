@@ -4,6 +4,7 @@ import type { PersonProfile } from '@/features/teams/api'
 import { requireAffected, toDataError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
 import type { Database, Json, TablesInsert } from '@/types/database.types'
+import { issueImagePaths, removeIssueImages } from './images'
 
 // Issues live in one workspace. Anyone who can see the workspace can create
 // and edit them; leads and team owners/admins delete issues and manage labels.
@@ -354,11 +355,12 @@ export async function setIssueLabels(issueId: string, labelIds: string[]) {
   if (error) throw toDataError('save the labels', error, writeErrors)
 }
 
-/** Sub-issues are kept and become top-level (parent_id → null). */
+/** Sub-issues are kept and become top-level (parent_id → null). The description's images are removed too. */
 export async function deleteIssue(issueId: string) {
-  const { data, error } = await supabase.from('issues').delete().eq('id', issueId).select('id')
+  const { data, error } = await supabase.from('issues').delete().eq('id', issueId).select('id, description')
   if (error) throw toDataError('delete the issue', error)
-  requireAffected(data, 'delete issue')
+  const [deleted] = requireAffected(data, 'delete issue')
+  await removeIssueImages(issueImagePaths(deleted.description))
 }
 
 const labelErrors = {

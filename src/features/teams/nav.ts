@@ -5,6 +5,7 @@ import {
   GitPullRequest,
   Home,
   LayoutDashboard,
+  MessageSquare,
   Settings,
   Shapes,
   Users,
@@ -85,10 +86,12 @@ export function getTeamNav(
   tools: (NavItem & { id: TeamToolId | 'issues' })[]
   members: NavItem
   settings: NavItem
+  messages: NavItem
 } {
   const base = teamPath(slug)
   return {
     home: { title: 'Home', to: base, icon: Home, end: true },
+    messages: { title: 'Messages', to: `${base}/messages`, icon: MessageSquare },
     tools: [
       ...TEAM_TOOLS.map((id) => ({
         id,

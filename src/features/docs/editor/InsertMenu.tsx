@@ -36,7 +36,7 @@ const items: Item[] = [
  * A plain popover (not a Radix menu) so the editor keeps focus and the
  * floating menu stays anchored to the line.
  */
-/** `onPickImage` omitted = no Image item (e.g. issue descriptions). */
+/** `onPickImage` omitted = no Image item (e.g. lessons). */
 export function InsertMenu({ editor, onPickImage }: { editor: Editor; onPickImage?: () => void }) {
   const [open, setOpen] = useState(false)
 

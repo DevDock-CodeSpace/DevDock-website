@@ -212,22 +212,46 @@ export async function deleteFolder(teamId: string, folderId: string, docIdsInsid
 
 // ----------------------------------------------------------------- images
 // Private bucket; object path <team_id>/<document_id>/<file>. Storage RLS
-// mirrors the doc: readers can view, editors can upload/delete.
+// mirrors the doc: readers can view, editors can upload/delete. Issue
+// descriptions keep theirs under issues/<workspace_id>/ (features/issues/images.ts).
 
 export const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp']
 export const IMAGE_MAX_BYTES = 10 * 1024 * 1024
 
-/** Uploads an image for a doc and returns its storage path (stored in the doc, not a URL). */
-export async function uploadDocImage(teamId: string, docId: string, file: File): Promise<string> {
-  if (!IMAGE_TYPES.includes(file.type)) throw new DataError('Only PNG, JPEG, GIF or WebP images can be added.')
-  if (file.size > IMAGE_MAX_BYTES) throw new DataError('Images can be at most 10 MB.')
+/** Why this file can't be added as an image, or null when it can. */
+export function imageProblem(file: File): string | null {
+  if (!IMAGE_TYPES.includes(file.type)) return 'Only PNG, JPEG, GIF or WebP images can be added.'
+  if (file.size > IMAGE_MAX_BYTES) return 'Images can be at most 10 MB.'
+  return null
+}
+
+/**
+ * Uploads an image into a folder of the image bucket and returns its storage
+ * path. Storage RLS decides who may write where (docs: <team>/<doc>; issue
+ * descriptions: issues/<workspace>).
+ */
+export async function uploadImageTo(folder: string, file: File): Promise<string> {
+  const problem = imageProblem(file)
+  if (problem) throw new DataError(problem)
   const ext = file.type.split('/')[1].replace('jpeg', 'jpg')
-  const path = `${teamId}/${docId}/${crypto.randomUUID()}.${ext}`
+  const path = `${folder}/${crypto.randomUUID()}.${ext}`
   const { error } = await supabase.storage
     .from(IMAGE_BUCKET)
     .upload(path, file, { contentType: file.type, upsert: false })
-  if (error) throw toDataError('upload the image', { message: error.message }, writeErrors)
+  if (error) throw toDataError('upload the image', { message: error.message })
   return path
+}
+
+/** Uploads an image for a doc and returns its storage path (stored in the doc, not a URL). */
+export function uploadDocImage(teamId: string, docId: string, file: File): Promise<string> {
+  return uploadImageTo(`${teamId}/${docId}`, file)
+}
+
+/** Removes uploaded images. Best effort: a leftover file is harmless, so failures are only logged. */
+export async function removeImages(paths: string[]) {
+  if (paths.length === 0) return
+  const { error } = await supabase.storage.from(IMAGE_BUCKET).remove(paths)
+  if (error) console.error('[data] Failed to remove images', error)
 }
 
 const SIGNED_URL_SECONDS = 60 * 60

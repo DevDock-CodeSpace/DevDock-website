@@ -14,6 +14,263 @@ export type Database = {
   }
   public: {
     Tables: {
+      message_mentions: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          mentioned_user_id: string
+          message_id: string
+          team_id: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          mentioned_user_id: string
+          message_id: string
+          team_id: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          mentioned_user_id?: string
+          message_id?: string
+          team_id?: string
+        }
+        Relationships: []
+      }
+      message_attachments: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          file_name: string
+          file_size: number
+          id: string
+          message_id: string
+          mime_type: string
+          storage_path: string
+          team_id: string
+          uploaded_by: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          file_name: string
+          file_size: number
+          id?: string
+          message_id: string
+          mime_type: string
+          storage_path: string
+          team_id: string
+          uploaded_by?: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          file_name?: string
+          file_size?: number
+          id?: string
+          message_id?: string
+          mime_type?: string
+          storage_path?: string
+          team_id?: string
+          uploaded_by?: string
+        }
+        Relationships: []
+      }
+      conversation_members: {
+        Row: {
+          conversation_id: string
+          history_from: string | null
+          joined_at: string
+          left_at: string | null
+          role: string
+          team_id: string
+          user_id: string
+        }
+        Insert: {
+          conversation_id: string
+          history_from?: string | null
+          joined_at?: string
+          left_at?: string | null
+          role?: string
+          team_id: string
+          user_id: string
+        }
+        Update: {
+          conversation_id?: string
+          history_from?: string | null
+          joined_at?: string
+          left_at?: string | null
+          role?: string
+          team_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      conversations: {
+        Row: {
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          is_archived: boolean
+          kind: string
+          name: string | null
+          team_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          is_archived?: boolean
+          kind: string
+          name?: string | null
+          team_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          is_archived?: boolean
+          kind?: string
+          name?: string | null
+          team_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      messages: {
+        Row: {
+          author_id: string
+          body: Json
+          client_id: string
+          content: string
+          conversation_id: string
+          created_at: string
+          deleted_at: string | null
+          edited_at: string | null
+          id: string
+          parent_id: string | null
+          team_id: string
+        }
+        Insert: {
+          author_id?: string
+          body: Json
+          client_id: string
+          conversation_id: string
+          created_at?: string
+          deleted_at?: string | null
+          edited_at?: string | null
+          id?: string
+          parent_id?: string | null
+          team_id: string
+        }
+        Update: {
+          author_id?: string
+          body?: Json
+          client_id?: string
+          conversation_id?: string
+          created_at?: string
+          content?: string
+          deleted_at?: string | null
+          edited_at?: string | null
+          id?: string
+          parent_id?: string | null
+          team_id?: string
+        }
+        Relationships: []
+      }
+      message_pins: {
+        Row: {
+          conversation_id: string
+          message_id: string
+          pinned_at: string
+          pinned_by: string
+          team_id: string
+        }
+        Insert: {
+          conversation_id: string
+          message_id: string
+          pinned_at?: string
+          pinned_by?: string
+          team_id: string
+        }
+        Update: {
+          conversation_id?: string
+          message_id?: string
+          pinned_at?: string
+          pinned_by?: string
+          team_id?: string
+        }
+        Relationships: []
+      }
+      message_reactions: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          emoji: string
+          message_id: string
+          team_id: string
+          user_id: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          emoji: string
+          message_id: string
+          team_id: string
+          user_id?: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          emoji?: string
+          message_id?: string
+          team_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          conversation_id: string | null
+          created_at: string
+          dedupe_key: string
+          id: string
+          kind: string
+          message_id: string | null
+          read_at: string | null
+          recipient_id: string
+          team_id: string
+        }
+        Insert: {
+          conversation_id?: string | null
+          created_at?: string
+          dedupe_key: string
+          id?: string
+          kind: string
+          message_id?: string | null
+          read_at?: string | null
+          recipient_id?: string
+          team_id: string
+        }
+        Update: {
+          conversation_id?: string | null
+          created_at?: string
+          dedupe_key?: string
+          id?: string
+          kind?: string
+          message_id?: string | null
+          read_at?: string | null
+          recipient_id?: string
+          team_id?: string
+        }
+        Relationships: []
+      }
       diagrams: {
         Row: {
           created_at: string
@@ -1304,6 +1561,30 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      mark_conversation_read: {
+        Args: { p_conversation_id: string; p_message_id?: string; p_thread_at?: string }
+        Returns: undefined
+      }
+      add_group_member: {
+        Args: { p_conversation_id: string; p_history: string; p_user_id: string }
+        Returns: string
+      }
+      create_direct_conversation: {
+        Args: { p_team_id: string; p_user_id: string }
+        Returns: string
+      }
+      create_channel: {
+        Args: { p_description?: string; p_name: string; p_team_id: string }
+        Returns: string
+      }
+      create_group_conversation: {
+        Args: { p_name: string; p_team_id: string; p_user_ids: string[] }
+        Returns: string
+      }
+      find_existing_group: {
+        Args: { p_team_id: string; p_user_ids: string[] }
+        Returns: string | null
+      }
       can_moderate_live_session: {
         Args: { p_session_id: string }
         Returns: boolean
@@ -1316,6 +1597,10 @@ export type Database = {
           p_title: string
           p_type: Database["public"]["Enums"]["workspace_type"]
         }
+        Returns: string
+      }
+      ensure_general_channel: {
+        Args: { p_team_id: string }
         Returns: string
       }
       default_workspace_modules: {
@@ -1358,6 +1643,30 @@ export type Database = {
       move_open_issues: {
         Args: { p_from: string; p_to: string }
         Returns: number
+      }
+      search_messages: {
+        Args: { p_conversation_id?: string; p_query: string; p_team_id: string }
+        Returns: {
+          author_id: string
+          content: string
+          conversation_id: string
+          created_at: string
+          edited_at: string | null
+          id: string
+          parent_id: string | null
+          team_id: string
+        }[]
+      }
+      send_message: {
+        Args: {
+          p_body: Json
+          p_client_id: string
+          p_content: string
+          p_conversation_id: string
+          p_mention_ids?: string[]
+          p_parent_id?: string
+        }
+        Returns: Database["public"]["Tables"]["messages"]["Row"]
       }
       reorder_learning_modules: {
         Args: { p_ids: string[]; p_workspace_id: string }

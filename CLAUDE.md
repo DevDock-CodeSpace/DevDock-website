@@ -20,7 +20,7 @@ DevDock is a private software-engineering teaching workspace for **one instructo
 
 **Phase 5c done: Diagrams (Lucidchart-style).** A `diagrams` table (same scope and RLS rules as `documents`) holding React Flow JSON, with Team → Diagrams and Workspace → Diagrams lists and an in-app editor styled like DevDock: a shape/icon library, containers, connectors, a properties panel, undo/redo, copy/paste, alignment guides, autosave. 
 
-**Phase 6a done: Issues (Linear-style), part 1.** Workspace-only issues with IDs like `CAP-12` (per-workspace `issue_key` + counter). Each issue has a status workflow, priority, assignee, labels, estimate, due date and sub-issues. Views are a List grouped by status and a Board with drag-and-drop; the issue page has a rich description (the Docs editor, without images), sub-issues, comments and a properties panel. Any workspace member can create and edit issues. Leads and team owners/admins delete issues and manage labels and the key. 
+**Phase 6a done: Issues (Linear-style), part 1.** Workspace-only issues with IDs like `CAP-12` (per-workspace `issue_key` + counter). Each issue has a status workflow, priority, assignee, labels, estimate, due date and sub-issues. Views are a List grouped by status and a Board with drag-and-drop; the issue page has a rich description (the Docs editor, with pasted/dropped images), sub-issues, comments and a properties panel. Any workspace member can create and edit issues. Leads and team owners/admins delete issues and manage labels and the key. 
 
 **Phase 6b done: Issues, part 2.**
 - **Cycles:** Linear's sprints, numbered per workspace and never overlapping; managers create, edit and delete them, and there's a "move open issues to the next cycle" action.
@@ -133,6 +133,7 @@ supabase/
   - Rows are addressed by **number within the workspace**, not UUID. The identifier is `issueIdentifier(workspace.issue_key, number)`.
   - `number`, `team_id` and `created_by` are set by DB triggers (`private.issue_counters`). The assignee-is-a-member, same-workspace-parent and no-loop rules are enforced by the `check_issue` trigger.
   - Labels on an issue are replaced with `rpc('set_issue_labels')`.
+  - **Images in descriptions** (`images.ts`): the docs `docImage` node, stored in the same `doc-images` bucket under `issues/<workspace_id>/<file>` (Storage RLS: workspace viewers view and upload; the uploader or a manager deletes). The issue page uploads on paste/drop/pick; the New issue dialog keeps picked files locally and uploads them on Create, appended after the text. `deleteIssue` removes the description's images.
   - Field edits go through `useUpdateIssue()` (optimistic, rolls back with a toast). Pickers use the searchable `Picker` popover.
   - The issue page's title and description save themselves (`hooks/use-save-on-exit.ts`): while typing, on leaving the issue, and when the tab is hidden or closed. `useUpdateIssue` runs saves one at a time (mutation `scope`); `IssueDescription` queues its own saves, writes the cache when a save starts, and takes a changed server description only when nothing is unsaved.
   - `useIssueContext().canManage` mirrors `private.can_manage_workspace` (UI only).
