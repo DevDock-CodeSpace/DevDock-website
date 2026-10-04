@@ -34,6 +34,14 @@ const AFFECTS: Record<string, QueryKey[]> = {
   learning_modules: [['learning']],
   lessons: [['learning']],
   lesson_progress: [['learning', 'progress']],
+  conversations: [['messaging', 'conversations']],
+  conversation_members: [['messaging', 'conversations'], ['messaging', 'members']],
+  messages: [['messaging', 'conversations'], ['messaging', 'messages']],
+  message_reactions: [['messaging', 'messages']],
+  message_pins: [['messaging', 'messages']],
+  conversation_reads: [['messaging', 'reads']],
+  conversation_preferences: [['messaging', 'preferences']],
+  notifications: [['messaging', 'notifications']],
 }
 
 const BATCH_MS = 250
