@@ -31,7 +31,7 @@ export function CyclePicker({
     <Picker
       open={open}
       onOpenChange={onOpenChange}
-      placeholder="Move to cycle…"
+      placeholder="Move to sprint…"
       align={align}
       selected={[value ?? NONE]}
       onSelect={(v) => {
@@ -39,7 +39,7 @@ export function CyclePicker({
         if (next !== value) onChange(next)
       }}
       options={[
-        { value: NONE, label: 'No cycle', icon: <IterationCw className="size-3.5 text-muted-foreground" /> },
+        { value: NONE, label: 'No sprint', icon: <IterationCw className="size-3.5 text-muted-foreground" /> },
         ...shown.map((c) => ({
           value: c.id,
           label: `${cycleTitle(c)}${cycleState(c, today) === 'current' ? ' (current)' : ''} · ${formatShortDate(c.starts_on)} – ${formatShortDate(c.ends_on)}`,

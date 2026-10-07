@@ -210,7 +210,7 @@ export const cyclesQuery = (workspaceId: string) =>
         .select('id, workspace_id, number, name, starts_on, ends_on')
         .eq('workspace_id', workspaceId)
         .order('starts_on')
-      if (error) throw toDataError('load cycles', error)
+      if (error) throw toDataError('load sprints', error)
       return data
     },
   })
@@ -397,8 +397,8 @@ export async function deleteLabel(labelId: string) {
 }
 
 const cycleErrors = {
-  '42501': 'Only workspace leads and group owners/admins can manage cycles.',
-  '23P01': 'Those dates overlap another cycle.',
+  '42501': 'Only workspace leads and group owners/admins can manage sprints.',
+  '23P01': 'Those dates overlap another sprint.',
   '23514': 'The end date must be on or after the start date.',
 }
 
@@ -413,7 +413,7 @@ export async function createCycle(workspaceId: string, input: CycleInput) {
     .insert(row as TablesInsert<'issue_cycles'>)
     .select('number')
     .single()
-  if (error) throw toDataError('create the cycle', error, cycleErrors)
+  if (error) throw toDataError('create the sprint', error, cycleErrors)
   return data
 }
 
@@ -423,15 +423,15 @@ export async function updateCycle(cycleId: string, input: CycleInput) {
     .update({ name: input.name.trim() || null, starts_on: input.startsOn, ends_on: input.endsOn })
     .eq('id', cycleId)
     .select('id')
-  if (error) throw toDataError('save the cycle', error, cycleErrors)
-  requireAffected(data, 'update cycle')
+  if (error) throw toDataError('save the sprint', error, cycleErrors)
+  requireAffected(data, 'update sprint')
 }
 
 /** Its issues are kept, without a cycle. */
 export async function deleteCycle(cycleId: string) {
   const { data, error } = await supabase.from('issue_cycles').delete().eq('id', cycleId).select('id')
-  if (error) throw toDataError('delete the cycle', error, cycleErrors)
-  requireAffected(data, 'delete cycle')
+  if (error) throw toDataError('delete the sprint', error, cycleErrors)
+  requireAffected(data, 'delete sprint')
 }
 
 /** Moves a cycle's unfinished issues to another cycle (or out of cycles). Returns how many moved. */
@@ -483,7 +483,7 @@ export const cycleHistoryQuery = (workspaceId: string, cycleId: string, currentI
         .eq('workspace_id', workspaceId)
         .eq('kind', 'cycle')
         .or(`from_value.eq.${cycleId},to_value.eq.${cycleId}`)
-      if (error) throw toDataError('load the cycle history', error)
+      if (error) throw toDataError('load the sprint history', error)
       const ids = [...new Set([...moves.map((m) => m.issue_id), ...currentIds])]
       const events: CycleEvent[] = moves.map((m) => ({ ...m, kind: 'cycle' as const }))
       const extraIds = ids.filter((id) => !currentIds.includes(id))
@@ -496,7 +496,7 @@ export const cycleHistoryQuery = (workspaceId: string, cycleId: string, currentI
           .select('issue_id, kind, from_value, to_value, created_at')
           .eq('kind', 'status')
           .in('issue_id', chunk)
-        if (statusError) throw toDataError('load the cycle history', statusError)
+        if (statusError) throw toDataError('load the sprint history', statusError)
         events.push(...data.map((m) => ({ ...m, kind: 'status' as const })))
       }
       for (let i = 0; i < extraIds.length; i += CHUNK) {
@@ -504,7 +504,7 @@ export const cycleHistoryQuery = (workspaceId: string, cycleId: string, currentI
           .from('issues')
           .select('id, created_at, estimate, status')
           .in('id', extraIds.slice(i, i + CHUNK))
-        if (issueError) throw toDataError('load the cycle history', issueError)
+        if (issueError) throw toDataError('load the sprint history', issueError)
         extra.push(...(data as HistoryIssue[]))
       }
       return { events, extra }

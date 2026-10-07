@@ -39,7 +39,7 @@ export function CyclePinButton({ cycle, current }: { cycle: IssueCycle; current:
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">
         <DropdownMenuItem onSelect={() => toggle(running, { kind: 'current_cycle' })}>
-          <span className="flex-1">{running ? 'Unpin' : 'Pin'} “Current cycle”</span>
+          <span className="flex-1">{running ? 'Unpin' : 'Pin'} “Current sprint”</span>
           {running && <Check className="size-4 text-brand" />}
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => toggle(specific, { kind: 'cycle', cycleId: cycle.id })}>

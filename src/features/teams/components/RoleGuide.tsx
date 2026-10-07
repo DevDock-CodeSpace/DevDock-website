@@ -86,7 +86,7 @@ export function RoleGuide({ type, myRole }: { type: TeamType; myRole: TeamRole }
         `Change the ${noun}’s settings and tools, and add or remove its members`,
         'Write its diagrams, delete its docs, and organize doc folders',
         'Schedule its live sessions',
-        'Delete issues, and manage labels and cycles',
+        'Delete issues, and manage labels and sprints',
         'Link the group’s repositories to it, and set their branches',
         'Move any issue to In Review or Done by hand (overriding GitHub)',
         ...(type === 'learning' ? ['Build the course in Learning and see the class’s progress'] : []),

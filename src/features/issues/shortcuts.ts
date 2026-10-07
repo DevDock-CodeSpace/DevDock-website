@@ -81,7 +81,7 @@ export const SHORTCUTS: { group: string; items: [keys: string, action: string][]
       ['A', 'Assign'],
       ['I', 'Assign to me'],
       ['L', 'Labels'],
-      ['⇧C', 'Move to cycle'],
+      ['⇧C', 'Move to sprint'],
       ['Esc', 'Back to the list'],
     ],
   },

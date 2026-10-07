@@ -133,7 +133,7 @@ export function IssueProperties({
           </Value>
         </LabelPicker>
       </Row>
-      <Row label="Cycle">
+      <Row label="Sprint">
         <CyclePicker
           value={issue.cycle_id}
           cycles={cycles}
@@ -142,7 +142,7 @@ export function IssueProperties({
         >
           <Value muted={!cycle}>
             <IterationCw className="size-4" />
-            <span className="truncate">{cycle ? cycleTitle(cycle) : 'No cycle'}</span>
+            <span className="truncate">{cycle ? cycleTitle(cycle) : 'No sprint'}</span>
           </Value>
         </CyclePicker>
       </Row>

@@ -124,8 +124,8 @@ function useItemCrumb(): Crumb[] {
   if (workspaceId && pathname.includes('/issues/cycles')) {
     const cycles = `${pathname.split('/issues/cycles')[0]}/issues/cycles`
     return [
-      { label: 'Cycles', to: cycles },
-      ...(cycleNumber ? [{ label: `Cycle ${cycleNumber}`, to: pathname }] : []),
+      { label: 'Sprints', to: cycles },
+      ...(cycleNumber ? [{ label: `Sprint ${cycleNumber}`, to: pathname }] : []),
     ]
   }
   const item = docId ? doc : diagramId ? diagram : sessionId ? session : undefined

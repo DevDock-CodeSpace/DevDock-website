@@ -306,7 +306,7 @@ export function CreateIssueDialog({
               <CyclePicker value={cycleId} cycles={cycles} onChange={setCycleId}>
                 <Chip>
                   <IterationCw className="size-3.5 text-muted-foreground" />
-                  {cycle ? cycleTitle(cycle) : 'Cycle'}
+                  {cycle ? cycleTitle(cycle) : 'Sprint'}
                 </Chip>
               </CyclePicker>
             )}
