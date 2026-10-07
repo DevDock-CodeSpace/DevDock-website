@@ -39,12 +39,12 @@ export function PersonRow({ profile, isYou, role, highlight, meta, actions }: Pe
   )
 }
 
-export function PersonAvatar({ profile, className }: { profile: PersonProfile; className?: string }) {
+export function PersonAvatar({ profile, className, fallbackClassName }: { profile: PersonProfile; className?: string; fallbackClassName?: string }) {
   const name = profile?.display_name ?? '?'
   return (
     <Avatar className={cn('size-6 rounded-full', className)}>
       {profile?.avatar_url && <AvatarImage src={profile.avatar_url} alt="" referrerPolicy="no-referrer" />}
-      <AvatarFallback className="rounded-full text-[9px] font-medium">{initials(name)}</AvatarFallback>
+      <AvatarFallback className={cn('rounded-full text-[9px] font-medium', fallbackClassName)}>{initials(name)}</AvatarFallback>
     </Avatar>
   )
 }

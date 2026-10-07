@@ -11,11 +11,13 @@ import {
   SidebarHeader,
   SidebarMenu,
   SidebarMenuAction,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
   useSidebar,
 } from '@/components/ui/sidebar'
+import { useUnread } from '@/features/messaging/hooks'
 import { UserMenu } from '@/features/auth/components/UserMenu'
 import { TeamSwitcher } from '@/features/teams/components/TeamSwitcher'
 import { useCurrentTeam } from '@/features/teams/hooks'
@@ -46,6 +48,7 @@ export function AppSidebar() {
   const { pins, isPinned, setPinned } = usePins()
   const visits = useRecentVisits(team.id)
   const nav = getTeamNav(team.slug, team.type)
+  const unreadMessages = useUnread(team.id).total
   // One section per workspace type that has items; the team type only decides which comes first.
   const sections = workspaceTypeOrder(team.type)
     .map((type) => ({ type, items: workspaces.filter((w) => w.type === type) }))
@@ -63,7 +66,7 @@ export function AppSidebar() {
         <SidebarGroup className="pb-0">
           <SidebarMenu>
             <NavLinkItem item={nav.home} onNavigate={close} />
-            <NavLinkItem item={nav.messages} onNavigate={close} />
+            <NavLinkItem item={nav.messages} onNavigate={close} badge={unreadMessages} />
             {nav.tools.map((item) => (
               <NavLinkItem key={item.id} item={item} onNavigate={close} />
             ))}
@@ -164,7 +167,7 @@ export function AppSidebar() {
   )
 }
 
-function NavLinkItem({ item, onNavigate }: { item: NavItem; onNavigate: () => void }) {
+function NavLinkItem({ item, onNavigate, badge = 0 }: { item: NavItem; onNavigate: () => void; badge?: number }) {
   const { pathname } = useLocation()
   return (
     <SidebarMenuItem>
@@ -179,6 +182,7 @@ function NavLinkItem({ item, onNavigate }: { item: NavItem; onNavigate: () => vo
           <span>{item.title}</span>
         </Link>
       </SidebarMenuButton>
+      {badge > 0 && <SidebarMenuBadge className="font-mono">{badge > 99 ? '99+' : badge}</SidebarMenuBadge>}
     </SidebarMenuItem>
   )
 }
