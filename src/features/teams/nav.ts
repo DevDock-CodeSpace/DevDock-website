@@ -64,7 +64,7 @@ export const TEAM_TOOLS: TeamToolId[] = ['docs', 'diagrams', 'live']
 export const teamToolDefs: Record<TeamToolId, { item: string; items: string }> = {
   docs: { item: 'doc', items: 'docs' },
   diagrams: { item: 'diagram', items: 'diagrams' },
-  live: { item: 'live session', items: 'live sessions' },
+  live: { item: 'meeting', items: 'meetings' },
 }
 
 export function isTeamTool(tool: string): tool is TeamToolId {
@@ -76,7 +76,7 @@ export const teamIssuesPath = (slug: string) => `${teamPath(slug)}/issues`
 
 /**
  * Sidebar team links: Home + team tools on top (plus Issues for development
- * groups, below Live), then the workspaces, then Members/Settings.
+ * groups, below Meetings), then the workspaces, then Members/Settings.
  */
 export function getTeamNav(
   slug: string,
@@ -125,7 +125,7 @@ export const workspaceTabDefs: Record<
   diagrams: { title: 'Diagrams', icon: Workflow, hint: 'Architecture and flow diagrams', soon: 'Diagrams assigned to this workspace will live here.' },
   exercises: { title: 'Exercises', icon: Shapes, hint: 'Practice and submissions', soon: 'Exercises and submissions will live here.' },
   github: { title: 'GitHub', icon: GitPullRequest, hint: 'Linked repositories' },
-  live: { title: 'Live', icon: Video, hint: 'Video sessions (Jitsi)' },
+  live: { title: 'Meetings', icon: Video, hint: 'Video meetings and schedule' },
   members: { title: 'Members', icon: Users },
 }
 
@@ -179,9 +179,9 @@ export const lessonPath = (teamSlug: string, workspaceId: string, lessonId: stri
 export const learningProgressPath = (teamSlug: string, workspaceId: string) =>
   `${learningPath(teamSlug, workspaceId)}/progress`
 
-/** Live sessions list, in the group view or inside a workspace. */
+/** Meetings list and calendar, in the group view or inside a workspace. */
 export const livePath = (teamSlug: string, workspaceId?: string) =>
   workspaceId ? `${workspacePath(teamSlug, workspaceId)}/live` : `${teamPath(teamSlug)}/live`
-/** One live session, opened from the group view or from inside its workspace. */
+/** One meeting, opened from the group view or from inside its workspace. */
 export const liveSessionPath = (teamSlug: string, sessionId: string, workspaceId?: string) =>
   `${livePath(teamSlug, workspaceId)}/${sessionId}`

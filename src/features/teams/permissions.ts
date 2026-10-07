@@ -57,7 +57,7 @@ export const workspaceTypes: Record<
   /** `noun` is what one is called in copy ("New course"), `plural` heads its sidebar section. */
   { label: string; noun: string; plural: string; hint: string; icon: LucideIcon }
 > = {
-  course: { label: 'Course', noun: 'course', plural: 'Courses', hint: 'Lessons, live classes, docs', icon: BookOpen },
+  course: { label: 'Course', noun: 'course', plural: 'Courses', hint: 'Lessons, meetings, docs', icon: BookOpen },
   project: { label: 'Project', noun: 'project', plural: 'Projects', hint: 'Code, docs, and planning', icon: FolderKanban },
   // The 'general' type is called a "space" in the UI (study groups, clubs, anything else).
   general: { label: 'Space', noun: 'space', plural: 'Spaces', hint: 'Study groups, discussions, anything else', icon: LayoutGrid },
