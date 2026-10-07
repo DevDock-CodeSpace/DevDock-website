@@ -10,7 +10,8 @@ export type Conversation = Pick<
 >
 export type ConversationMember = Tables<'conversation_members'>
 export type Message = Tables<'messages'>
-export type MessageCursor = { createdAt: string; id: string }
+export type NotificationMode = 'all' | 'mentions' | 'muted'
+export type UnreadCount = Database['public']['Functions']['conversation_unread_counts']['Returns'][number]
 export type Notification = Tables<'notifications'>
 export type Reaction = Tables<'message_reactions'>
 export type Pin = Tables<'message_pins'>
@@ -27,14 +28,25 @@ export const MESSAGE_ATTACHMENT_TYPES = [
 ] as const
 export const MESSAGE_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024
 
-const PAGE_SIZE = 50
+export const PAGE_SIZE = 50
+
+/** Teams whose #general channel was already ensured in this tab (the RPC writes, so don't repeat it on every refetch). */
+const ensuredTeams = new Set<string>()
 
 export const conversationKeys = {
   all: ['messaging'] as const,
   conversations: (teamId: string) => ['messaging', 'conversations', teamId] as const,
   members: (conversationId: string) => ['messaging', 'members', conversationId] as const,
-  messages: (conversationId: string, before?: MessageCursor) =>
-    ['messaging', 'messages', conversationId, before?.createdAt ?? 'latest', before?.id ?? ''] as const,
+  messages: (conversationId: string, limit?: number) =>
+    limit === undefined
+      ? (['messaging', 'messages', conversationId] as const)
+      : (['messaging', 'messages', conversationId, limit] as const),
+  threadUnread: (conversationId: string) => ['messaging', 'thread-unread', conversationId] as const,
+  unread: (teamId: string) => ['messaging', 'unread', teamId] as const,
+  preferences: ['messaging', 'preferences'] as const,
+  reactions: (conversationId: string) => ['messaging', 'reactions', conversationId] as const,
+  attachments: (conversationId: string) => ['messaging', 'attachments', conversationId] as const,
+  replies: (conversationId: string) => ['messaging', 'thread', conversationId] as const,
   notifications: (teamId: string, userId: string) => ['messaging', 'notifications', teamId, userId] as const,
 }
 
@@ -42,8 +54,11 @@ export const teamConversationsQuery = (teamId: string) =>
   queryOptions({
     queryKey: conversationKeys.conversations(teamId),
     queryFn: async (): Promise<Conversation[]> => {
-      const { error: ensureError } = await supabase.rpc('ensure_general_channel', { p_team_id: teamId })
-      if (ensureError) throw toDataError('prepare messages', ensureError)
+      if (!ensuredTeams.has(teamId)) {
+        const { error: ensureError } = await supabase.rpc('ensure_general_channel', { p_team_id: teamId })
+        if (ensureError) throw toDataError('prepare messages', ensureError)
+        ensuredTeams.add(teamId)
+      }
       const { data, error } = await supabase
         .from('conversations')
         .select('id, team_id, kind, name, description, is_archived, created_at, updated_at')
@@ -68,15 +83,16 @@ export const conversationMembersQuery = (conversationId: string) =>
     },
   })
 
-export const threadMessagesQuery = (conversationId: string, parentId: string) =>
+/** Every thread reply in the conversation, in one request; the UI groups them by `parent_id`. */
+export const conversationRepliesQuery = (conversationId: string) =>
   queryOptions({
-    queryKey: ['messaging', 'thread', conversationId, parentId] as const,
+    queryKey: conversationKeys.replies(conversationId),
     queryFn: async (): Promise<Message[]> => {
       const { data, error } = await supabase
         .from('messages')
         .select('id, conversation_id, team_id, author_id, parent_id, client_id, body, content, edited_at, deleted_at, created_at')
         .eq('conversation_id', conversationId)
-        .eq('parent_id', parentId)
+        .not('parent_id', 'is', null)
         .order('created_at')
         .order('id')
       if (error) throw toDataError('load thread replies', error)
@@ -84,11 +100,12 @@ export const threadMessagesQuery = (conversationId: string, parentId: string) =>
     },
   })
 
-export const reactionsQuery = (messageId: string) =>
+/** Every reaction in the conversation, in one request; the UI groups them by `message_id`. */
+export const conversationReactionsQuery = (conversationId: string) =>
   queryOptions({
-    queryKey: ['messaging', 'reactions', messageId] as const,
+    queryKey: conversationKeys.reactions(conversationId),
     queryFn: async (): Promise<Reaction[]> => {
-      const { data, error } = await supabase.from('message_reactions').select('message_id, conversation_id, team_id, user_id, emoji, created_at').eq('message_id', messageId)
+      const { data, error } = await supabase.from('message_reactions').select('message_id, conversation_id, team_id, user_id, emoji, created_at').eq('conversation_id', conversationId)
       if (error) throw toDataError('load reactions', error)
       return data
     },
@@ -118,26 +135,67 @@ export const teamConversationMembersQuery = (teamId: string) =>
     },
   })
 
-export const messagesQuery = (conversationId: string, before?: MessageCursor) =>
+/** The newest `limit` top-level messages, oldest first. Loading earlier history raises the limit, so a refetch never leaves a gap. */
+export const messagesQuery = (conversationId: string, limit = PAGE_SIZE) =>
   queryOptions({
-    queryKey: conversationKeys.messages(conversationId, before),
+    queryKey: conversationKeys.messages(conversationId, limit),
     queryFn: async (): Promise<Message[]> => {
-      let query = supabase
+      const { data, error } = await supabase
         .from('messages')
         .select('id, conversation_id, team_id, author_id, parent_id, client_id, body, content, edited_at, deleted_at, created_at')
         .eq('conversation_id', conversationId)
         .is('parent_id', null)
         .order('created_at', { ascending: false })
         .order('id', { ascending: false })
-        .limit(PAGE_SIZE)
-      if (before) {
-        query = query.or(`created_at.lt.${before.createdAt},and(created_at.eq.${before.createdAt},id.lt.${before.id})`)
-      }
-      const { data, error } = await query
+        .limit(limit)
       if (error) throw toDataError('load messages', error)
       return data.reverse()
     },
   })
+
+/** Threads you take part in that have replies you haven't seen: `parent_id → count`. */
+export const threadUnreadQuery = (conversationId: string) =>
+  queryOptions({
+    queryKey: conversationKeys.threadUnread(conversationId),
+    queryFn: async (): Promise<Map<string, number>> => {
+      const { data, error } = await supabase.rpc('thread_unread_counts', { p_conversation_id: conversationId })
+      if (error) throw toDataError('load unread replies', error)
+      return new Map(data.map((row) => [row.parent_id, row.unread_count]))
+    },
+  })
+
+export async function markThreadRead(parentId: string) {
+  const { error } = await supabase.rpc('mark_thread_read', { p_parent_id: parentId })
+  if (error) throw toDataError('mark the thread read', error)
+}
+
+export const unreadCountsQuery = (teamId: string) =>
+  queryOptions({
+    queryKey: conversationKeys.unread(teamId),
+    queryFn: async (): Promise<UnreadCount[]> => {
+      const { data, error } = await supabase.rpc('conversation_unread_counts', { p_team_id: teamId })
+      if (error) throw toDataError('load unread counts', error)
+      return data
+    },
+  })
+
+/** The caller's own notification settings (RLS limits the rows to them). */
+export const preferencesQuery = () =>
+  queryOptions({
+    queryKey: conversationKeys.preferences,
+    queryFn: async (): Promise<{ conversation_id: string; notification_mode: NotificationMode }[]> => {
+      const { data, error } = await supabase.from('conversation_preferences').select('conversation_id, notification_mode')
+      if (error) throw toDataError('load notification settings', error)
+      return data.map((row) => ({ conversation_id: row.conversation_id, notification_mode: row.notification_mode as NotificationMode }))
+    },
+  })
+
+export async function setNotificationMode(conversationId: string, mode: NotificationMode) {
+  const { error } = await supabase
+    .from('conversation_preferences')
+    .upsert({ conversation_id: conversationId, notification_mode: mode, updated_at: new Date().toISOString() }, { onConflict: 'conversation_id,user_id' })
+  if (error) throw toDataError('change the notification setting', error)
+}
 
 export const notificationsQuery = (teamId: string, userId: string) =>
   queryOptions({
@@ -234,16 +292,17 @@ export async function sendMessage(input: {
   return data
 }
 
-export async function updateMessage(messageId: string, content: string, body: Json) {
-  const { data, error } = await supabase.from('messages').update({ content: content.trim(), body }).eq('id', messageId).select('id').single()
+export async function editMessage(messageId: string, content: string, body: Json) {
+  const { error } = await supabase.rpc('edit_message', { p_message_id: messageId, p_content: content.trim(), p_body: body })
   if (error) throw toDataError('edit the message', error)
-  return data
 }
 
 export async function deleteMessage(messageId: string) {
-  const { data, error } = await supabase.from('messages').update({ content: '[deleted]', body: { type: 'doc', content: [{ type: 'paragraph' }] }, deleted_at: new Date().toISOString() }).eq('id', messageId).select('id').single()
+  // Remove the files first (best effort); the function then clears the rows and marks the message deleted.
+  const { data: files } = await supabase.from('message_attachments').select('storage_path').eq('message_id', messageId)
+  if (files && files.length > 0) await supabase.storage.from('message-attachments').remove(files.map((file) => file.storage_path))
+  const { error } = await supabase.rpc('delete_message', { p_message_id: messageId })
   if (error) throw toDataError('delete the message', error)
-  return data
 }
 
 export async function toggleReaction(input: { messageId: string; conversationId: string; teamId: string; userId: string; emoji: string; active: boolean }) {
@@ -271,11 +330,12 @@ export async function markConversationRead(conversationId: string, messageId: st
   if (error) throw toDataError('mark the conversation read', error)
 }
 
-export const messageAttachmentsQuery = (messageId: string) =>
+/** Every attachment in the conversation, in one request; the UI groups them by `message_id`. */
+export const conversationAttachmentsQuery = (conversationId: string) =>
   queryOptions({
-    queryKey: ['messaging', 'attachments', messageId] as const,
+    queryKey: conversationKeys.attachments(conversationId),
     queryFn: async (): Promise<MessageAttachment[]> => {
-      const { data, error } = await supabase.from('message_attachments').select('id, team_id, conversation_id, message_id, uploaded_by, storage_path, file_name, mime_type, file_size, created_at').eq('message_id', messageId).order('created_at')
+      const { data, error } = await supabase.from('message_attachments').select('id, team_id, conversation_id, message_id, uploaded_by, storage_path, file_name, mime_type, file_size, created_at').eq('conversation_id', conversationId).order('created_at')
       if (error) throw toDataError('load attachments', error)
       return data
     },
