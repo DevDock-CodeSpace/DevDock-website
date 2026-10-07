@@ -47,6 +47,8 @@ DevDock is a private software-engineering teaching workspace for **one instructo
 - **Status lock:** on issues whose repo is connected, only GitHub (`devdock.via = 'github'`) or workspace managers can set In Review or Done (`check_issue`, SQLSTATE `DD001`, message in `writeErrors`). Everyone can still reopen an issue or cancel it.
 - **Merged branches:** GitHub deletes them (the repo's "Automatically delete head branches" setting); the Development block shows them as merged and links to the PR.
 
+**Issue views done:** saved views (a name + tab + layout + filters; private or shared with the workspace), a sidebar **Pinned** section (your saved views, one person's issues, or a built-in tab), and person views (`?assignee=<id>`, from the Members page or a pin). Display options (group by, sub-group, ordering, properties) are not built.
+
 **Messaging (team-wide chat) done, part 1:** channels (`#general` is automatic), DMs and ad-hoc groups; threads, reactions, pins, mentions, attachments, search, unread badges, mute. Design record: `docs/MESSAGING_ARCHITECTURE.md`.
 
 Next: 9e deleting an issue can delete its branch (opt-in). Branches are never deleted when an issue moves back.
@@ -141,7 +143,9 @@ supabase/
   - `useIssueContext().canManage` mirrors `private.can_manage_workspace` (UI only).
   - Cycles live under `…/issues/cycles[/:cycleNumber]` (`cycleLoader`). Numbering and the no-overlap rule are enforced by the `prepare_issue_cycle` trigger; `rpc('move_open_issues')` rolls open issues over.
   - `issue_activity` is written only by triggers (`log_issue_activity`, `log_issue_label_activity`); clients can only read it. Don't add client-side activity writes.
-  - Views are URL state: `?tab=`, filter facets (`readFilters`/`writeFilters`, `useIssueFilters`), `?view=board`.
+  - Views are URL state: `?tab=`, filter facets (`readFilters`/`writeFilters`, `useIssueFilters`, which reads the URL directly and composes quick successive changes), `?view=board`.
+  - **Saved views** (`issue_views`, `views.ts`/`viewsApi.ts`/`viewsHooks.ts`, components `ViewsMenu`/`OpenViewTab`/`ViewActions`/`ViewDialog`): opening one copies its state into the URL (`viewHref`, `?v=<id>&tab=…&status=…`), so the URL stays the single source of truth; "modified" is the URL differing from the saved state (`sameViewState`), and Save changes / Reset / Save as new act on that. A bare `?v=` link is filled in once (`useActiveView`). Visible to the owner, or to the workspace when `shared`; owners edit them, and workspace managers can edit or delete shared ones but cannot make someone else's view private (RLS). Names are unique per owner, at most 50 per person and workspace; `filters` is validated by `private.prepare_issue_view` (only the known facets, lists of short strings). Choosing a built-in tab leaves the view and starts fresh.
+  - **Pins** (`issue_pins`, `PinButton`, `PinnedNav` in `AppSidebar`): kind `view` / `person` / `tab`, per person, ordered by `position` (`reorder_issue_pins`; at most 30). `PinButton` pins what's on screen: the open view, a person-only filter (`personOf`), or a plain tab; unsaved filters can't be pinned. A view pin must point at a view you can see, a person pin at someone in the group. `PinnedNav` hides pins whose view or project you can't reach and shows the project name only when the group has several. This is the one deliberate exception to "workspace features aren't sidebar items".
   - Shortcuts use `useShortcuts` (ignored while typing or while a menu/dialog is open). Lists get J/K focus and per-row menus through `IssueCollection` + `IssueNavContext`.
 - **Data pattern:** `features/<name>/api.ts` exports `queryOptions` and mutation functions.
   - Loaders prime what the shell needs with `ensureQueryData`. Pages read with `useSuspenseQuery`; `AppLayout` has a Suspense boundary, so pages may also load secondary data that way.

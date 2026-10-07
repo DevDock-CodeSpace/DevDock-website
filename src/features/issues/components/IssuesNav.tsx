@@ -5,6 +5,8 @@ import { useCurrentTeam, useCurrentWorkspace } from '@/features/teams/hooks'
 import { cyclesPath, issuesPath } from '@/features/teams/nav'
 import { cn } from '@/lib/utils'
 import { ISSUE_TABS, readTab } from '../filters'
+import { tabHref, VIEW_PARAM } from '../views'
+import { OpenViewTab, ViewsMenu } from './ViewsMenu'
 
 /**
  * Second-level navigation inside the Issues tab, like Linear's team views:
@@ -16,10 +18,14 @@ export function IssuesNav({ actions }: { actions?: ReactNode }) {
   const { pathname } = useLocation()
   const [params] = useSearchParams()
   const onCycles = pathname.startsWith(cyclesPath(team.slug, workspace.id))
-  const tab = onCycles ? null : readTab(params)
+  // With a saved view open, none of the built-in tabs is the current one.
+  const viewOpen = params.has(VIEW_PARAM)
+  const tab = onCycles || viewOpen ? null : readTab(params)
   const base = issuesPath(team.slug, workspace.id)
   // Switching tabs keeps the view (list/board) and the filters.
   const withTab = (id: string) => {
+    // Leaving a saved view for a built-in tab starts that tab fresh (the view's filters don't carry over).
+    if (viewOpen) return tabHref(base, id as 'all' | 'active' | 'backlog' | 'mine')
     const next = new URLSearchParams(onCycles ? undefined : params)
     if (id === 'all') next.delete('tab')
     else next.set('tab', id)
@@ -49,6 +55,9 @@ export function IssuesNav({ actions }: { actions?: ReactNode }) {
         >
           <IterationCw className="size-3.5" /> Cycles
         </Link>
+        <span className="mx-1 h-4 w-px bg-border" aria-hidden />
+        <ViewsMenu />
+        <OpenViewTab />
       </nav>
       {actions && <div className="flex items-center gap-2">{actions}</div>}
     </div>
