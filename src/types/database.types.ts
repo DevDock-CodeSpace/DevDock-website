@@ -1188,6 +1188,42 @@ export type Database = {
           },
         ]
       }
+      live_session_rsvps: {
+        Row: {
+          session_id: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          session_id: string
+          status: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          session_id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_session_rsvps_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "live_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "live_session_rsvps_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       live_sessions: {
         Row: {
           calendar_event_id: string | null
@@ -2262,6 +2298,10 @@ export type Database = {
       set_issue_labels: {
         Args: { p_issue_id: string; p_label_ids: string[] }
         Returns: undefined
+      }
+      set_live_session_rsvps: {
+        Args: { p_responses: Json; p_session_id: string }
+        Returns: number
       }
       set_workspace_modules: {
         Args: {

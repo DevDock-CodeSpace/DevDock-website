@@ -10,6 +10,22 @@ import { supabase } from '@/lib/supabase'
 // (group owners/admins, workspace leads) schedule, edit and cancel. The room
 // itself is only reachable with a token from the jaas-token Edge Function.
 
+/** Google's reply states; 'needsAction' is "invited, hasn't replied". */
+export type RsvpStatus = 'accepted' | 'declined' | 'tentative' | 'needsAction'
+
+const RSVP_STATUSES: RsvpStatus[] = ['accepted', 'declined', 'tentative', 'needsAction']
+
+/** The database constrains this, but narrow it here rather than trust the column's `string`. */
+const toRsvpStatus = (value: string): RsvpStatus =>
+  (RSVP_STATUSES as string[]).includes(value) ? (value as RsvpStatus) : 'needsAction'
+
+export type Rsvp = {
+  user_id: string
+  status: RsvpStatus
+  updated_at: string
+  profile: PersonProfile | null
+}
+
 export type LiveSession = {
   id: string
   team_id: string
@@ -28,9 +44,15 @@ export type LiveSession = {
   workspace: { id: string; title: string; type: WorkspaceType } | null
 }
 
+/** Replies, for the single-meeting query only; lists don't need them. */
+const RSVP_COLUMNS = ', rsvps:live_session_rsvps(user_id, status, updated_at, profile:profiles(display_name, avatar_url))'
+
 // room_name is left out: the browser only gets it with a JaaS token.
 const COLUMNS =
   'id, team_id, workspace_id, title, description, starts_at, ends_at, calendar_event_id, series_id, created_by, created_at, updated_at, author:profiles!live_sessions_created_by_fkey(display_name, avatar_url), workspace:workspaces!live_sessions_workspace_team_fkey(id, title, type)'
+
+/** The single-meeting select: the same columns plus the embedded replies. */
+const SESSION_COLUMNS = `${COLUMNS}${RSVP_COLUMNS}`
 
 const writeErrors = {
   '42501': 'You don’t have permission to schedule meetings here.',
@@ -73,10 +95,15 @@ export const workspaceLiveSessionsQuery = (workspaceId: string) =>
 export const liveSessionQuery = (sessionId: string) =>
   queryOptions({
     queryKey: ['live', sessionId],
-    queryFn: async (): Promise<LiveSession | null> => {
-      const { data, error } = await supabase.from('live_sessions').select(COLUMNS).eq('id', sessionId).maybeSingle()
+    queryFn: async (): Promise<(LiveSession & { rsvps: Rsvp[] }) | null> => {
+      // One query: the replies come back embedded, so the page makes no extra round trip.
+      const { data, error } = await supabase
+        .from('live_sessions')
+        .select(SESSION_COLUMNS)
+        .eq('id', sessionId)
+        .maybeSingle()
       if (error) throw toDataError('load the meeting', error)
-      return data
+      return data && { ...data, rsvps: data.rsvps.map((r) => ({ ...r, status: toRsvpStatus(r.status) })) }
     },
   })
 
@@ -199,6 +226,18 @@ export async function deleteLiveSession(sessionId: string) {
   const { data, error } = await supabase.from('live_sessions').delete().eq('id', sessionId).select('id')
   if (error) throw toDataError('cancel the meeting', error, writeErrors)
   requireAffected(data, 'delete live session')
+}
+
+/**
+ * Stores who replied to the invite. Emails go in, only profile ids are kept
+ * (the function resolves them), so no address is ever written to a readable table.
+ */
+export async function saveRsvps(sessionId: string, responses: { email: string; status: string }[]) {
+  const { error } = await supabase.rpc('set_live_session_rsvps', {
+    p_session_id: sessionId,
+    p_responses: responses,
+  })
+  if (error) throw toDataError('save the replies', error)
 }
 
 /** Emails of everyone the session is for (group or workspace), minus the caller. Writers only. */
