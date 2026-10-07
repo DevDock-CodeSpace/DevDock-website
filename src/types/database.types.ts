@@ -756,6 +756,7 @@ export type Database = {
       issue_pins: {
         Row: {
           created_at: string
+          cycle_id: string | null
           id: string
           kind: string
           person_id: string | null
@@ -768,6 +769,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          cycle_id?: string | null
           id?: string
           kind: string
           person_id?: string | null
@@ -780,6 +782,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          cycle_id?: string | null
           id?: string
           kind?: string
           person_id?: string | null
@@ -791,6 +794,13 @@ export type Database = {
           workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "issue_pins_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "issue_cycles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "issue_pins_person_id_fkey"
             columns: ["person_id"]

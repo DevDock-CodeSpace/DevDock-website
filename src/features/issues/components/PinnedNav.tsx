@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { ChevronDown, Layers, ListTodo, MoreHorizontal } from 'lucide-react'
+import { ChevronDown, IterationCw, Layers, ListTodo, MoreHorizontal } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router'
 import { PersonAvatar } from '@/components/PersonRow'
@@ -7,11 +7,12 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuAction, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar'
 import { teamMembersQuery } from '@/features/teams/api'
 import { useCurrentTeam } from '@/features/teams/hooks'
-import { issuesPath } from '@/features/teams/nav'
+import { cyclePath, cyclesPath, issuesPath } from '@/features/teams/nav'
 import { teamWorkspacesQuery } from '@/features/workspaces/api'
 import { FACETS, ISSUE_TABS, readFilters, readTab } from '../filters'
 import { personHref, personOf, readViewState, tabHref, viewHref, VIEW_PARAM } from '../views'
-import { teamViewsQuery, type IssuePin } from '../viewsApi'
+import { cycleTitle } from '../cycles'
+import { pinnedCyclesQuery, teamViewsQuery, type IssuePin } from '../viewsApi'
 import { usePins } from '../viewsHooks'
 
 /** How many pins show before "N more". */
@@ -30,6 +31,7 @@ export function PinnedNav({ onNavigate }: { onNavigate: () => void }) {
   const views = useQuery(teamViewsQuery(team.id)).data
   const workspaces = useQuery(teamWorkspacesQuery(team.id)).data
   const people = useQuery(teamMembersQuery(team.id)).data
+  const cycles = useQuery(pinnedCyclesQuery(pins.flatMap((pin) => (pin.cycle_id ? [pin.cycle_id] : [])))).data
   const [expanded, setExpanded] = useState(false)
   // The project's name only helps when there is more than one to tell apart.
   const showWhere = (workspaces?.length ?? 0) > 1
@@ -59,6 +61,16 @@ export function PinnedNav({ onNavigate }: { onNavigate: () => void }) {
           active: here && !params.has(VIEW_PARAM) && personOf(readViewState(params)) === pin.person_id,
         },
       ]
+    }
+    if (pin.kind === 'cycle') {
+      const cycle = cycles?.find((item) => item.id === pin.cycle_id)
+      if (!cycle) return []
+      const to = cyclePath(team.slug, workspace.id, cycle.number)
+      return [{ pin, label: cycleTitle(cycle), where: workspace.title, to, icon: <IterationCw />, active: pathname === to }]
+    }
+    if (pin.kind === 'current_cycle') {
+      const to = `${cyclesPath(team.slug, workspace.id)}/current`
+      return [{ pin, label: 'Current cycle', where: workspace.title, to, icon: <IterationCw />, active: pathname === to }]
     }
     const tab = ISSUE_TABS.find((item) => item.id === pin.tab)
     if (!tab) return []

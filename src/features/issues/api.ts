@@ -1,6 +1,7 @@
 import { queryOptions } from '@tanstack/react-query'
 import { callGitHub } from '@/features/repos/api'
 import type { PersonProfile } from '@/features/teams/api'
+import type { CycleEvent, HistoryIssue } from './cycleStats'
 import { requireAffected, toDataError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
 import type { Database, Json, TablesInsert } from '@/types/database.types'
@@ -117,6 +118,7 @@ const writeErrors = {
 // ---------------------------------------------------------------- queries
 
 export const issueKeys = {
+  cycleHistory: (workspaceId: string, cycleId: string) => ['issues', 'cycle-history', workspaceId, cycleId] as const,
   all: ['issues'] as const,
   workspace: (workspaceId: string) => ['issues', 'workspace', workspaceId] as const,
   detail: (workspaceId: string, number: number) => ['issues', 'detail', workspaceId, number] as const,
@@ -462,3 +464,49 @@ export async function deleteComment(commentId: string) {
   if (error) throw toDataError('delete the comment', error)
   requireAffected(data, 'delete comment')
 }
+
+// ---------------------------------------------------------------- cycle history
+
+const CHUNK = 100
+
+/**
+ * What the cycle's burn-up chart is built from: when each issue entered or left the cycle and when its
+ * status changed, for the issues in the cycle now (`currentIds`) and the ones that were moved out of it.
+ */
+export const cycleHistoryQuery = (workspaceId: string, cycleId: string, currentIds: string[]) =>
+  queryOptions({
+    queryKey: issueKeys.cycleHistory(workspaceId, cycleId),
+    queryFn: async (): Promise<{ events: CycleEvent[]; extra: HistoryIssue[] }> => {
+      const { data: moves, error } = await supabase
+        .from('issue_activity')
+        .select('issue_id, kind, from_value, to_value, created_at')
+        .eq('workspace_id', workspaceId)
+        .eq('kind', 'cycle')
+        .or(`from_value.eq.${cycleId},to_value.eq.${cycleId}`)
+      if (error) throw toDataError('load the cycle history', error)
+      const ids = [...new Set([...moves.map((m) => m.issue_id), ...currentIds])]
+      const events: CycleEvent[] = moves.map((m) => ({ ...m, kind: 'cycle' as const }))
+      const extraIds = ids.filter((id) => !currentIds.includes(id))
+      const extra: HistoryIssue[] = []
+      // Long lists of ids are fetched in chunks (they travel in the URL).
+      for (let i = 0; i < ids.length; i += CHUNK) {
+        const chunk = ids.slice(i, i + CHUNK)
+        const { data, error: statusError } = await supabase
+          .from('issue_activity')
+          .select('issue_id, kind, from_value, to_value, created_at')
+          .eq('kind', 'status')
+          .in('issue_id', chunk)
+        if (statusError) throw toDataError('load the cycle history', statusError)
+        events.push(...data.map((m) => ({ ...m, kind: 'status' as const })))
+      }
+      for (let i = 0; i < extraIds.length; i += CHUNK) {
+        const { data, error: issueError } = await supabase
+          .from('issues')
+          .select('id, created_at, estimate, status')
+          .in('id', extraIds.slice(i, i + CHUNK))
+        if (issueError) throw toDataError('load the cycle history', issueError)
+        extra.push(...(data as HistoryIssue[]))
+      }
+      return { events, extra }
+    },
+  })
