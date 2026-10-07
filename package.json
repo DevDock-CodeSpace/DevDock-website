@@ -9,6 +9,8 @@
     "typecheck": "tsc -b",
     "lint": "oxlint",
     "preview": "vite preview",
+    "perf": "node scripts/check-performance.mjs",
+    "check": "npm run lint && npm run build && npm run perf",
     "db:types": "supabase gen types typescript --linked --schema public > src/types/database.types.ts"
   },
   "dependencies": {

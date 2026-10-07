@@ -4,7 +4,7 @@ import { authCallbackLoader, loginLoader } from '@/features/auth/loaders'
 import { watchAuthIdentity } from '@/features/auth/session'
 import { diagramLoader } from '@/features/diagrams/loaders'
 import { docLoader } from '@/features/docs/loaders'
-import { cycleLoader, issueLoader } from '@/features/issues/loaders'
+import { cycleLoader, issueLoader, issuesLoader } from '@/features/issues/loaders'
 import { lessonLoader } from '@/features/learning/loaders'
 import { liveSessionLoader } from '@/features/live/loaders'
 import { githubCallbackLoader } from '@/features/repos/loaders'
@@ -136,6 +136,8 @@ export const router = createBrowserRouter([
                   {
                     // Linear-style issues (workspace-only).
                     path: 'issues',
+                    // Starts all the data the Issues pages need at once (see issuesLoader).
+                    loader: issuesLoader,
                     element: <WorkspaceToolGate tool="issues" />,
                     children: [
                       { index: true, element: <WorkspaceIssuesPage /> },

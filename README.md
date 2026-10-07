@@ -13,13 +13,13 @@ npm run dev        # http://localhost:5173
 
 Sign-in uses **Google via Supabase Auth**, so the app needs `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` (see [Environment variables](#environment-variables)). Teams, workspaces and memberships come from the database; Lessons, Live Session and Resources are placeholders until their tables exist.
 
-Checks (all must pass before merging):
+Checks, before every pull request: one command runs them all (lint, typecheck and production build, then the performance budget):
 
 ```bash
-npm run typecheck
-npm run lint
-npm run build
+npm run check
 ```
+
+GitHub runs the same command on every pull request, so a failing check shows up there too. Individually: `npm run lint`, `npm run typecheck`, `npm run build`, and `npm run perf` (run after a build; it fails if the first load of the app gets heavier or an editor leaks into it). The performance rules the project follows are in `.claude/skills/devdock-performance/SKILL.md`.
 
 Node 22 LTS is recommended. Node 20 is end-of-life, and newer `@supabase/supabase-js` releases require Node ≥ 22. The repo is currently pinned to a supabase-js version that still supports Node 20.
 
