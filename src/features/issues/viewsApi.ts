@@ -2,6 +2,7 @@ import { queryOptions } from '@tanstack/react-query'
 import { requireAffected, toDataError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
 import type { Tables, TablesInsert } from '@/types/database.types'
+import type { IssueCycle } from './api'
 import type { IssueTab } from './filters'
 import { serializeFilters, type ViewState } from './views'
 
@@ -16,7 +17,7 @@ export const viewKeys = {
 }
 
 const VIEW_COLUMNS = 'id, team_id, workspace_id, owner_id, name, shared, layout, tab, filters, created_at, updated_at'
-const PIN_COLUMNS = 'id, user_id, team_id, workspace_id, kind, view_id, person_id, tab, position, created_at'
+const PIN_COLUMNS = 'id, user_id, team_id, workspace_id, kind, view_id, person_id, tab, cycle_id, position, created_at'
 
 const viewErrors = {
   '23505': 'You already have a view with that name.',
@@ -53,6 +54,19 @@ export const teamPinsQuery = (teamId: string) =>
     queryFn: async (): Promise<IssuePin[]> => {
       const { data, error } = await supabase.from('issue_pins').select(PIN_COLUMNS).eq('team_id', teamId).order('position').order('created_at')
       if (error) throw toDataError('load pins', error)
+      return data
+    },
+  })
+
+/** The cycles your cycle pins point at (the sidebar needs their numbers and names). */
+export const pinnedCyclesQuery = (cycleIds: string[]) =>
+  queryOptions({
+    // Under the pins prefix, so a change to pins or cycles refreshes it.
+    queryKey: ['issues', 'pins', 'cycles', [...cycleIds].sort().join(',')] as const,
+    enabled: cycleIds.length > 0,
+    queryFn: async (): Promise<IssueCycle[]> => {
+      const { data, error } = await supabase.from('issue_cycles').select('id, workspace_id, number, name, starts_on, ends_on').in('id', cycleIds)
+      if (error) throw toDataError('load pinned cycles', error)
       return data
     },
   })
@@ -102,6 +116,9 @@ export type PinTarget =
   | { kind: 'view'; viewId: string }
   | { kind: 'person'; personId: string }
   | { kind: 'tab'; tab: IssueTab }
+  | { kind: 'cycle'; cycleId: string }
+  /** Whichever cycle is running now. */
+  | { kind: 'current_cycle' }
 
 export async function pinTarget(workspaceId: string, target: PinTarget) {
   const row: Omit<TablesInsert<'issue_pins'>, 'team_id'> = {
@@ -110,6 +127,7 @@ export async function pinTarget(workspaceId: string, target: PinTarget) {
     ...(target.kind === 'view' ? { view_id: target.viewId } : {}),
     ...(target.kind === 'person' ? { person_id: target.personId } : {}),
     ...(target.kind === 'tab' ? { tab: target.tab } : {}),
+    ...(target.kind === 'cycle' ? { cycle_id: target.cycleId } : {}),
   }
   const { error } = await supabase.from('issue_pins').insert(row as TablesInsert<'issue_pins'>)
   if (error) throw toDataError('pin it', error, { '23505': 'That is already pinned.', '23514': 'That person isn’t in this group.', '54000': 'You can pin at most 30 items.' })
@@ -128,6 +146,8 @@ export async function reorderPins(teamId: string, ids: string[]) {
 /** Does this pin point at the given target? (A pin is one of view / person / tab, per workspace.) */
 export function pinMatches(pin: IssuePin, workspaceId: string, target: PinTarget) {
   if (target.kind === 'view') return pin.kind === 'view' && pin.view_id === target.viewId
+  if (target.kind === 'cycle') return pin.kind === 'cycle' && pin.cycle_id === target.cycleId
   if (pin.workspace_id !== workspaceId) return false
+  if (target.kind === 'current_cycle') return pin.kind === 'current_cycle'
   return target.kind === 'person' ? pin.kind === 'person' && pin.person_id === target.personId : pin.kind === 'tab' && pin.tab === target.tab
 }

@@ -14,15 +14,19 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { deleteCycle, issueKeys, moveOpenIssues, workspaceIssuesQuery, type IssueStatus } from '@/features/issues/api'
 import { CycleDialog } from '@/features/issues/components/CycleDialog'
+import { CycleInsights } from '@/features/issues/components/CycleInsights'
+import { CyclePinButton } from '@/features/issues/components/CyclePinButton'
 import { CycleProgress } from '@/features/issues/components/CycleProgress'
 import { IssueCollection } from '@/features/issues/components/IssueCollection'
 import { IssueFilterBar } from '@/features/issues/components/IssueFilterBar'
 import { IssuesNav } from '@/features/issues/components/IssuesNav'
+import { PanelToggle, SidePanelLayout } from '@/features/issues/components/SidePanel'
 import { ViewToggle } from '@/features/issues/components/ViewToggle'
-import { cycleProgress, cycleState, cycleTitle, cycleWhen, nextCycle } from '@/features/issues/cycles'
+import { currentCycle, cycleProgress, cycleState, cycleTitle, cycleWhen, nextCycle } from '@/features/issues/cycles'
 import { applyFilters } from '@/features/issues/filters'
 import { useIssueContext, useIssueFilters, useIssueView } from '@/features/issues/hooks'
 import { isClosed } from '@/features/issues/meta'
+import { usePanelOpen } from '@/features/issues/usePanelOpen'
 import { useCurrentTeam } from '@/features/teams/hooks'
 import { cyclePath, cyclesPath } from '@/features/teams/nav'
 import { errorMessage } from '@/lib/errors'
@@ -42,13 +46,30 @@ export function IssueCyclePage() {
   const [today] = useState(() => localDateISO(new Date()))
   const [creating, setCreating] = useState<IssueStatus | null>(null)
   const [filterOpen, setFilterOpen] = useState(false)
+  const [panelOpen, setPanelOpen] = usePanelOpen()
   const [editing, setEditing] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [busy, setBusy] = useState(false)
 
-  const cycle = cycles.find((c) => c.number === Number(cycleNumber))
+  // /cycles/current is the pinnable address of whichever cycle is running.
+  const viaCurrent = cycleNumber === 'current'
+  const cycle = viaCurrent ? currentCycle(cycles, today) : cycles.find((c) => c.number === Number(cycleNumber))
   if (!cycle) {
-    return <p className="py-16 text-center text-sm text-muted-foreground">This cycle doesn’t exist anymore.</p>
+    return (
+      <>
+        <IssuesNav />
+        <p className="py-16 text-center text-sm text-muted-foreground">
+          {viaCurrent ? (
+            <>
+              No cycle is running right now.{' '}
+              <Link to={cyclesPath(team.slug, workspace.id)} className="font-medium text-foreground underline underline-offset-2">See all cycles</Link>
+            </>
+          ) : (
+            'This cycle doesn’t exist anymore.'
+          )}
+        </p>
+      </>
+    )
   }
 
   const inCycle = all.filter((i) => i.cycle_id === cycle.id)
@@ -96,6 +117,8 @@ export function IssueCyclePage() {
       <IssuesNav
         actions={
           <>
+            <CyclePinButton cycle={cycle} current={cycleState(cycle, today) === 'current'} />
+            <PanelToggle open={panelOpen} onChange={setPanelOpen} />
             <ViewToggle view={view} onChange={setView} />
             <Button size="sm" onClick={() => setCreating('todo')}>
               <Plus /> New issue
@@ -182,30 +205,33 @@ export function IssueCyclePage() {
         </div>
       </header>
 
-      <div className="mb-3">
-        <IssueFilterBar
-          filters={filters}
-          onChange={setFilters}
-          open={filterOpen}
-          onOpenChange={setFilterOpen}
-          hideFacets={['cycle']}
+      <SidePanelLayout open={panelOpen} panel={<CycleInsights cycle={cycle} issues={inCycle} today={today} />}>
+        <div className="mb-3">
+          <IssueFilterBar
+            filters={filters}
+            onChange={setFilters}
+            open={filterOpen}
+            onOpenChange={setFilterOpen}
+            hideFacets={['cycle']}
+          />
+        </div>
+        <IssueCollection
+          issues={issues}
+          view={view}
+          cycleId={cycle.id}
+          creating={creating}
+          onCreatingChange={setCreating}
+          shortcuts={{ f: () => setFilterOpen(true) }}
+          empty={
+            <div className="border-y py-12 text-center text-sm text-muted-foreground">
+              {inCycle.length === 0
+                ? 'No issues in this cycle yet. Create one here, or set the Cycle on existing issues (⇧C).'
+                : 'No issues match these filters.'}
+            </div>
+          }
         />
-      </div>
-      <IssueCollection
-        issues={issues}
-        view={view}
-        cycleId={cycle.id}
-        creating={creating}
-        onCreatingChange={setCreating}
-        shortcuts={{ f: () => setFilterOpen(true) }}
-        empty={
-          <div className="border-y py-12 text-center text-sm text-muted-foreground">
-            {inCycle.length === 0
-              ? 'No issues in this cycle yet. Create one here, or set the Cycle on existing issues (⇧C).'
-              : 'No issues match these filters.'}
-          </div>
-        }
-      />
+
+      </SidePanelLayout>
 
       <CycleDialog key={editing ? 'open' : 'closed'} open={editing} onOpenChange={setEditing} cycle={cycle} />
       <ConfirmDialog

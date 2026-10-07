@@ -9,12 +9,16 @@ import { IssueFilterBar } from '@/features/issues/components/IssueFilterBar'
 import { IssuesNav } from '@/features/issues/components/IssuesNav'
 import { PersonViewHeader } from '@/features/issues/components/PersonViewHeader'
 import { PinButton } from '@/features/issues/components/PinButton'
+import { PanelToggle, SidePanelLayout } from '@/features/issues/components/SidePanel'
 import { ViewActions } from '@/features/issues/components/ViewActions'
+import { ViewInsights } from '@/features/issues/components/ViewInsights'
 import { ViewToggle } from '@/features/issues/components/ViewToggle'
 import { currentCycle } from '@/features/issues/cycles'
-import { applyFilters, hasFilters, readTab } from '@/features/issues/filters'
+import { applyFilters, hasFilters, ISSUE_TABS, readTab } from '@/features/issues/filters'
+import { personOf } from '@/features/issues/views'
 import { useIssueContext, useIssueFilters, useIssueView } from '@/features/issues/hooks'
 import { isClosed } from '@/features/issues/meta'
+import { usePanelOpen } from '@/features/issues/usePanelOpen'
 import { useActiveView } from '@/features/issues/viewsHooks'
 import { useCurrentTeam } from '@/features/teams/hooks'
 import { issuesPath } from '@/features/teams/nav'
@@ -27,8 +31,9 @@ import { localDateISO } from '@/lib/format'
  */
 export function WorkspaceIssuesPage() {
   const { team } = useCurrentTeam()
-  const { workspace, cycles, userId } = useIssueContext()
-  const { missing } = useActiveView()
+  const { workspace, cycles, userId, members } = useIssueContext()
+  const { missing, view: openView, state: viewState } = useActiveView()
+  const [panelOpen, setPanelOpen] = usePanelOpen()
   const all = useSuspenseQuery(workspaceIssuesQuery(workspace.id)).data
   const [params] = useSearchParams()
   const [view, setView] = useIssueView()
@@ -40,6 +45,10 @@ export function WorkspaceIssuesPage() {
   const [filters, setFilters] = useIssueFilters()
   const issues = applyFilters(all, tab, filters, { userId, currentCycleId: currentCycle(cycles, today)?.id })
   const open = issues.filter((i) => !isClosed(i.status)).length
+  const person = openView ? null : personOf(viewState)
+  const panelTitle =
+    openView?.name ??
+    (person ? `${members.find((m) => m.user_id === person)?.profile?.display_name ?? 'Former member'}’s issues` : (ISSUE_TABS.find((t) => t.id === tab)?.label ?? 'All issues'))
 
   const empty =
     all.length === 0 ? (
@@ -64,6 +73,7 @@ export function WorkspaceIssuesPage() {
         actions={
           <>
             <PinButton />
+            <PanelToggle open={panelOpen} onChange={setPanelOpen} />
             <ViewToggle view={view} onChange={setView} />
             <Button size="sm" onClick={() => setCreating('todo')}>
               <Plus /> New issue
@@ -77,29 +87,31 @@ export function WorkspaceIssuesPage() {
           <Link to={issuesPath(team.slug, workspace.id)} className="font-medium text-foreground underline underline-offset-2">Show all issues</Link>
         </p>
       )}
-      <PersonViewHeader />
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <IssueFilterBar
-            filters={filters}
-            onChange={setFilters}
-            open={filterOpen}
-            onOpenChange={setFilterOpen}
-          />
-          <ViewActions />
+      <SidePanelLayout open={panelOpen} panel={<ViewInsights title={panelTitle} view={openView} issues={issues} />}>
+        <PersonViewHeader />
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <IssueFilterBar
+              filters={filters}
+              onChange={setFilters}
+              open={filterOpen}
+              onOpenChange={setFilterOpen}
+            />
+            <ViewActions />
+          </div>
+          <span className="font-mono text-xs text-muted-foreground" title="Open issues / issues shown">
+            {open} open · {issues.length}
+          </span>
         </div>
-        <span className="font-mono text-xs text-muted-foreground" title="Open issues / issues shown">
-          {open} open · {issues.length}
-        </span>
-      </div>
-      <IssueCollection
-        issues={issues}
-        view={view}
-        empty={empty}
-        creating={creating}
-        onCreatingChange={setCreating}
-        shortcuts={{ f: () => setFilterOpen(true) }}
-      />
+        <IssueCollection
+          issues={issues}
+          view={view}
+          empty={empty}
+          creating={creating}
+          onCreatingChange={setCreating}
+          shortcuts={{ f: () => setFilterOpen(true) }}
+        />
+      </SidePanelLayout>
     </>
   )
 }
