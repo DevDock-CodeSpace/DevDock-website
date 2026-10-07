@@ -13,20 +13,25 @@ import { cn } from '@/lib/utils'
 import type { DocFolder } from '../api'
 import { folderTree } from '../folders'
 
-/** "Move to…": pick a folder in the doc's scope (tree, indented by depth) or the top level. */
+/** "Move to…": pick a folder in the scope (tree, indented by depth) or the top level, for one or several items. */
 export function MoveDocDialog({
   open,
   onOpenChange,
-  docTitle,
+  title,
   currentFolderId,
   folders,
+  blocker,
   onMove,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  docTitle: string
+  /** What is being moved: “Report”, “3 items”. */
+  title: string
+  /** Where the items are now (marked "current"). */
   currentFolderId: string | null
   folders: DocFolder[]
+  /** Why items can't go into a folder (null = top level), or null when they can. */
+  blocker: (folderId: string | null) => string | null
   onMove: (folderId: string | null) => Promise<void>
 }) {
   const [target, setTarget] = useState<string | null>(currentFolderId)
@@ -50,22 +55,28 @@ export function MoveDocDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Move “{docTitle}”</DialogTitle>
+          <DialogTitle>Move {title}</DialogTitle>
           <DialogDescription>Choose a folder.</DialogDescription>
         </DialogHeader>
         <ul role="listbox" aria-label="Folders" className="max-h-72 overflow-y-auto rounded-md border p-1">
           {options.map((option) => {
             const selected = option.id === target
+            const blocked = blocker(option.id)
             const Icon = option.id === null ? FolderOpen : Folder
             return (
               <li
                 key={option.id ?? 'top'}
                 role="option"
                 aria-selected={selected}
-                onClick={() => setTarget(option.id)}
+                aria-disabled={blocked !== null && option.id !== currentFolderId ? true : undefined}
+                title={blocked && option.id !== currentFolderId ? blocked : undefined}
+                onClick={() => {
+                  if (blocked === null || option.id === currentFolderId) setTarget(option.id)
+                }}
                 className={cn(
                   'flex cursor-pointer items-center gap-2 rounded-sm py-1.5 pr-2 text-sm hover:bg-muted',
                   selected && 'bg-muted font-medium',
+                  blocked !== null && option.id !== currentFolderId && 'cursor-not-allowed opacity-40 hover:bg-transparent',
                 )}
                 style={{ paddingLeft: 8 + option.depth * 16 }}
               >
@@ -78,7 +89,7 @@ export function MoveDocDialog({
           })}
         </ul>
         <DialogFooter>
-          <Button disabled={target === currentFolderId || pending} onClick={() => void move()}>
+          <Button disabled={target === currentFolderId || blocker(target) !== null || pending} onClick={() => void move()}>
             {pending && <LoaderCircle className="animate-spin" />}
             Move here
           </Button>

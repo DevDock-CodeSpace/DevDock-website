@@ -2169,6 +2169,10 @@ export type Database = {
         Returns: undefined
       }
       mark_thread_read: { Args: { p_parent_id: string }; Returns: undefined }
+      move_doc_items: {
+        Args: { p_doc_ids: string[]; p_folder_ids: string[]; p_target: string }
+        Returns: undefined
+      }
       move_open_issues: {
         Args: { p_from: string; p_to: string }
         Returns: number
