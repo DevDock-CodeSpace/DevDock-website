@@ -1,4 +1,4 @@
-import { useSuspenseQuery } from '@tanstack/react-query'
+import { useSuspenseQueries } from '@tanstack/react-query'
 import { Check, Copy, GitBranch, GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft, LoaderCircle } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
@@ -21,8 +21,7 @@ const stateIcon: Record<IssuePullRequest['state'], { icon: typeof GitPullRequest
  */
 export function IssueDevelopment({ issue }: { issue: IssueDetail }) {
   const { workspace, repos } = useIssueContext()
-  const pullRequests = useSuspenseQuery(pullRequestsQuery(issue.id)).data
-  const branches = useSuspenseQuery(issueBranchesQuery(issue.id)).data
+  const [{ data: pullRequests }, { data: branches }] = useSuspenseQueries({ queries: [pullRequestsQuery(issue.id), issueBranchesQuery(issue.id)] })
   const createBranch = useCreateIssueBranch()
   const [copied, setCopied] = useState(false)
   if (repos.length === 0 && pullRequests.length === 0 && branches.length === 0) return null

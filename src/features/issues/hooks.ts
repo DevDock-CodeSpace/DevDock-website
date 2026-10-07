@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
+import { useMutation, useQueryClient, useSuspenseQueries } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useSearchParams } from 'react-router'
 import { toast } from 'sonner'
@@ -28,10 +28,10 @@ import { readFilters, writeFilters, type IssueFilters } from './filters'
 export function useIssueContext() {
   const { user } = useAuth()
   const { workspace, can } = useCurrentWorkspace()
-  const members = useSuspenseQuery(workspaceMembersQuery(workspace.id)).data
-  const labels = useSuspenseQuery(labelsQuery(workspace.id)).data
-  const cycles = useSuspenseQuery(cyclesQuery(workspace.id)).data
-  const repos = useSuspenseQuery(workspaceReposQuery(workspace.id)).data
+  // One batch: separate useSuspenseQuery calls in a row would each wait for the one before (a waterfall).
+  const [{ data: members }, { data: labels }, { data: cycles }, { data: repos }] = useSuspenseQueries({
+    queries: [workspaceMembersQuery(workspace.id), labelsQuery(workspace.id), cyclesQuery(workspace.id), workspaceReposQuery(workspace.id)],
+  })
   return { workspace, members, labels, cycles, repos, canManage: can.canEdit, userId: user.id }
 }
 
