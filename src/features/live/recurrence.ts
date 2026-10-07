@@ -154,3 +154,43 @@ export function toRdate(starts: Date[], timeZone: string): string | null {
     `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`
   return `RDATE;TZID=${timeZone}:${starts.slice(1).map(stamp).join(',')}`
 }
+
+const DAY_CODES = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA']
+
+/**
+ * An RRULE describing these start times, or null when they don't form a regular
+ * pattern (hand-picked dates, or an occurrence whose time was edited). Used to
+ * hand a whole series to Google Calendar in one link, since a calendar URL can
+ * carry a rule but not a list of dates.
+ */
+export function inferRecurrence(starts: Date[]): string | null {
+  if (starts.length < 2) return null
+  // One rule can only describe occurrences at the same time of day.
+  const [first] = starts
+  if (starts.some((d) => d.getHours() !== first.getHours() || d.getMinutes() !== first.getMinutes())) return null
+
+  const last = starts[starts.length - 1]
+  const dayOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+  const count = starts.length
+
+  // Consecutive days are a daily rule, whatever weekdays they happen to land on.
+  const DAY_MS = 24 * 60 * 60_000
+  const consecutive = starts.every((d, i) => i === 0 || dayOf(d) - dayOf(starts[i - 1]) === DAY_MS)
+  if (consecutive) return `RRULE:FREQ=DAILY;COUNT=${count}`
+
+  const weekdays = [...new Set(starts.map((d) => d.getDay()))].sort((a, b) => a - b)
+
+  // The rule holds only if every matching day in the range is actually a meeting.
+  const expected: number[] = []
+  for (
+    const day = new Date(first.getFullYear(), first.getMonth(), first.getDate());
+    day.getTime() <= dayOf(last);
+    day.setDate(day.getDate() + 1)
+  ) {
+    if (weekdays.includes(day.getDay())) expected.push(day.getTime())
+  }
+  const actual = starts.map(dayOf)
+  if (expected.length !== actual.length || expected.some((time, i) => time !== actual[i])) return null
+
+  return `RRULE:FREQ=WEEKLY;BYDAY=${weekdays.map((d) => DAY_CODES[d]).join(',')};COUNT=${count}`
+}
