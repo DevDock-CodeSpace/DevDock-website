@@ -48,7 +48,7 @@ export function PrivacyPage() {
           <ul>
             <li>groups, workspaces and who belongs to them, with their roles;</li>
             <li>docs (including images you add to them) and diagrams;</li>
-            <li>issues (including images you add to their descriptions), comments, labels and cycles, and a history of changes made to issues;</li>
+            <li>issues (including images you add to their descriptions), comments, labels and sprints, and a history of changes made to issues;</li>
             <li>the GitHub repositories your group uses (their names and GitHub ids) and which projects use them.</li>
           </ul>
           <p>

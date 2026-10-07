@@ -57,8 +57,8 @@ function useFacetOptions(): Record<FilterFacet, PickerOption[]> {
       icon: <span className={cn('size-2 rounded-full', labelDotClass[l.color])} />,
     })),
     cycle: [
-      { value: 'current', label: 'Current cycle', icon: <IterationCw className="size-3.5 text-brand" /> },
-      { value: 'none', label: 'No cycle', icon: <IterationCw className="size-3.5 text-muted-foreground" /> },
+      { value: 'current', label: 'Current sprint', icon: <IterationCw className="size-3.5 text-brand" /> },
+      { value: 'none', label: 'No sprint', icon: <IterationCw className="size-3.5 text-muted-foreground" /> },
       ...[...cycles].reverse().map((c) => ({
         value: c.id,
         label: cycleTitle(c),

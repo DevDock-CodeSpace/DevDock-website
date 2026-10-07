@@ -26,7 +26,7 @@ export function cycleWhen(cycle: IssueCycle, today: string, formatEnd: (date: st
 
 /** "Cycle 3" or "Cycle 3 · Auth sprint". */
 export function cycleTitle(cycle: Pick<IssueCycle, 'number' | 'name'>) {
-  return cycle.name ? `Cycle ${cycle.number} · ${cycle.name}` : `Cycle ${cycle.number}`
+  return cycle.name ? `Sprint ${cycle.number} · ${cycle.name}` : `Sprint ${cycle.number}`
 }
 
 export function currentCycle(cycles: IssueCycle[], today: string) {

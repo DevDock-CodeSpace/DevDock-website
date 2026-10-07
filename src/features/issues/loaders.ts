@@ -23,7 +23,7 @@ export async function cycleLoader({ request, params }: LoaderFunctionArgs) {
   const cycles = await queryClient.ensureQueryData(cyclesQuery(params.workspaceId ?? ''))
   // "current" is the pinnable address of whichever cycle is running (the page says so if none is).
   if (params.cycleNumber !== 'current' && !cycles.some((c) => c.number === Number(params.cycleNumber))) {
-    throw data('Cycle not found.', { status: 404 })
+    throw data('Sprint not found.', { status: 404 })
   }
   return null
 }

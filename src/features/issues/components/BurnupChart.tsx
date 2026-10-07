@@ -11,7 +11,7 @@ const BOTTOM = 18
 export function BurnupChart({ series, unit }: { series: SeriesPoint[]; unit: string }) {
   const [hover, setHover] = useState<number | null>(null)
   if (series.length === 0) {
-    return <p className="py-6 text-center text-xs text-muted-foreground">The chart starts once the cycle does.</p>
+    return <p className="py-6 text-center text-xs text-muted-foreground">The chart starts once the sprint does.</p>
   }
   const last = series.length - 1
   const peak = Math.max(1, ...series.map((p) => p.scope))

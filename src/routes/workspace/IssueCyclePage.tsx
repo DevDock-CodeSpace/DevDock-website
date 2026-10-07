@@ -61,11 +61,11 @@ export function IssueCyclePage() {
         <p className="py-16 text-center text-sm text-muted-foreground">
           {viaCurrent ? (
             <>
-              No cycle is running right now.{' '}
-              <Link to={cyclesPath(team.slug, workspace.id)} className="font-medium text-foreground underline underline-offset-2">See all cycles</Link>
+              No sprint is running right now.{' '}
+              <Link to={cyclesPath(team.slug, workspace.id)} className="font-medium text-foreground underline underline-offset-2">See all sprints</Link>
             </>
           ) : (
-            'This cycle doesn’t exist anymore.'
+            'This sprint doesn’t exist anymore.'
           )}
         </p>
       </>
@@ -87,7 +87,7 @@ export function IssueCyclePage() {
     try {
       const moved = await moveOpenIssues(cycle.id, to)
       const target = cycles.find((c) => c.id === to)
-      toast.success(`${moved} ${moved === 1 ? 'issue' : 'issues'} moved ${target ? `to ${cycleTitle(target)}` : 'out of cycles'}`)
+      toast.success(`${moved} ${moved === 1 ? 'issue' : 'issues'} moved ${target ? `to ${cycleTitle(target)}` : 'out of sprints'}`)
       await queryClient.invalidateQueries({ queryKey: issueKeys.all })
     } catch (error) {
       toast.error(errorMessage(error))
@@ -131,7 +131,7 @@ export function IssueCyclePage() {
         <div className="min-w-0 space-y-1.5">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Link to={cyclesPath(team.slug, workspace.id)} className="inline-flex items-center gap-1 hover:text-foreground">
-              <ArrowLeft className="size-3.5" /> Cycles
+              <ArrowLeft className="size-3.5" /> Sprints
             </Link>
             <span aria-hidden>·</span>
             <span className={cn(state === 'current' && 'font-medium text-brand')}>{when}</span>
@@ -162,7 +162,7 @@ export function IssueCyclePage() {
             <Button
               variant="ghost"
               size="icon-sm"
-              aria-label="Previous cycle"
+              aria-label="Previous sprint"
               disabled={!previous}
               onClick={() => previous && void navigate(cyclePath(team.slug, workspace.id, previous.number))}
             >
@@ -171,7 +171,7 @@ export function IssueCyclePage() {
             <Button
               variant="ghost"
               size="icon-sm"
-              aria-label="Next cycle"
+              aria-label="Next sprint"
               disabled={!following}
               onClick={() => following && void navigate(cyclePath(team.slug, workspace.id, following.number))}
             >
@@ -180,7 +180,7 @@ export function IssueCyclePage() {
             {canManage && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon-sm" aria-label="Cycle actions" disabled={busy}>
+                  <Button variant="ghost" size="icon-sm" aria-label="Sprint actions" disabled={busy}>
                     <MoreHorizontal />
                   </Button>
                 </DropdownMenuTrigger>
@@ -191,12 +191,12 @@ export function IssueCyclePage() {
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuItem disabled={openCount === 0} onSelect={() => void move(null)}>
-                    Remove {openCount} open {openCount === 1 ? 'issue' : 'issues'} from the cycle
+                    Remove {openCount} open {openCount === 1 ? 'issue' : 'issues'} from the sprint
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onSelect={() => setEditing(true)}>Edit cycle</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setEditing(true)}>Edit sprint</DropdownMenuItem>
                   <DropdownMenuItem variant="destructive" onSelect={() => setConfirmDelete(true)}>
-                    Delete cycle
+                    Delete sprint
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -225,7 +225,7 @@ export function IssueCyclePage() {
           empty={
             <div className="border-y py-12 text-center text-sm text-muted-foreground">
               {inCycle.length === 0
-                ? 'No issues in this cycle yet. Create one here, or set the Cycle on existing issues (⇧C).'
+                ? 'No issues in this sprint yet. Create one here, or set the Sprint on existing issues (⇧C).'
                 : 'No issues match these filters.'}
             </div>
           }
@@ -238,8 +238,8 @@ export function IssueCyclePage() {
         open={confirmDelete}
         onOpenChange={setConfirmDelete}
         title={`Delete ${cycleTitle(cycle)}?`}
-        description="Its issues are kept; they just won’t be in a cycle anymore."
-        confirmLabel="Delete cycle"
+        description="Its issues are kept; they just won’t be in a sprint anymore."
+        confirmLabel="Delete sprint"
         pending={busy}
         onConfirm={() => void remove()}
       />

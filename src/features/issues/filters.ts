@@ -27,7 +27,7 @@ export const facetLabel: Record<FilterFacet, string> = {
   priority: 'Priority',
   assignee: 'Assignee',
   label: 'Labels',
-  cycle: 'Cycle',
+  cycle: 'Sprint',
   repo: 'Repository',
 }
 

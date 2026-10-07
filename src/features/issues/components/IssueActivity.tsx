@@ -182,7 +182,7 @@ function useDescribeActivity() {
       }
       case 'cycle': {
         const cycle = cycles.find((c) => c.id === (to ?? from))
-        const name = cycle ? cycleTitle(cycle) : 'a deleted cycle'
+        const name = cycle ? cycleTitle(cycle) : 'a deleted sprint'
         return to === null ? <>removed the issue from {strong(name)}</> : <>moved the issue to {strong(name)}</>
       }
       case 'estimate':

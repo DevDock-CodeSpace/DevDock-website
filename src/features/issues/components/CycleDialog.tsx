@@ -64,9 +64,9 @@ export function CycleDialog({
       <DialogContent className="sm:max-w-md">
         <form onSubmit={submit} className="space-y-4">
           <DialogHeader>
-            <DialogTitle>{cycle ? `Edit ${cycleTitle(cycle)}` : 'New cycle'}</DialogTitle>
+            <DialogTitle>{cycle ? `Edit ${cycleTitle(cycle)}` : 'New sprint'}</DialogTitle>
             <DialogDescription>
-              A time-boxed stretch of work (a sprint). Put issues in it from their Cycle property. Cycles can’t overlap.
+              A time-boxed stretch of work. Put issues in it from their Sprint property. Sprints can’t overlap.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-1.5">
@@ -137,7 +137,7 @@ export function CycleDialog({
           <DialogFooter>
             <Button type="submit" disabled={!startsOn || !endsOn || save.isPending}>
               {save.isPending && <LoaderCircle className="animate-spin" />}
-              {cycle ? 'Save' : 'Create cycle'}
+              {cycle ? 'Save' : 'Create sprint'}
             </Button>
           </DialogFooter>
         </form>

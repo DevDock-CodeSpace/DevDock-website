@@ -53,7 +53,7 @@ export function IssuesNav({ actions }: { actions?: ReactNode }) {
           className={item(onCycles)}
           aria-current={onCycles ? 'page' : undefined}
         >
-          <IterationCw className="size-3.5" /> Cycles
+          <IterationCw className="size-3.5" /> Sprints
         </Link>
         <span className="mx-1 h-4 w-px bg-border" aria-hidden />
         <ViewsMenu />
