@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { Fragment, Suspense } from 'react'
+import { Fragment } from 'react'
 import { Link, matchPath, Outlet, useLocation, useParams } from 'react-router'
 import { AppSidebar } from '@/components/AppSidebar'
 import { ThemeToggle } from '@/components/ThemeToggle'
@@ -12,7 +12,6 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb'
 import { Separator } from '@/components/ui/separator'
-import { Skeleton } from '@/components/ui/skeleton'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 import { diagramQuery } from '@/features/diagrams/api'
 import { liveSessionQuery } from '@/features/live/api'
@@ -25,42 +24,45 @@ import { useCurrentTeam, useCurrentWorkspace } from '@/features/teams/hooks'
 import { getTeamNav, getWorkspaceTabs, teamPath, workspacePath, type NavItem } from '@/features/teams/nav'
 import { workspaceQuery } from '@/features/workspaces/api'
 import { useRealtimeSync } from '@/hooks/use-realtime-sync'
+import { useFullBleed } from './full-bleed'
+import { PageArea } from './PageArea'
 
 // The shadcn sidebar writes its open/collapsed state to this cookie but doesn't read it back.
 const sidebarStartsOpen = () => !document.cookie.includes('sidebar_state=false')
 
 /** Team shell: sidebar + header + page. Rendered for /t/:teamSlug/*. */
 export function AppLayout() {
-  const { workspaceId } = useParams()
   useRealtimeSync()
   return (
     <LiveCallProvider>
-      <SidebarProvider defaultOpen={sidebarStartsOpen()}>
-        <AppSidebar />
-        {/* min-w-0: wide content (the issue board) scrolls inside the page instead of widening it. */}
-        <SidebarInset className="min-w-0">
-          <header className="sticky top-0 z-10 flex h-12 shrink-0 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur md:px-6">
-            <SidebarTrigger className="-ml-1" />
-            <Separator orientation="vertical" className="mr-2 h-4 data-vertical:self-center" />
-            {workspaceId ? <WorkspaceBreadcrumb /> : <TeamBreadcrumb />}
-            <div className="ml-auto">
-              <ThemeToggle />
-            </div>
-          </header>
-          {/* Left-aligned next to the sidebar, not a narrow centered column. */}
-          <div className="flex-1 px-4 py-6 md:px-8 md:py-8 lg:px-12">
-            <div className="w-full max-w-[1200px]">
-              {/* Pages may load secondary data with useSuspenseQuery. */}
-              <Suspense fallback={<PageSkeleton />}>
-                <Outlet />
-              </Suspense>
-            </div>
-          </div>
-        </SidebarInset>
-      </SidebarProvider>
+      <AppShell />
       {/* Keeps an active call alive across navigation (docks on the session page, floats elsewhere). */}
       <CallDock />
     </LiveCallProvider>
+  )
+}
+
+function AppShell() {
+  const { workspaceId } = useParams()
+  const fullBleed = useFullBleed()
+  return (
+    <SidebarProvider defaultOpen={sidebarStartsOpen()}>
+      <AppSidebar />
+      {/* min-w-0: wide content (the issue board) scrolls inside the page instead of widening it. */}
+      <SidebarInset className="min-w-0">
+        <header className="sticky top-0 z-10 flex h-12 shrink-0 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur md:px-6">
+          <SidebarTrigger className="-ml-1" />
+          <Separator orientation="vertical" className="mr-2 h-4 data-vertical:self-center" />
+          {workspaceId ? <WorkspaceBreadcrumb /> : <TeamBreadcrumb />}
+          <div className="ml-auto">
+            <ThemeToggle />
+          </div>
+        </header>
+        <PageArea fullBleed={fullBleed}>
+          <Outlet />
+        </PageArea>
+      </SidebarInset>
+    </SidebarProvider>
   )
 }
 
@@ -157,17 +159,5 @@ function Crumbs({ crumbs }: { crumbs: Crumb[] }) {
         ))}
       </BreadcrumbList>
     </Breadcrumb>
-  )
-}
-
-function PageSkeleton() {
-  return (
-    <div className="space-y-6" aria-busy="true" aria-label="Loading">
-      <div className="space-y-2">
-        <Skeleton className="h-7 w-48" />
-        <Skeleton className="h-4 w-72" />
-      </div>
-      <Skeleton className="h-40 w-full" />
-    </div>
   )
 }
