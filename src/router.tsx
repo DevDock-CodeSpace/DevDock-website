@@ -17,6 +17,7 @@ import { DocPage } from '@/routes/DocPage'
 import { GitHubCallbackPage } from '@/routes/GitHubCallbackPage'
 import { LiveSessionPage } from '@/routes/LiveSessionPage'
 import { MessagesPage } from '@/routes/team/MessagesPage'
+import { FULL_BLEED } from '@/layouts/full-bleed'
 import { LoginPage } from '@/routes/LoginPage'
 import { NotFoundPage, RouteErrorPage } from '@/routes/NotFoundPage'
 import { OnboardingPage } from '@/routes/OnboardingPage'
@@ -92,7 +93,7 @@ export const router = createBrowserRouter([
             errorElement: <RouteErrorPage inline />,
             children: [
               { index: true, element: <TeamWorkspacesPage /> },
-              { path: 'messages', element: <MessagesPage /> },
+              { path: 'messages', handle: FULL_BLEED, element: <MessagesPage /> },
               { path: 'members', element: <TeamMembersPage /> },
               { path: 'settings', element: <TeamSettingsPage /> },
               // Team → Docs: team-wide docs + docs of every workspace the user can see.

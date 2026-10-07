@@ -84,8 +84,9 @@ export function CallDock() {
         aria-hidden={hidden || undefined}
         inert={hidden}
         className={cn(
-          'fixed z-50 flex flex-col overflow-hidden bg-muted shadow-lg',
-          docked ? 'rounded-lg border' : 'right-4 bottom-4 h-[248px] w-[min(360px,calc(100vw-2rem))] rounded-xl border',
+          'fixed z-50 flex flex-col overflow-hidden bg-muted',
+          // Docked it is part of the page (no frame); floating it is a window.
+          !docked && 'right-4 bottom-4 h-[248px] w-[min(360px,calc(100vw-2rem))] rounded-xl border shadow-lg',
           hidden && 'pointer-events-none invisible',
         )}
       >

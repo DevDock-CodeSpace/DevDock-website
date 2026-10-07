@@ -177,6 +177,7 @@ supabase/
     - Connect flow: `rpc('start_github_connect')` returns a one-time state (30 min, tied to the person and group), then `github.com/apps/<slug>/installations/new?state=`, then `/github/callback` (`githubCallbackLoader`), then the function, then back to Group settings.
     - `installation_id` null means **Not connected** (added by name, or disconnected; the FK sets it null). Adding the same repo from GitHub connects the existing row.
     - Disconnecting only forgets the installation in DevDock; uninstalling happens on GitHub (Manage link).
+- **Full-bleed pages:** the page area normally has padding and a 1200px limit (`PageArea`). A route with `handle: FULL_BLEED` (Messages), or the session page while a call is docked, switches it to full-bleed (`useFullBleed`): no padding or width limit, and the page sets its own height (`h-[calc(100svh-3rem)]`). `PageArea` and `WorkspaceLayout` keep the same elements and only change classes, because remounting the page would undock the call and flip the layout back and forth. A docked call has no frame; the floating one is the framed window.
 - **Docs editor** (`features/docs/editor/`, page body `features/docs/components/DocView.tsx`, lazy-loaded by `routes/DocPage.tsx`):
   - Extensions are listed in `extensions.ts`, and the typography lives in `styles.ts` as Tailwind classes (no global CSS).
   - `documents.body` (TipTap JSON) is the source of truth; `content` is a plain-text copy written with it.

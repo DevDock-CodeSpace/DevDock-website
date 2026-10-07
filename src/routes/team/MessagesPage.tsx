@@ -72,7 +72,7 @@ export function MessagesPage() {
   const selected = conversations.find((conversation) => conversation.id === selectedId) ?? visible[0] ?? conversations[0]
 
   return (
-    <div className="flex h-[calc(100svh-7rem)] min-h-96 flex-col overflow-hidden rounded-lg border bg-background lg:h-[calc(100svh-8rem)] lg:flex-row">
+    <div className="flex h-[calc(100svh-3rem)] min-h-96 flex-col overflow-hidden bg-background lg:flex-row">
       <aside className="flex w-full shrink-0 flex-col border-b bg-muted/20 lg:w-64 lg:border-r lg:border-b-0">
         <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b px-4 lg:h-14">
           <div className="min-w-0">
