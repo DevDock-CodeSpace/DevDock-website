@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
+import { useMutation, useQueryClient, useSuspenseQueries, useSuspenseQuery } from '@tanstack/react-query'
 import { LoaderCircle, MoreHorizontal } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
@@ -40,8 +40,7 @@ import { StatusIcon } from './StatusIcon'
  */
 export function IssueActivity({ issue }: { issue: IssueDetail }) {
   const { canManage, userId } = useIssueContext()
-  const comments = useSuspenseQuery(commentsQuery(issue.id)).data
-  const activity = useSuspenseQuery(activityQuery(issue.id)).data
+  const [{ data: comments }, { data: activity }] = useSuspenseQueries({ queries: [commentsQuery(issue.id), activityQuery(issue.id)] })
   const describe = useDescribeActivity()
   const queryClient = useQueryClient()
   const [now] = useState(Date.now)
@@ -182,7 +181,7 @@ function useDescribeActivity() {
       }
       case 'cycle': {
         const cycle = cycles.find((c) => c.id === (to ?? from))
-        const name = cycle ? cycleTitle(cycle) : 'a deleted cycle'
+        const name = cycle ? cycleTitle(cycle) : 'a deleted sprint'
         return to === null ? <>removed the issue from {strong(name)}</> : <>moved the issue to {strong(name)}</>
       }
       case 'estimate':

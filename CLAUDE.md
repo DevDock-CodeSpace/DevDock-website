@@ -4,7 +4,7 @@ DevDock is a private software-engineering teaching workspace for **one instructo
 
 ## Current status
 
-> **Naming:** the UI calls a team a **group** ("Group settings", "Group-wide", "Create or join a group"). Code, routes (`/t/:teamSlug`), query keys and the database still say **team**. Keep new user-facing text on "group"; don't rename code for it.
+> **Naming:** the UI calls a team a **group** ("Group settings", "Group-wide", "Create or join a group"). Code, routes (`/t/:teamSlug`), query keys and the database still say **team**. Keep new user-facing text on "group"; don't rename code for it. The same goes for issue **cycles**: the UI calls them **sprints** ("Sprint 3", "Current sprint", "New sprint"), while code, routes (`…/issues/cycles`), query keys, URL params (`?cycle=`), tables and docs below still say cycle. Keep new user-facing text on "sprint".
 
 **Phase 1 done: frontend shell.** React Router, Tailwind v4, shadcn/ui, and TanStack Query are installed. The app has a responsive sidebar layout, light/dark/system theme, and placeholder pages driven by mock data (replaced by real data in Phase 4). TipTap (Phase 5b), React Flow (Phase 5c) and the Jitsi React SDK (Phase 5d, Live) are installed. **Add each piece only when a task needs it**, and don't build ahead.
 
@@ -80,13 +80,19 @@ npm run dev         # Vite dev server
 npm run typecheck   # tsc -b (app + node configs)
 npm run lint        # oxlint
 npm run build       # typecheck + production build to dist/
+npm run perf        # after a build: fails if the first load got heavier (budgets: scripts/check-performance.mjs)
+npm run check       # everything below in one go: lint, typecheck + build, perf (CI runs this on every PR)
 npm run preview     # serve dist/
 npm run db:types    # regenerate src/types/database.types.ts from the linked project (Supabase CLI)
 ```
 
 Supabase CLI (DB work only; the app doesn't need it): `supabase migration new <name>`, `supabase db push [--dry-run]`, `supabase migration list`. `supabase start` / `db reset` need Docker; nothing else does.
 
-Before calling a task done, run `npm run typecheck`, `npm run lint`, and `npm run build`. All three must pass.
+Before calling a task done, run `npm run check` (lint, typecheck + build, then the performance budget). It must pass; GitHub Actions (`.github/workflows/ci.yml`) runs the same command on every pull request to `dev` and `prod`.
+
+## Performance (read before coding)
+
+The app is fast on purpose, and that has to stay true. **Before writing code that fetches data, adds a route, list, query, dependency or editor, read `.claude/skills/devdock-performance/SKILL.md`** and follow it: no request waterfalls (prefetch in loaders, `useSuspenseQueries`), no N+1, lazy-load anything heavy, keep first-load JS within budget. **If a feature would slow things down** (extra requests on every page, more than ~10 KB gzipped on the first load, sequential round trips, unbounded lists, polling), **stop and ask the owner before implementing it**, with the cheaper options, as the skill describes.
 
 ## Conventions
 
@@ -134,6 +140,7 @@ supabase/
 - **Navigation:** the **sidebar is the hierarchy**: team switcher, Home, the **team tools** (Docs, Diagrams, Live; `TEAM_TOOLS`), the team's workspaces grouped by **workspace** type (Courses, Projects, Workspaces; empty sections hidden; the group type decides which section comes first, the default for "+ New", and **which types are allowed**: `allowedWorkspaceTypes` (learning: course/project/space; development: project/space, **no courses**; general: all), enforced by `private.check_workspace_type`/`check_team_type`. The `general` type is labelled **Space** in the UI. Development groups also get a group-wide **Issues** item below Live (`TeamIssuesPage`, `teamIssuesQuery`)), one "+ New", team Members and Settings. **Workspace features are horizontal tabs** under the workspace title (`WorkspaceLayout`), **generated from the workspace's enabled tools** (`workspace_modules`; `getWorkspaceTabs(teamSlug, id, modules)` in `features/teams/nav.ts`): Overview, then the tools in `MODULE_ORDER`, then Members. Workspace *type* only picks default tools (`defaultModules`, which mirrors `public.default_workspace_modules`). Create workspaces with `rpc('create_workspace')` and change tools with `rpc('set_workspace_modules')`; both are atomic and run under RLS. Don't put workspace features in the sidebar.
 - **Team tools vs workspace tabs:** Docs, Diagrams and Live exist at both levels as views of the same data. Rows have `team_id` (required) + `workspace_id` (nullable: null = team-wide; composite FK `(workspace_id, team_id) → workspaces(id, team_id)` keeps it in the same team). The team page shows everything the caller can access; the workspace tab shows only that workspace's rows. Docs, Diagrams and Live are built this way (`documents`/`diagrams`/`live_sessions`, `Team…Page`/`Workspace…Page`, one `DocPage`/`DiagramPage`/`LiveSessionPage` for both routes, `docLoader`/`diagramLoader`/`liveSessionLoader`). The "New …" dialog is the shared `CreateInScopeDialog` (Live uses its own `ScheduleSessionDialog`). Built workspace tools sit under `WorkspaceToolGate`, which 404s when the tool is off. Issues, Learning, Exercises and GitHub are workspace-only. **Resources was retired** (Docs with folders replaces it): the `'resources'` enum value remains in the database but is blocked by `workspace_modules_no_resources`, and `WorkspaceModule` excludes it.
 - **Issues** (`features/issues/`, routes `…/w/:id/issues` (`?view=board`) and `…/issues/:issueNumber`, `issueLoader`):
+  - **Loading:** the `issues` route has a loader (`issuesLoader`) that prefetches members, labels, sprints, repos, saved views and (except on a single issue's page) the issue list in parallel, and `useIssueContext` reads its four queries as one batch. Keep new Issues-page data in that loader so the page never loads it one request at a time.
   - Rows are addressed by **number within the workspace**, not UUID. The identifier is `issueIdentifier(workspace.issue_key, number)`.
   - `number`, `team_id` and `created_by` are set by DB triggers (`private.issue_counters`). The assignee-is-a-member, same-workspace-parent and no-loop rules are enforced by the `check_issue` trigger.
   - Labels on an issue are replaced with `rpc('set_issue_labels')`.
@@ -179,6 +186,7 @@ supabase/
     - Connect flow: `rpc('start_github_connect')` returns a one-time state (30 min, tied to the person and group), then `github.com/apps/<slug>/installations/new?state=`, then `/github/callback` (`githubCallbackLoader`), then the function, then back to Group settings.
     - `installation_id` null means **Not connected** (added by name, or disconnected; the FK sets it null). Adding the same repo from GitHub connects the existing row.
     - Disconnecting only forgets the installation in DevDock; uninstalling happens on GitHub (Manage link).
+- **Sidebar width:** the sidebar's right edge is a resize handle (`SidebarResizer`, a focusable `separator`): drag it, double-click to reset, or use the arrow keys (Shift = bigger steps, Home/End = the limits, Enter = reset). Limits and storage are in `lib/sidebar-width.ts` (224–448px, default 256; a narrow window caps the sidebar so the page keeps ~480px, without overwriting the saved choice); the choice is remembered in localStorage (`useSidebarWidth`) and applied through `--sidebar-width` on `SidebarProvider`. The width animation is switched off while dragging (inline `transition: none` on the sidebar container and gap). Collapsed to icons, the edge is the usual rail (click to expand); on mobile there is no handle.
 - **Full-bleed pages:** the page area normally has padding and a 1200px limit (`PageArea`). A route with `handle: FULL_BLEED` (Messages), or the session page while a call is docked, switches it to full-bleed (`useFullBleed`): no padding or width limit, and the page sets its own height (`h-[calc(100svh-3rem)]`). `PageArea` and `WorkspaceLayout` keep the same elements and only change classes, because remounting the page would undock the call and flip the layout back and forth. A docked call has no frame; the floating one is the framed window.
 - **Docs editor** (`features/docs/editor/`, page body `features/docs/components/DocView.tsx`, lazy-loaded by `routes/DocPage.tsx`):
   - Extensions are listed in `extensions.ts`, and the typography lives in `styles.ts` as Tailwind classes (no global CSS).

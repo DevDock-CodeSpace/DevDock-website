@@ -42,7 +42,7 @@ export function IssueCyclesPage() {
         actions={
           canManage && (
             <Button size="sm" onClick={() => setCreating(true)}>
-              <Plus /> New cycle
+              <Plus /> New sprint
             </Button>
           )
         }
@@ -50,14 +50,14 @@ export function IssueCyclesPage() {
       {cycles.length === 0 ? (
         <div className="border-y py-12 text-center">
           <IterationCw className="mx-auto size-5 text-muted-foreground" />
-          <p className="mt-3 text-sm font-medium">No cycles yet</p>
+          <p className="mt-3 text-sm font-medium">No sprints yet</p>
           <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-            Cycles are time-boxed sprints, usually 1–2 weeks. Plan which issues get done in each one and track progress.
+            A sprint is a time-boxed stretch of work, usually 1–2 weeks. Plan which issues get done in each one and track progress.
             {!canManage && ' The workspace lead can create them.'}
           </p>
           {canManage && (
             <Button size="sm" variant="outline" className="mt-4" onClick={() => setCreating(true)}>
-              <Plus /> Create the first cycle
+              <Plus /> Create the first sprint
             </Button>
           )}
         </div>
@@ -163,8 +163,8 @@ function CycleRow({
         open={confirmDelete}
         onOpenChange={setConfirmDelete}
         title={`Delete ${cycleTitle(cycle)}?`}
-        description="Its issues are kept; they just won’t be in a cycle anymore."
-        confirmLabel="Delete cycle"
+        description="Its issues are kept; they just won’t be in a sprint anymore."
+        confirmLabel="Delete sprint"
         pending={deleting}
         onConfirm={() => void remove()}
       />

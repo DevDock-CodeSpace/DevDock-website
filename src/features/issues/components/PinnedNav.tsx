@@ -70,7 +70,7 @@ export function PinnedNav({ onNavigate }: { onNavigate: () => void }) {
     }
     if (pin.kind === 'current_cycle') {
       const to = `${cyclesPath(team.slug, workspace.id)}/current`
-      return [{ pin, label: 'Current cycle', where: workspace.title, to, icon: <IterationCw />, active: pathname === to }]
+      return [{ pin, label: 'Current sprint', where: workspace.title, to, icon: <IterationCw />, active: pathname === to }]
     }
     const tab = ISSUE_TABS.find((item) => item.id === pin.tab)
     if (!tab) return []

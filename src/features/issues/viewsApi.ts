@@ -66,7 +66,7 @@ export const pinnedCyclesQuery = (cycleIds: string[]) =>
     enabled: cycleIds.length > 0,
     queryFn: async (): Promise<IssueCycle[]> => {
       const { data, error } = await supabase.from('issue_cycles').select('id, workspace_id, number, name, starts_on, ends_on').in('id', cycleIds)
-      if (error) throw toDataError('load pinned cycles', error)
+      if (error) throw toDataError('load pinned sprints', error)
       return data
     },
   })
