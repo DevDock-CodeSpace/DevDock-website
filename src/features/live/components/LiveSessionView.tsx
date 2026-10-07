@@ -85,9 +85,10 @@ export function LiveSessionView({ session, workspaceId }: LiveSessionViewProps) 
   })
 
   if (active) {
+    // Fills the area under the top bar: a slim title bar, then the call edge to edge.
     return (
-      <div className="space-y-3">
-        <div className="flex items-center justify-between gap-4">
+      <div className="flex h-[calc(100svh-3rem)] flex-col">
+        <div className="flex h-11 shrink-0 items-center justify-between gap-4 border-b px-4">
           <div className="flex min-w-0 items-center gap-2">
             <span className="size-2 shrink-0 animate-pulse rounded-full bg-destructive" />
             <h1 className="truncate text-sm font-semibold">{session.title}</h1>
@@ -98,7 +99,7 @@ export function LiveSessionView({ session, workspaceId }: LiveSessionViewProps) 
           </Button>
         </div>
         {/* CallDock renders the call over this box, so it survives navigation. */}
-        <div ref={setAnchorEl} className="h-[calc(100svh-11rem)] min-h-[480px] rounded-lg border bg-muted" />
+        <div ref={setAnchorEl} className="min-h-0 flex-1 bg-muted" />
       </div>
     )
   }

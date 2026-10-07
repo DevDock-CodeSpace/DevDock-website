@@ -162,11 +162,25 @@ export async function deleteDocument(teamId: string, docId: string) {
   requireAffected(data, 'delete doc')
 }
 
-/** Moves a doc into a folder of its scope, or to the top level (null). */
-export async function moveDocument(docId: string, folderId: string | null) {
-  const { data, error } = await supabase.from('documents').update({ folder_id: folderId }).eq('id', docId).select('id')
-  if (error) throw toDataError('move the doc', error, writeErrors)
-  requireAffected(data, 'move doc')
+/**
+ * Moves docs and folders into a folder of their scope, or to the top level (null), in one step: either
+ * everything moves or nothing does. Writers only; the database checks scope, depth and names.
+ */
+export async function moveDocItems(input: { docIds: string[]; folderIds: string[]; targetId: string | null }) {
+  const { error } = await supabase.rpc('move_doc_items', {
+    p_doc_ids: input.docIds,
+    p_folder_ids: input.folderIds,
+    // Generated types can't express a nullable argument.
+    p_target: input.targetId as string,
+  })
+  if (error) {
+    throw toDataError('move them', error, {
+      '23514': 'That move isn’t allowed: items stay in their own place, folders nest 3 levels deep, and a folder can’t go inside itself.',
+      '23505': 'There’s already a folder with that name in the destination.',
+      '42501': 'You don’t have permission to move these.',
+      '22023': 'Move fewer items at a time.',
+    })
+  }
 }
 
 const folderErrors = {

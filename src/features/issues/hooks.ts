@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { useAuth } from '@/features/auth/hooks'
@@ -145,14 +145,25 @@ export function useIssueView() {
 }
 
 /**
- * Filters as state (instant, and quick successive picks compose) mirrored into
- * the URL so views can be shared and survive reloads.
+ * The filters, read straight from the URL (so a link, a saved view or a pinned person opens with
+ * them, and the back button works). `setFilters` composes with the latest URL, so several quick
+ * picks in a row all stick.
  */
 export function useIssueFilters() {
   const [params, setParams] = useSearchParams()
-  const [filters, setFilters] = useState<IssueFilters>(() => readFilters(params))
+  const latest = useRef(params)
   useEffect(() => {
-    setParams((p) => writeFilters(p, filters), { replace: true })
-  }, [filters, setParams])
+    latest.current = params
+  }, [params])
+  const filters = useMemo(() => readFilters(params), [params])
+  const setFilters = useCallback(
+    (update: IssueFilters | ((previous: IssueFilters) => IssueFilters)) => {
+      const next = typeof update === 'function' ? update(readFilters(latest.current)) : update
+      const nextParams = writeFilters(latest.current, next)
+      latest.current = nextParams
+      setParams(nextParams, { replace: true })
+    },
+    [setParams],
+  )
   return [filters, setFilters] as const
 }

@@ -20,6 +20,9 @@ export type LiveCallValue = {
   call: ActiveCall | null
   /** The spot on the session page the call docks into; null = show it floating. */
   anchorEl: HTMLElement | null
+  /** Floating call tucked away into a small pill (the call keeps running). Ignored while docked. */
+  minimized: boolean
+  setMinimized: (minimized: boolean) => void
   startCall: (call: ActiveCall) => void
   endCall: () => void
   setAnchorEl: (el: HTMLElement | null) => void
