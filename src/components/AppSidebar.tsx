@@ -58,8 +58,9 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-      {/* Match the app header (h-12 + border-b) so the team switcher lines up with the top bar. */}
-      <SidebarHeader className="h-12 justify-center border-b px-2 py-0 group-data-[collapsible=icon]:px-0">
+      {/* Match the app header (h-12 + border-b) so the team switcher lines up with the top bar.
+          The same px-2 collapsed or not keeps the logo centered over the icon column below. */}
+      <SidebarHeader className="h-12 justify-center border-b px-2 py-0">
         <TeamSwitcher />
       </SidebarHeader>
 
