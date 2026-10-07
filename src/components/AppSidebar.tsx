@@ -14,9 +14,10 @@ import {
   SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarRail,
   useSidebar,
 } from '@/components/ui/sidebar'
+import { SidebarResizer } from '@/components/SidebarResizer'
+import type { SidebarWidth } from '@/hooks/use-sidebar-width'
 import { PinnedNav } from '@/features/issues/components/PinnedNav'
 import { useUnread } from '@/features/messaging/hooks'
 import { UserMenu } from '@/features/auth/components/UserMenu'
@@ -40,7 +41,7 @@ const activeIcon = 'data-active:[&_svg]:text-brand'
  * Each type section shows at most 3: pinned first, then recently opened. The
  * section title ("Courses · 5") links to the full list.
  */
-export function AppSidebar() {
+export function AppSidebar({ sidebarWidth }: { sidebarWidth: SidebarWidth }) {
   const { team, can } = useCurrentTeam()
   const workspaces = useSuspenseQuery(teamWorkspacesQuery(team.id)).data
   const { pathname } = useLocation()
@@ -166,7 +167,7 @@ export function AppSidebar() {
       <SidebarFooter>
         <UserMenu />
       </SidebarFooter>
-      <SidebarRail />
+      <SidebarResizer sidebar={sidebarWidth} />
     </Sidebar>
   )
 }

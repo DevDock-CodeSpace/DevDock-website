@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { Fragment } from 'react'
+import { Fragment, type CSSProperties } from 'react'
 import { Link, matchPath, Outlet, useLocation, useParams } from 'react-router'
 import { AppSidebar } from '@/components/AppSidebar'
 import { ThemeToggle } from '@/components/ThemeToggle'
@@ -25,6 +25,7 @@ import { useCurrentTeam, useCurrentWorkspace } from '@/features/teams/hooks'
 import { getTeamNav, getWorkspaceTabs, teamPath, workspacePath, type NavItem } from '@/features/teams/nav'
 import { workspaceQuery } from '@/features/workspaces/api'
 import { useRealtimeSync } from '@/hooks/use-realtime-sync'
+import { useSidebarWidth } from '@/hooks/use-sidebar-width'
 import { useFullBleed } from './full-bleed'
 import { PageArea } from './PageArea'
 
@@ -46,9 +47,11 @@ export function AppLayout() {
 function AppShell() {
   const { workspaceId } = useParams()
   const fullBleed = useFullBleed()
+  const sidebarWidth = useSidebarWidth()
   return (
-    <SidebarProvider defaultOpen={sidebarStartsOpen()}>
-      <AppSidebar />
+    // --sidebar-width is what every part of the sidebar (and the page beside it) is sized from.
+    <SidebarProvider defaultOpen={sidebarStartsOpen()} style={{ '--sidebar-width': `${sidebarWidth.width}px` } as CSSProperties}>
+      <AppSidebar sidebarWidth={sidebarWidth} />
       {/* min-w-0: wide content (the issue board) scrolls inside the page instead of widening it. */}
       <SidebarInset className="min-w-0">
         <header className="sticky top-0 z-10 flex h-12 shrink-0 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur md:px-6">
