@@ -11,7 +11,7 @@ npm install
 npm run dev        # http://localhost:5173
 ```
 
-Sign-in uses **Google via Supabase Auth**, so the app needs `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` (see [Environment variables](#environment-variables)). Teams, workspaces and memberships come from the database; Lessons, Live Session and Resources are placeholders until their tables exist.
+Sign-in uses **Google via Supabase Auth**, so the app needs `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` (see [Environment variables](#environment-variables)). Teams, workspaces and memberships come from the database; Exercises is a placeholder until its tables exist.
 
 Checks, before every pull request: one command runs them all (lint, typecheck and production build, then the performance budget):
 
@@ -162,8 +162,8 @@ Code lives in `src/features/auth/` (`api.ts`, `loaders.ts`, `hooks.ts`, `session
 In [Google Cloud Console](https://console.cloud.google.com/) → **Google Auth Platform**:
 
 1. **Branding / Audience:** set the app name (DevDock) and support email. The user type is **External**.
-   - While the publishing status is **Testing**, only the accounts listed under **Audience → Test users** can sign in. Add yourself and your students, or publish the app. DevDock only uses the basic `openid`, `email` and `profile` scopes, which don't require Google's app verification.
-2. **Data Access:** the scopes are `openid`, `.../auth/userinfo.email` and `.../auth/userinfo.profile`.
+   - While the publishing status is **Testing**, only the accounts listed under **Audience → Test users** can sign in. Add yourself and your students, or publish the app. Sign-in alone uses only the basic `openid`, `email` and `profile` scopes, which don't require Google's app verification — but the optional Calendar sync does (see [Meetings and calendars](#meetings-and-calendars)).
+2. **Data Access:** the scopes are `openid`, `.../auth/userinfo.email` and `.../auth/userinfo.profile`, plus `.../auth/calendar.events` if you want the Calendar sync below.
 3. **Clients → Create client → Web application:**
    - **Authorized JavaScript origins:** `http://localhost:5173`, plus each deployed origin later.
    - **Authorized redirect URIs:** `https://<project-ref>.supabase.co/auth/v1/callback`. This is Supabase's callback, *not* the app's `/auth/callback`.
@@ -189,6 +189,28 @@ The app always sends `redirectTo = window.location.origin + '/auth/callback'`, s
 - **Vercel:** set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` in the project's environment variables.
 
 `supabase/config.toml` only configures the optional local Docker stack. The hosted project is configured in the dashboard.
+
+## Meetings and calendars
+
+Meetings (the UI name for `live_sessions`) reach people's calendars three ways, in increasing order of setup:
+
+1. **Add to calendar links** — pre-filled Google Calendar and Outlook/Teams URLs. The person clicks Save. No setup, no account connection, works everywhere.
+2. **Download .ics** — a standard calendar file, for one meeting or a whole repeating series. Opens in Outlook/Teams, Google and Apple Calendar. No setup. Neither of these invites anyone; they add the meeting to the calendar of whoever clicks.
+3. **Google Calendar sync** — DevDock creates the event in the organizer's Google Calendar and emails an invite to everyone in the audience. This is the only automatic option.
+
+### Turning on Google Calendar sync
+
+The sync needs the `calendar.events` scope, which Google classes as **sensitive**. That means:
+
+- While the consent screen is in **Testing**, each organizer sees an "unverified app" warning *and must re-approve every 7 days*. That's what makes it feel broken.
+- Switching the consent screen to **Production** (Google Auth Platform → Audience → Publish app) removes the weekly re-approval. The warning screen then appears once per person.
+- Removing the warning entirely needs Google's verification: app verification only, **no security assessment** (that's for restricted scopes), and roughly 3–5 business days. Not required below 100 users.
+
+### Why there's no Outlook/Teams sync
+
+Evaluated and rejected in October 2026; don't retry it without new information. Creating events in Outlook needs a Microsoft Entra app registration, and Microsoft **blocks end users from consenting to newly registered multitenant apps whose publisher isn't verified** when they ask for more than basic sign-in. `Calendars.ReadWrite` is more than basic sign-in. Becoming a verified publisher needs a Microsoft Cloud Partner Program account with a verified Partner Global Account — a business registration, out of proportion here.
+
+In practice an organizer's work account could only connect if their employer's IT granted admin consent. Teams meeting *creation* is a separate dead end: it needs a paid Microsoft 365 business or school account and can't be done for personal accounts at all. The Outlook link (option 1) covers the everyday need in two clicks.
 
 ## GitHub App setup
 

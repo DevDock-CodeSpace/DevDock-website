@@ -13,7 +13,7 @@ export function LiveSessionPage() {
   const session = useSuspenseQuery(liveSessionQuery(sessionId)).data
 
   if (!session) {
-    return <p className="py-16 text-center text-sm text-muted-foreground">This session was cancelled.</p>
+    return <p className="py-16 text-center text-sm text-muted-foreground">This meeting was cancelled.</p>
   }
   return <LiveSessionView key={session.id} session={session} workspaceId={workspaceId} />
 }

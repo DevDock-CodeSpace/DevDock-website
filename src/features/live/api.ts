@@ -5,7 +5,7 @@ import type { WorkspaceType } from '@/features/workspaces/api'
 import { DataError, requireAffected, toDataError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
 
-// Live sessions: scheduled Jitsi (JaaS) calls. Same scope model and access
+// Meetings (live_sessions): scheduled Jitsi (JaaS) calls. Same scope model and access
 // rules as docs (workspace_id null = group-wide): readers see and join, writers
 // (group owners/admins, workspace leads) schedule, edit and cancel. The room
 // itself is only reachable with a token from the jaas-token Edge Function.
@@ -19,6 +19,8 @@ export type LiveSession = {
   starts_at: string
   ends_at: string
   calendar_event_id: string | null
+  /** Shared by every meeting of a repeating series; null for one-off meetings. */
+  series_id: string | null
   created_by: string | null
   created_at: string
   updated_at: string
@@ -28,16 +30,16 @@ export type LiveSession = {
 
 // room_name is left out: the browser only gets it with a JaaS token.
 const COLUMNS =
-  'id, team_id, workspace_id, title, description, starts_at, ends_at, calendar_event_id, created_by, created_at, updated_at, author:profiles!live_sessions_created_by_fkey(display_name, avatar_url), workspace:workspaces!live_sessions_workspace_team_fkey(id, title, type)'
+  'id, team_id, workspace_id, title, description, starts_at, ends_at, calendar_event_id, series_id, created_by, created_at, updated_at, author:profiles!live_sessions_created_by_fkey(display_name, avatar_url), workspace:workspaces!live_sessions_workspace_team_fkey(id, title, type)'
 
 const writeErrors = {
-  '42501': 'You don’t have permission to schedule sessions here.',
-  '23514': 'Check the times: a session ends after it starts and lasts at most 12 hours.',
+  '42501': 'You don’t have permission to schedule meetings here.',
+  '23514': 'Check the times: a meeting ends after it starts and lasts at most 12 hours.',
 }
 
 // ---------------------------------------------------------------- queries
 
-/** Group → Live: group-wide sessions plus sessions of every workspace the caller can see. */
+/** Group → Meetings: group-wide meetings plus meetings of every workspace the caller can see. */
 export const teamLiveSessionsQuery = (teamId: string) =>
   queryOptions({
     queryKey: ['live', 'team', teamId],
@@ -47,12 +49,12 @@ export const teamLiveSessionsQuery = (teamId: string) =>
         .select(COLUMNS)
         .eq('team_id', teamId)
         .order('starts_at', { ascending: true })
-      if (error) throw toDataError('load live sessions', error)
+      if (error) throw toDataError('load meetings', error)
       return data
     },
   })
 
-/** Workspace → Live: only this workspace's sessions. */
+/** Workspace → Meetings: only this workspace's meetings. */
 export const workspaceLiveSessionsQuery = (workspaceId: string) =>
   queryOptions({
     queryKey: ['live', 'workspace', workspaceId],
@@ -62,7 +64,7 @@ export const workspaceLiveSessionsQuery = (workspaceId: string) =>
         .select(COLUMNS)
         .eq('workspace_id', workspaceId)
         .order('starts_at', { ascending: true })
-      if (error) throw toDataError('load live sessions', error)
+      if (error) throw toDataError('load meetings', error)
       return data
     },
   })
@@ -73,10 +75,24 @@ export const liveSessionQuery = (sessionId: string) =>
     queryKey: ['live', sessionId],
     queryFn: async (): Promise<LiveSession | null> => {
       const { data, error } = await supabase.from('live_sessions').select(COLUMNS).eq('id', sessionId).maybeSingle()
-      if (error) throw toDataError('load the session', error)
+      if (error) throw toDataError('load the meeting', error)
       return data
     },
   })
+
+/** All meetings of a series, soonest first (for the calendar event and the series summary). */
+export async function fetchSeriesSessions(seriesId: string): Promise<LiveSession[]> {
+  const { data, error } = await supabase
+    .from('live_sessions')
+    .select(COLUMNS)
+    .eq('series_id', seriesId)
+    .order('starts_at', { ascending: true })
+  if (error) throw toDataError('load the series', error)
+  return data
+}
+
+export const seriesSessionsQuery = (seriesId: string) =>
+  queryOptions({ queryKey: ['live', 'series', seriesId], queryFn: () => fetchSeriesSessions(seriesId) })
 
 // -------------------------------------------------------------- mutations
 
@@ -103,8 +119,32 @@ export async function createLiveSession(
     })
     .select('id')
     .single()
-  if (error) throw toDataError('schedule the session', error, writeErrors)
+  if (error) throw toDataError('schedule the meeting', error, writeErrors)
   return data
+}
+
+/** One database call creates the whole series. Returns the new meetings, soonest first. */
+export async function createLiveSeries(
+  input: Omit<LiveSessionInput, 'startsAt' | 'endsAt'> & {
+    teamId: string
+    workspaceId: string | null
+    starts: Date[]
+    durationMinutes: number
+  },
+): Promise<{ id: string; seriesId: string | null; startsAt: string }[]> {
+  const { data, error } = await supabase.rpc('create_live_series', {
+    p_team_id: input.teamId,
+    // The generated type says string; the function takes null for group-wide meetings.
+    p_workspace_id: input.workspaceId as string,
+    p_title: input.title.trim(),
+    p_description: input.description.trim(),
+    p_starts: input.starts.map((d) => d.toISOString()),
+    p_duration_minutes: input.durationMinutes,
+  })
+  if (error) throw toDataError('schedule the meetings', error, writeErrors)
+  return data
+    .map((row) => ({ id: row.id, seriesId: row.series_id, startsAt: row.starts_at }))
+    .sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt))
 }
 
 export async function updateLiveSession(sessionId: string, input: LiveSessionInput) {
@@ -118,7 +158,7 @@ export async function updateLiveSession(sessionId: string, input: LiveSessionInp
     })
     .eq('id', sessionId)
     .select('id')
-  if (error) throw toDataError('save the session', error, writeErrors)
+  if (error) throw toDataError('save the meeting', error, writeErrors)
   requireAffected(data, 'update live session')
 }
 
@@ -132,9 +172,32 @@ export async function setCalendarEventId(sessionId: string, eventId: string | nu
   requireAffected(data, 'set calendar event id')
 }
 
+/** Every meeting of the series gets the same Google Calendar event. */
+export async function setSeriesCalendarEventId(seriesId: string, eventId: string | null) {
+  const { data, error } = await supabase
+    .from('live_sessions')
+    .update({ calendar_event_id: eventId })
+    .eq('series_id', seriesId)
+    .select('id')
+  if (error) throw toDataError('save the calendar event', error, writeErrors)
+  requireAffected(data, 'set series calendar event id')
+}
+
+/** Cancels this meeting and every later one in its series (not the ones already held). */
+export async function deleteLiveSeriesFrom(seriesId: string, fromStartsAt: string) {
+  const { data, error } = await supabase
+    .from('live_sessions')
+    .delete()
+    .eq('series_id', seriesId)
+    .gte('starts_at', fromStartsAt)
+    .select('id')
+  if (error) throw toDataError('cancel the meetings', error, writeErrors)
+  requireAffected(data, 'delete live series')
+}
+
 export async function deleteLiveSession(sessionId: string) {
   const { data, error } = await supabase.from('live_sessions').delete().eq('id', sessionId).select('id')
-  if (error) throw toDataError('cancel the session', error, writeErrors)
+  if (error) throw toDataError('cancel the meeting', error, writeErrors)
   requireAffected(data, 'delete live session')
 }
 
@@ -151,9 +214,9 @@ export type JaasToken = { token: string; appId: string; roomName: string }
 
 const tokenErrors: Record<string, string> = {
   not_configured: 'Live video isn’t set up yet. The group owner needs to add the JaaS keys.',
-  too_early: 'This session opens 15 minutes before it starts.',
-  ended: 'This session has ended.',
-  not_found: 'This session doesn’t exist anymore, or you don’t have access to it.',
+  too_early: 'This meeting opens 15 minutes before it starts.',
+  ended: 'This meeting has ended.',
+  not_found: 'This meeting doesn’t exist anymore, or you don’t have access to it.',
   unauthorized: 'Your session expired. Sign in again to join.',
 }
 

@@ -1197,6 +1197,7 @@ export type Database = {
           ends_at: string
           id: string
           room_name: string
+          series_id: string | null
           starts_at: string
           team_id: string
           title: string
@@ -1211,6 +1212,7 @@ export type Database = {
           ends_at: string
           id?: string
           room_name?: string
+          series_id?: string | null
           starts_at: string
           team_id: string
           title: string
@@ -1225,6 +1227,7 @@ export type Database = {
           ends_at?: string
           id?: string
           room_name?: string
+          series_id?: string | null
           starts_at?: string
           team_id?: string
           title?: string
@@ -2112,6 +2115,21 @@ export type Database = {
       create_group_conversation: {
         Args: { p_name: string; p_team_id: string; p_user_ids: string[] }
         Returns: string
+      }
+      create_live_series: {
+        Args: {
+          p_description: string
+          p_duration_minutes: number
+          p_starts: string[]
+          p_team_id: string
+          p_title: string
+          p_workspace_id: string
+        }
+        Returns: {
+          id: string
+          series_id: string
+          starts_at: string
+        }[]
       }
       create_workspace: {
         Args: {

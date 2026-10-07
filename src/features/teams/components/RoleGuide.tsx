@@ -61,7 +61,7 @@ export function RoleGuide({ type, myRole }: { type: TeamType; myRole: TeamRole }
         'Invite people with invite codes, and remove members',
         `Create, edit and delete ${nouns}, and choose who’s in each and who leads it`,
         `See and manage every ${noun}, even ones they haven’t joined`,
-        'Write group-wide diagrams, delete group-wide docs and organize their folders, schedule group-wide live sessions, and change group settings',
+        'Write group-wide diagrams, delete group-wide docs and organize their folders, schedule group-wide meetings, and change group settings',
         'Add and remove the group’s GitHub repositories',
       ],
     },
@@ -85,7 +85,7 @@ export function RoleGuide({ type, myRole }: { type: TeamType; myRole: TeamRole }
       can: [
         `Change the ${noun}’s settings and tools, and add or remove its members`,
         'Write its diagrams, delete its docs, and organize doc folders',
-        'Schedule its live sessions',
+        'Schedule its meetings',
         'Delete issues, and manage labels and sprints',
         'Link the group’s repositories to it, and set their branches',
         'Move any issue to In Review or Done by hand (overriding GitHub)',

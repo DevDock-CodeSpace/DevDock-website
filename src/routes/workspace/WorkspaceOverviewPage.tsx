@@ -146,7 +146,7 @@ function RecentActivity({ members }: { members: WorkspaceMember[] }) {
           </li>
         ))}
       </ul>
-      <p className="text-xs text-muted-foreground">Activity from tools (docs, lessons, live sessions) will show up here later.</p>
+      <p className="text-xs text-muted-foreground">Activity from tools (docs, lessons, meetings) will show up here later.</p>
     </Section>
   )
 }

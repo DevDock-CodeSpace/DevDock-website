@@ -1,10 +1,10 @@
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useAuth } from '@/features/auth/hooks'
 import { useCanWriteDocs } from '@/features/docs/hooks'
 import { errorMessage } from '@/lib/errors'
-import { liveSessionQuery } from './api'
+import { liveSessionQuery, seriesSessionsQuery } from './api'
 import { flushCalendarQueue, runCalendarOps, type CalendarOp } from './calendar'
 
 /**
@@ -40,7 +40,7 @@ export function useCalendarOps() {
   }
 }
 
-/** On Live pages: finish calendar changes queued before a trip to Google. */
+/** On Meetings pages: finish calendar changes queued before a trip to Google. */
 export function useCalendarQueue() {
   const queryClient = useQueryClient()
   const load = useLoadFresh()
@@ -58,4 +58,10 @@ export function useCalendarQueue() {
     )
     // Once per mount (`started` also guards StrictMode's double run).
   }, [load, queryClient])
+}
+
+/** The meetings of a series (soonest first); empty for one-off meetings. Loads after the page paints. */
+export function useSeriesSessions(seriesId: string | null) {
+  const query = useQuery({ ...seriesSessionsQuery(seriesId ?? ''), enabled: seriesId !== null })
+  return query.data ?? []
 }
