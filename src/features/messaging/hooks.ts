@@ -1,12 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 import { toast } from 'sonner'
 import { useAuth } from '@/features/auth/hooks'
+import { teamMembersQuery } from '@/features/teams/api'
 import { errorMessage } from '@/lib/errors'
 import type { Json } from '@/types/database.types'
 import {
   conversationKeys,
   preferencesQuery,
+  teamConversationMembersQuery,
+  teamConversationsQuery,
   sendMessage,
   setNotificationMode,
   unreadCountsQuery,
@@ -14,7 +17,7 @@ import {
   type Message,
   type NotificationMode,
 } from './api'
-import { pendingMessageId } from './names'
+import { conversationTitle, pendingMessageId } from './names'
 
 export type SendInput = { clientId: string; content: string; body: Json; mentionIds: string[]; files: File[] }
 
@@ -99,4 +102,24 @@ export function useSendReply(conversationId: string, teamId: string, parentId: s
       void queryClient.invalidateQueries({ queryKey: conversationKeys.attachments(conversationId) })
     },
   })
+}
+
+/** The display name of a conversation (a DM is named after the other person), loaded only when `enabled`. */
+export function useConversationTitles(teamId: string, enabled: boolean) {
+  const { user } = useAuth()
+  const conversations = useQuery({ ...teamConversationsQuery(teamId), enabled }).data
+  const people = useQuery({ ...teamMembersQuery(teamId), enabled }).data
+  const members = useQuery({ ...teamConversationMembersQuery(teamId), enabled }).data
+  const participants = useMemo(() => {
+    const map = new Map<string, string[]>()
+    for (const member of members ?? []) map.set(member.conversation_id, [...(map.get(member.conversation_id) ?? []), member.user_id])
+    return map
+  }, [members])
+  return useCallback(
+    (conversationId: string | null) => {
+      const conversation = conversations?.find((item) => item.id === conversationId)
+      return conversation ? conversationTitle(conversation.kind, conversation.name, people ?? [], user.id, participants.get(conversation.id)) : 'a conversation'
+    },
+    [conversations, people, participants, user.id],
+  )
 }

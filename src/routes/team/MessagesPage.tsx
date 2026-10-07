@@ -8,15 +8,12 @@ import { teamMembersQuery } from '@/features/teams/api'
 import { useCurrentTeam } from '@/features/teams/hooks'
 import {
   conversationKeys,
-  markNotificationRead,
-  notificationsQuery,
   searchMessagesQuery,
   teamConversationMembersQuery,
   teamConversationsQuery,
 } from '@/features/messaging/api'
 import { ConversationItem } from '@/features/messaging/components/ConversationItem'
 import { NewConversationDialog } from '@/features/messaging/components/NewConversationDialog'
-import { NotificationList } from '@/features/messaging/components/NotificationList'
 import { useUnread } from '@/features/messaging/hooks'
 import { conversationTitle, displayName } from '@/features/messaging/names'
 
@@ -30,7 +27,6 @@ export function MessagesPage() {
   const conversations = useSuspenseQuery(teamConversationsQuery(team.id)).data
   const people = useSuspenseQuery(teamMembersQuery(team.id)).data
   const conversationMembers = useSuspenseQuery(teamConversationMembersQuery(team.id)).data
-  const notifications = useSuspenseQuery(notificationsQuery(team.id, user.id)).data
   const unread = useUnread(team.id)
   const [search, setSearch] = useState('')
   // The open conversation (and a message to scroll to) live in the URL, so links to a message work.
@@ -102,16 +98,6 @@ export function MessagesPage() {
             )}
           </div>
         )}
-        <NotificationList
-          notifications={notifications}
-          conversations={conversations}
-          titleOf={titleOf}
-          onSelect={async (conversationId, notificationId) => {
-            await markNotificationRead(notificationId)
-            select(conversationId)
-            await queryClient.invalidateQueries({ queryKey: conversationKeys.notifications(team.id, user.id) })
-          }}
-        />
         <nav aria-label="Conversations" className="flex gap-1 overflow-x-auto px-2 pb-2 lg:block lg:min-h-0 lg:flex-1 lg:space-y-4 lg:overflow-x-visible lg:overflow-y-auto lg:pt-2">
           {sections.map((section) => (
             <div key={section.label} className="flex gap-1 lg:block lg:space-y-0.5">

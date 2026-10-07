@@ -63,3 +63,6 @@ export function formatDay(iso: string, now = new Date()) {
   if (date.toDateString() === yesterday.toDateString()) return 'Yesterday'
   return date.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', ...(date.getFullYear() === now.getFullYear() ? {} : { year: 'numeric' }) })
 }
+
+/** "3:32 PM" for today, otherwise "Yesterday" / "Monday, October 5". */
+export const formatWhen = (iso: string, now = new Date()) => (new Date(iso).toDateString() === now.toDateString() ? formatTime(iso) : formatDay(iso, now))

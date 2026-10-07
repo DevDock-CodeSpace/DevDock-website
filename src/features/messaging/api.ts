@@ -12,7 +12,7 @@ export type ConversationMember = Tables<'conversation_members'>
 export type Message = Tables<'messages'>
 export type NotificationMode = 'all' | 'mentions' | 'muted'
 export type UnreadCount = Database['public']['Functions']['conversation_unread_counts']['Returns'][number]
-export type Notification = Tables<'notifications'>
+export type Notification = Tables<'notifications'> & { message?: { parent_id: string | null } | null }
 export type Reaction = Tables<'message_reactions'>
 export type Pin = Tables<'message_pins'>
 export type MessageAttachment = Tables<'message_attachments'>
@@ -203,7 +203,7 @@ export const notificationsQuery = (teamId: string, userId: string) =>
     queryFn: async (): Promise<Notification[]> => {
       const { data, error } = await supabase
         .from('notifications')
-        .select('id, team_id, recipient_id, conversation_id, message_id, kind, dedupe_key, read_at, created_at')
+        .select('id, team_id, recipient_id, conversation_id, message_id, kind, dedupe_key, read_at, created_at, message:messages(parent_id)')
         .eq('team_id', teamId)
         .eq('recipient_id', userId)
         .is('read_at', null)
@@ -228,6 +228,17 @@ export const searchMessagesQuery = (teamId: string, query: string, conversationI
 export async function markNotificationRead(notificationId: string) {
   const { error } = await supabase.from('notifications').update({ read_at: new Date().toISOString() }).eq('id', notificationId)
   if (error) throw toDataError('dismiss the notification', error)
+}
+
+export async function markAllNotificationsRead(teamId: string, userId: string) {
+  const { error } = await supabase.from('notifications').update({ read_at: new Date().toISOString() }).eq('team_id', teamId).eq('recipient_id', userId).is('read_at', null)
+  if (error) throw toDataError('dismiss the notifications', error)
+}
+
+/** Reading a conversation clears its notifications. */
+export async function markConversationNotificationsRead(conversationId: string, userId: string) {
+  const { error } = await supabase.from('notifications').update({ read_at: new Date().toISOString() }).eq('conversation_id', conversationId).eq('recipient_id', userId).is('read_at', null)
+  if (error) throw toDataError('dismiss the notifications', error)
 }
 
 export async function findExistingGroup(teamId: string, userIds: string[]): Promise<string | null> {
