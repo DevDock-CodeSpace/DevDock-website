@@ -1,4 +1,5 @@
 import type { LiveSession } from './api'
+import { inferRecurrence } from './recurrence'
 
 // Calendar files (RFC 5545). A meeting downloads as an .ics that any calendar
 // opens — Outlook/Teams, Google, Apple — so nobody needs to connect an account
@@ -149,8 +150,13 @@ function body(session: LiveSession, link: string): string {
   return [session.description?.trim(), `Join in DevDock: ${link}`].filter(Boolean).join('\n\n')
 }
 
-/** Opens Google Calendar's "new event" form, pre-filled. */
-export function googleCalendarUrl(session: LiveSession, link: string): string {
+/**
+ * Opens Google Calendar's "new event" form, pre-filled. Given a whole series it
+ * adds a recurrence rule so one click covers every meeting; an irregular series
+ * (hand-picked dates) has no rule, so only this meeting is added and the .ics
+ * stays the way to get them all.
+ */
+export function googleCalendarUrl(session: LiveSession, link: string, series: LiveSession[] = []): string {
   const params = new URLSearchParams({
     action: 'TEMPLATE',
     text: session.title,
@@ -158,8 +164,14 @@ export function googleCalendarUrl(session: LiveSession, link: string): string {
     details: body(session, link),
     location: link,
   })
+  const recur = series.length > 1 ? inferRecurrence(series.map((s) => new Date(s.starts_at))) : null
+  if (recur) params.set('recur', recur)
   return `https://www.google.com/calendar/render?${params}`
 }
+
+/** Whether a Google link would carry the whole series (used for the hint text). */
+export const seriesFitsLink = (series: LiveSession[]): boolean =>
+  series.length > 1 && inferRecurrence(series.map((s) => new Date(s.starts_at))) !== null
 
 /** Opens Outlook (work/school, outlook.office.com) with the event filled in. */
 export function outlookCalendarUrl(session: LiveSession, link: string): string {

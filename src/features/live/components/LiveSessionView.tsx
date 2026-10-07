@@ -1,18 +1,12 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { CalendarArrowDown as CalendarDown, CalendarCheck, CalendarPlus, Clock, LoaderCircle, Pencil, Repeat, Trash2, Video } from 'lucide-react'
+import { CalendarArrowDown as CalendarDown, CalendarCheck, CalendarPlus, CircleHelp, Clock, LoaderCircle, Pencil, Repeat, Trash2, Video } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { PersonAvatar } from '@/components/PersonRow'
 import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useUserIdentity } from '@/features/auth/hooks'
 import { DocScope } from '@/features/docs/components/DocScope'
 import { useCurrentTeam } from '@/features/teams/hooks'
@@ -22,7 +16,7 @@ import { timeAgo } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { deleteLiveSeriesFrom, deleteLiveSession, fetchJaasToken, type LiveSession } from '../api'
 import { useLiveCall } from '../call/context'
-import { buildIcs, downloadIcs, googleCalendarUrl, icsFileName, outlookCalendarUrl } from '../ics'
+import { buildIcs, downloadIcs, googleCalendarUrl, icsFileName, outlookCalendarUrl, seriesFitsLink } from '../ics'
 import { useSeriesSessions } from '../hooks'
 import { useCalendarOps, useCalendarQueue, useCanWriteLive, useNow } from '../hooks'
 import { canJoin, durationMinutes, EARLY_JOIN_MS, formatDay, formatDuration, formatTime, formatTimeRange, sessionStatus } from '../time'
@@ -49,6 +43,13 @@ export function LiveSessionView({ session, workspaceId }: LiveSessionViewProps) 
   const [cancelRest, setCancelRest] = useState(false)
   const series = useSeriesSessions(session.series_id)
   const laterInSeries = series.filter((s) => Date.parse(s.starts_at) > Date.parse(session.starts_at)).length
+  const wholeSeries = series.length > 1
+  // A Google link carries a repeat rule; Outlook's cannot, and irregular dates have no rule.
+  const addHint = !wholeSeries
+    ? 'Opens your calendar with the meeting filled in.'
+    : seriesFitsLink(series)
+      ? `Google adds all ${series.length} meetings. Outlook adds this one.`
+      : `These dates don’t follow a pattern, so the links add this meeting only. The .ics file has all ${series.length}.`
 
   const status = sessionStatus(session, now)
   const joinable = canJoin(session, now, canWrite)
@@ -218,63 +219,79 @@ export function LiveSessionView({ session, workspaceId }: LiveSessionViewProps) 
             <span className="text-muted-foreground">Unknown</span>
           )}
         </Detail>
-        <Detail label="Add to calendar">
-          <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="xs">
-                  <CalendarDown /> Add to calendar
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                {/* Links open the calendar with the event filled in; no account connection. */}
-                <DropdownMenuItem asChild>
-                  <a href={googleCalendarUrl(session, eventUrl)} target="_blank" rel="noreferrer">
-                    Google Calendar
-                  </a>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <a href={outlookCalendarUrl(session, eventUrl)} target="_blank" rel="noreferrer">
-                    Outlook / Teams
-                  </a>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={() => saveIcs('one')}>Download .ics</DropdownMenuItem>
-                {session.series_id && series.length > 1 && (
-                  <DropdownMenuItem onSelect={() => saveIcs('series')}>
-                    Download .ics ({series.length} meetings)
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <span className="text-xs text-muted-foreground">
-              {session.series_id && series.length > 1
-                ? 'Links add this meeting; the .ics file holds the whole series.'
-                : 'Opens your calendar with the meeting filled in.'}
-            </span>
-          </span>
-        </Detail>
-        <Detail label="Google invites">
-          <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            {session.calendar_event_id ? (
-              <span className="flex items-center gap-1.5">
-                <CalendarCheck className="size-4 text-muted-foreground" /> In Google Calendar, invites sent
-              </span>
-            ) : (
-              <span className="text-muted-foreground">Not in Google Calendar</span>
-            )}
-            {canWrite && status !== 'ended' && (
-              <Button
-                variant="outline"
-                size="xs"
-                onClick={() => syncCalendar.mutate()}
-                disabled={syncCalendar.isPending}
-              >
-                {syncCalendar.isPending ? <LoaderCircle className="animate-spin" /> : <CalendarPlus />}
-                {session.calendar_event_id ? 'Update invites' : 'Add to Google Calendar'}
+        <Detail label="My calendar">
+          <div className="space-y-1.5">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Plain links: they open the calendar with the meeting filled in, no account connection. */}
+              <Button asChild variant="outline" size="xs">
+                <a href={googleCalendarUrl(session, eventUrl, series)} target="_blank" rel="noreferrer">
+                  <CalendarDown /> Google
+                </a>
               </Button>
+              <Button asChild variant="outline" size="xs">
+                <a href={outlookCalendarUrl(session, eventUrl)} target="_blank" rel="noreferrer">
+                  <CalendarDown /> Outlook
+                </a>
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                or{' '}
+                <button
+                  type="button"
+                  onClick={() => saveIcs(wholeSeries ? 'series' : 'one')}
+                  className="underline underline-offset-2 hover:text-foreground"
+                >
+                  download .ics
+                </button>
+                {wholeSeries && ' (all ' + series.length + ')'}
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground">{addHint}</p>
+          </div>
+        </Detail>
+        <Detail label="Invites">
+          <div className="space-y-1.5">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              {session.calendar_event_id ? (
+                <span className="flex items-center gap-1.5">
+                  <CalendarCheck className="size-4 text-muted-foreground" /> Invites sent
+                </span>
+              ) : (
+                <span className="text-muted-foreground">Nobody invited yet</span>
+              )}
+              {canWrite && status !== 'ended' && (
+                <span className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="xs"
+                    onClick={() => syncCalendar.mutate()}
+                    disabled={syncCalendar.isPending}
+                  >
+                    {syncCalendar.isPending ? <LoaderCircle className="animate-spin" /> : <CalendarPlus />}
+                    {session.calendar_event_id ? 'Update invites' : 'Invite everyone'}
+                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        aria-label="What this does"
+                        className="flex size-5 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+                      >
+                        <CircleHelp className="size-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      {session.calendar_event_id
+                        ? 'Updates the event in your Google Calendar and emails everyone this meeting is for again, so they see the change.'
+                        : 'Creates the event in your Google Calendar and emails an invite to everyone this meeting is for. They don’t need a DevDock or Google account to receive it.'}
+                    </TooltipContent>
+                  </Tooltip>
+                </span>
+              )}
+            </div>
+            {!canWrite && (
+              <p className="text-xs text-muted-foreground">Leads and group admins send invites.</p>
             )}
-          </span>
+          </div>
         </Detail>
         {session.description && (
           <Detail label="Notes">
