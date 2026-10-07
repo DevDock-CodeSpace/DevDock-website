@@ -753,6 +753,74 @@ export type Database = {
           },
         ]
       }
+      issue_pins: {
+        Row: {
+          created_at: string
+          id: string
+          kind: string
+          person_id: string | null
+          position: number
+          tab: string | null
+          team_id: string
+          user_id: string
+          view_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind: string
+          person_id?: string | null
+          position?: number
+          tab?: string | null
+          team_id: string
+          user_id?: string
+          view_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: string
+          person_id?: string | null
+          position?: number
+          tab?: string | null
+          team_id?: string
+          user_id?: string
+          view_id?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "issue_pins_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "issue_pins_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "issue_pins_view_id_fkey"
+            columns: ["view_id"]
+            isOneToOne: false
+            referencedRelation: "issue_views"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "issue_pins_workspace_fkey"
+            columns: ["workspace_id", "team_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id", "team_id"]
+          },
+        ]
+      }
       issue_pull_requests: {
         Row: {
           author_login: string | null
@@ -822,6 +890,63 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "repos"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      issue_views: {
+        Row: {
+          created_at: string
+          filters: Json
+          id: string
+          layout: string
+          name: string
+          owner_id: string
+          shared: boolean
+          tab: string
+          team_id: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          filters?: Json
+          id?: string
+          layout?: string
+          name: string
+          owner_id?: string
+          shared?: boolean
+          tab?: string
+          team_id: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          filters?: Json
+          id?: string
+          layout?: string
+          name?: string
+          owner_id?: string
+          shared?: boolean
+          tab?: string
+          team_id?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "issue_views_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "issue_views_workspace_fkey"
+            columns: ["workspace_id", "team_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id", "team_id"]
           },
         ]
       }
@@ -2044,9 +2169,17 @@ export type Database = {
         Returns: undefined
       }
       mark_thread_read: { Args: { p_parent_id: string }; Returns: undefined }
+      move_doc_items: {
+        Args: { p_doc_ids: string[]; p_folder_ids: string[]; p_target: string }
+        Returns: undefined
+      }
       move_open_issues: {
         Args: { p_from: string; p_to: string }
         Returns: number
+      }
+      reorder_issue_pins: {
+        Args: { p_ids: string[]; p_team_id: string }
+        Returns: undefined
       }
       reorder_learning_modules: {
         Args: { p_ids: string[]; p_workspace_id: string }
