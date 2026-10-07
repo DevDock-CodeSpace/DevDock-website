@@ -1,4 +1,4 @@
-import { CalendarCheck, Video } from 'lucide-react'
+import { CalendarCheck, Repeat, Video } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { PersonAvatar } from '@/components/PersonRow'
@@ -91,6 +91,7 @@ function Rows({
                 >
                   <Video className="size-4 shrink-0 text-muted-foreground" />
                   <span className="truncate">{session.title}</span>
+                  {session.series_id && <Repeat className="size-3 shrink-0 text-muted-foreground" aria-label="Repeating meeting" />}
                 </span>
                 {showScope && (
                   <span className="pl-6">

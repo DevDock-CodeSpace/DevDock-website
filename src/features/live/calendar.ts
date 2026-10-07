@@ -1,7 +1,8 @@
 import { connectGoogleCalendar } from '@/features/auth/api'
 import { clearCalendarToken, getCalendarToken } from '@/features/auth/google-calendar'
 import { DataError } from '@/lib/errors'
-import { fetchInvitees, setCalendarEventId, type LiveSession } from './api'
+import { fetchInvitees, fetchSeriesSessions, setCalendarEventId, setSeriesCalendarEventId, type LiveSession } from './api'
+import { toRdate } from './recurrence'
 
 // Google Calendar sync for live sessions. The organizer's own calendar holds
 // the event; everyone the session is for is an attendee, and Google emails
@@ -18,6 +19,8 @@ const QUEUE_KEY = 'devdock:calendar-queue'
 export type CalendarOp =
   /** Create the event, or update it when the session already has one. */
   | { kind: 'sync'; sessionId: string; url: string }
+  /** One recurring event for a whole series (every meeting shares its id). */
+  | { kind: 'sync_series'; seriesId: string; url: string }
   /** Cancel an event whose session was deleted. */
   | { kind: 'delete'; eventId: string }
 
@@ -35,8 +38,10 @@ async function calendarFetch(token: string, path: string, init: RequestInit): Pr
   return response
 }
 
-function eventBody(session: LiveSession, invitees: string[], url: string) {
+function eventBody(session: LiveSession, invitees: string[], url: string, series: LiveSession[] = []) {
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  // The first meeting is the event itself; the rest are listed as extra dates.
+  const rdate = toRdate(series.map((s) => new Date(s.starts_at)), timeZone)
   const description = [session.description?.trim(), `Join in DevDock: ${url}`].filter(Boolean).join('\n\n')
   return {
     summary: session.title,
@@ -48,6 +53,7 @@ function eventBody(session: LiveSession, invitees: string[], url: string) {
     source: { title: 'DevDock', url },
     guestsCanInviteOthers: false,
     reminders: { useDefault: true },
+    ...(rdate ? { recurrence: [rdate] } : {}),
   }
 }
 
@@ -67,6 +73,28 @@ async function syncEvent(token: string, session: LiveSession, url: string): Prom
   if (!response.ok) throw await googleError(response)
   const event = (await response.json()) as { id: string }
   await setCalendarEventId(session.id, event.id)
+}
+
+/** Creates or updates the single recurring event behind a series. */
+async function syncSeriesEvent(token: string, seriesId: string, url: string): Promise<void> {
+  const series = await fetchSeriesSessions(seriesId)
+  const first = series[0]
+  // Cancelled in the meantime.
+  if (!first) return
+  const invitees = await fetchInvitees(first.id)
+  const body = JSON.stringify(eventBody(first, invitees, url, series))
+  if (first.calendar_event_id) {
+    const response = await calendarFetch(token, `/${encodeURIComponent(first.calendar_event_id)}?sendUpdates=all`, {
+      method: 'PATCH',
+      body,
+    })
+    if (response.ok) return
+    if (response.status !== 404 && response.status !== 410) throw await googleError(response)
+  }
+  const response = await calendarFetch(token, '?sendUpdates=all', { method: 'POST', body })
+  if (!response.ok) throw await googleError(response)
+  const event = (await response.json()) as { id: string }
+  await setSeriesCalendarEventId(seriesId, event.id)
 }
 
 async function deleteEvent(token: string, eventId: string): Promise<void> {
@@ -112,6 +140,7 @@ export function hasQueuedCalendarOps(): boolean {
 
 async function runOp(token: string, op: CalendarOp, load: (id: string) => Promise<LiveSession | null>) {
   if (op.kind === 'delete') return deleteEvent(token, op.eventId)
+  if (op.kind === 'sync_series') return syncSeriesEvent(token, op.seriesId, op.url)
   const session = await load(op.sessionId)
   // Cancelled in the meantime: nothing to sync.
   if (session) await syncEvent(token, session, op.url)

@@ -97,7 +97,7 @@ export function CallDock() {
             <Button variant="ghost" size="icon-sm" aria-label="Hide call window" title="Hide (the call keeps running)" onClick={() => setMinimized(true)}>
               <Minus />
             </Button>
-            <Button variant="ghost" size="icon-sm" aria-label="Return to session" title="Return to session" onClick={() => navigate(call.returnTo)}>
+            <Button variant="ghost" size="icon-sm" aria-label="Return to meeting" title="Return to meeting" onClick={() => navigate(call.returnTo)}>
               <Maximize2 />
             </Button>
             <Button
@@ -132,7 +132,7 @@ export function CallDock() {
           <Button variant="ghost" size="icon-sm" className="rounded-full" aria-label="Show call window" title="Show call" onClick={() => setMinimized(false)}>
             <ChevronUp />
           </Button>
-          <Button variant="ghost" size="icon-sm" className="rounded-full" aria-label="Return to session" title="Return to session" onClick={() => navigate(call.returnTo)}>
+          <Button variant="ghost" size="icon-sm" className="rounded-full" aria-label="Return to meeting" title="Return to meeting" onClick={() => navigate(call.returnTo)}>
             <Maximize2 />
           </Button>
           <Button variant="ghost" size="icon-sm" className="rounded-full text-muted-foreground hover:text-destructive" aria-label="Leave call" title="Leave call" onClick={endCall}>

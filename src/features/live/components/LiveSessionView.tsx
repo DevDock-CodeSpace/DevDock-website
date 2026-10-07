@@ -1,11 +1,18 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { CalendarCheck, CalendarPlus, Clock, LoaderCircle, Pencil, Trash2, Video } from 'lucide-react'
+import { CalendarArrowDown as CalendarDown, CalendarCheck, CalendarPlus, Clock, LoaderCircle, Pencil, Repeat, Trash2, Video } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { PersonAvatar } from '@/components/PersonRow'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { useUserIdentity } from '@/features/auth/hooks'
 import { DocScope } from '@/features/docs/components/DocScope'
 import { useCurrentTeam } from '@/features/teams/hooks'
@@ -13,8 +20,10 @@ import { livePath, liveSessionPath } from '@/features/teams/nav'
 import { errorMessage } from '@/lib/errors'
 import { timeAgo } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import { deleteLiveSession, fetchJaasToken, type LiveSession } from '../api'
+import { deleteLiveSeriesFrom, deleteLiveSession, fetchJaasToken, type LiveSession } from '../api'
 import { useLiveCall } from '../call/context'
+import { buildIcs, downloadIcs, googleCalendarUrl, icsFileName, outlookCalendarUrl } from '../ics'
+import { useSeriesSessions } from '../hooks'
 import { useCalendarOps, useCalendarQueue, useCanWriteLive, useNow } from '../hooks'
 import { canJoin, durationMinutes, EARLY_JOIN_MS, formatDay, formatDuration, formatTime, formatTimeRange, sessionStatus } from '../time'
 import { ScheduleSessionDialog } from './ScheduleSessionDialog'
@@ -37,6 +46,9 @@ export function LiveSessionView({ session, workspaceId }: LiveSessionViewProps) 
   const now = useNow()
   const { call, startCall, endCall, setAnchorEl } = useLiveCall()
   const [confirmCancel, setConfirmCancel] = useState(false)
+  const [cancelRest, setCancelRest] = useState(false)
+  const series = useSeriesSessions(session.series_id)
+  const laterInSeries = series.filter((s) => Date.parse(s.starts_at) > Date.parse(session.starts_at)).length
 
   const status = sessionStatus(session, now)
   const joinable = canJoin(session, now, canWrite)
@@ -60,7 +72,14 @@ export function LiveSessionView({ session, workspaceId }: LiveSessionViewProps) 
 
   const syncCalendar = useMutation({
     mutationFn: () =>
-      calendarOps([{ kind: 'sync', sessionId: session.id, url: eventUrl }], liveSessionPath(team.slug, session.id, workspaceId)),
+      calendarOps(
+        [
+          session.series_id
+            ? { kind: 'sync_series', seriesId: session.series_id, url: eventUrl }
+            : { kind: 'sync', sessionId: session.id, url: eventUrl },
+        ],
+        liveSessionPath(team.slug, session.id, workspaceId),
+      ),
     onSuccess: (result) => {
       if (result === 'done') toast.success('Google Calendar updated. Invites were sent.')
     },
@@ -69,20 +88,41 @@ export function LiveSessionView({ session, workspaceId }: LiveSessionViewProps) 
 
   const cancel = useMutation({
     mutationFn: async () => {
-      await deleteLiveSession(session.id)
+      const seriesId = session.series_id
+      const wholeSeries = seriesId !== null && cancelRest
+      if (wholeSeries) await deleteLiveSeriesFrom(seriesId, session.starts_at)
+      else await deleteLiveSession(session.id)
       // Leave first so this page doesn't render a deleted session.
       await navigate(listPath, { replace: true })
       await queryClient.invalidateQueries({ queryKey: ['live'] })
-      if (!session.calendar_event_id) return
+      const eventId = session.calendar_event_id
+      if (!eventId) return
+      // The series' one Google event: gone when nothing earlier is left, else re-synced
+      // so it only lists what remains. Cancelling a single meeting leaves the event alone.
+      const keepsEarlier = series.some((s) => Date.parse(s.starts_at) < Date.parse(session.starts_at))
       try {
-        await calendarOps([{ kind: 'delete', eventId: session.calendar_event_id }], listPath)
+        if (!seriesId) await calendarOps([{ kind: 'delete', eventId }], listPath)
+        else if (wholeSeries && !keepsEarlier) await calendarOps([{ kind: 'delete', eventId }], listPath)
+        else if (wholeSeries) await calendarOps([{ kind: 'sync_series', seriesId, url: eventUrl }], listPath)
       } catch (error) {
-        toast.error(`Session cancelled, but the calendar event wasn’t removed. ${errorMessage(error)}`)
+        toast.error(`Meeting cancelled, but the calendar event wasn’t updated. ${errorMessage(error)}`)
       }
     },
-    onSuccess: () => toast.success('Session cancelled.'),
+    onSuccess: () => toast.success(cancelRest && session.series_id ? 'Meetings cancelled.' : 'Meeting cancelled.'),
     onError: (error) => toast.error(errorMessage(error)),
   })
+
+  /** Writes an .ics for this meeting, or for every meeting of its series. */
+  const saveIcs = (scope: 'one' | 'series') => {
+    const sessions = scope === 'series' && series.length > 1 ? series : [session]
+    try {
+      const url = (s: LiveSession) =>
+        `${window.location.origin}${liveSessionPath(team.slug, s.id, s.workspace_id ?? undefined)}`
+      downloadIcs(icsFileName(session.title), buildIcs({ sessions, url }))
+    } catch (error) {
+      toast.error(errorMessage(error))
+    }
+  }
 
   if (active) {
     // Fills the area under the top bar: a slim title bar, then the call edge to edge.
@@ -108,7 +148,7 @@ export function LiveSessionView({ session, workspaceId }: LiveSessionViewProps) 
     <div className="max-w-3xl">
       <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
         <Video className="size-3.5" />
-        <span>Live session</span>
+        <span>Meeting</span>
         <span aria-hidden>·</span>
         <DocScope doc={session} />
       </div>
@@ -120,20 +160,25 @@ export function LiveSessionView({ session, workspaceId }: LiveSessionViewProps) 
             <span className="font-mono">{formatTimeRange(session)}</span>
             <span aria-hidden>·</span>
             <span>{formatDuration(durationMinutes(session))}</span>
+            {session.series_id && series.length > 1 && (
+              <span className="flex items-center gap-1 text-xs">
+                <Repeat className="size-3" /> {series.findIndex((s) => s.id === session.id) + 1} of {series.length}
+              </span>
+            )}
             <StatusBadge status={status} startsAt={session.starts_at} now={now} />
           </p>
         </div>
         {canWrite && (
           <div className="flex shrink-0 items-center gap-1">
             <ScheduleSessionDialog session={session} workspaceId={workspaceId}>
-              <Button variant="ghost" size="icon-sm" aria-label="Edit session" className="text-muted-foreground">
+              <Button variant="ghost" size="icon-sm" aria-label="Edit meeting" className="text-muted-foreground">
                 <Pencil />
               </Button>
             </ScheduleSessionDialog>
             <Button
               variant="ghost"
               size="icon-sm"
-              aria-label="Cancel session"
+              aria-label="Cancel meeting"
               className="text-muted-foreground hover:text-destructive"
               onClick={() => setConfirmCancel(true)}
             >
@@ -155,7 +200,7 @@ export function LiveSessionView({ session, workspaceId }: LiveSessionViewProps) 
               : 'Opens in DevDock. Your camera and mic are off until you turn them on.'
             : status === 'upcoming'
               ? `Opens 15 minutes before it starts (${formatTime(new Date(Date.parse(session.starts_at) - EARLY_JOIN_MS).toISOString())}).`
-              : 'This session has ended.'}
+              : 'This meeting has ended.'}
         </span>
       </div>
 
@@ -173,7 +218,43 @@ export function LiveSessionView({ session, workspaceId }: LiveSessionViewProps) 
             <span className="text-muted-foreground">Unknown</span>
           )}
         </Detail>
-        <Detail label="Calendar">
+        <Detail label="Add to calendar">
+          <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="xs">
+                  <CalendarDown /> Add to calendar
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {/* Links open the calendar with the event filled in; no account connection. */}
+                <DropdownMenuItem asChild>
+                  <a href={googleCalendarUrl(session, eventUrl)} target="_blank" rel="noreferrer">
+                    Google Calendar
+                  </a>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <a href={outlookCalendarUrl(session, eventUrl)} target="_blank" rel="noreferrer">
+                    Outlook / Teams
+                  </a>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => saveIcs('one')}>Download .ics</DropdownMenuItem>
+                {session.series_id && series.length > 1 && (
+                  <DropdownMenuItem onSelect={() => saveIcs('series')}>
+                    Download .ics ({series.length} meetings)
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <span className="text-xs text-muted-foreground">
+              {session.series_id && series.length > 1
+                ? 'Links add this meeting; the .ics file holds the whole series.'
+                : 'Opens your calendar with the meeting filled in.'}
+            </span>
+          </span>
+        </Detail>
+        <Detail label="Google invites">
           <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
             {session.calendar_event_id ? (
               <span className="flex items-center gap-1.5">
@@ -207,14 +288,30 @@ export function LiveSessionView({ session, workspaceId }: LiveSessionViewProps) 
         onOpenChange={setConfirmCancel}
         title={`Cancel ${session.title}?`}
         description={
-          session.calendar_event_id
-            ? 'The session is deleted and the Google Calendar event is cancelled for everyone invited.'
-            : 'The session is deleted. This can’t be undone.'
+          session.series_id
+            ? 'This meeting is deleted. It can’t be undone.'
+            : session.calendar_event_id
+              ? 'The meeting is deleted and the Google Calendar event is cancelled for everyone invited.'
+              : 'The meeting is deleted. This can’t be undone.'
         }
-        confirmLabel="Cancel session"
+        confirmLabel={cancelRest && laterInSeries > 0 ? `Cancel ${laterInSeries + 1} meetings` : 'Cancel meeting'}
         pending={cancel.isPending}
         onConfirm={() => cancel.mutate()}
-      />
+      >
+        {session.series_id && laterInSeries > 0 && (
+          <label className="flex cursor-pointer items-start gap-2.5 rounded-md border px-3 py-2.5 text-sm">
+            <input
+              type="checkbox"
+              checked={cancelRest}
+              onChange={(e) => setCancelRest(e.target.checked)}
+              className="mt-0.5 size-4 accent-brand"
+            />
+            <span>
+              Also cancel the {laterInSeries} later {laterInSeries === 1 ? 'meeting' : 'meetings'} in this series
+            </span>
+          </label>
+        )}
+      </ConfirmDialog>
     </div>
   )
 }

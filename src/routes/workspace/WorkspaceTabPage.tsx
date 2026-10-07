@@ -3,7 +3,7 @@ import { useCurrentTeam, useCurrentWorkspace } from '@/features/teams/hooks'
 import { hasWorkspaceTab, isTeamTool, teamPath, teamToolDefs, workspaceTabDefs } from '@/features/teams/nav'
 import { ToolNotEnabled } from '@/features/workspaces/components/ToolNotEnabled'
 
-/** Enabled tools whose features don't exist yet (Docs, Live, …). Tools not enabled here → not found. */
+/** Enabled tools whose features don't exist yet (Docs, Meetings, …). Tools not enabled here → not found. */
 export function WorkspaceTabPage() {
   const { tab = '' } = useParams()
   const { team } = useCurrentTeam()
