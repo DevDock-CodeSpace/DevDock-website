@@ -3,6 +3,7 @@ import { Fragment, Suspense } from 'react'
 import { Link, matchPath, Outlet, useLocation, useParams } from 'react-router'
 import { AppSidebar } from '@/components/AppSidebar'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { NotificationBell } from '@/features/messaging/components/NotificationBell'
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -43,7 +44,8 @@ export function AppLayout() {
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="mr-2 h-4 data-vertical:self-center" />
             {workspaceId ? <WorkspaceBreadcrumb /> : <TeamBreadcrumb />}
-            <div className="ml-auto">
+            <div className="ml-auto flex items-center gap-1">
+              <NotificationBell />
               <ThemeToggle />
             </div>
           </header>

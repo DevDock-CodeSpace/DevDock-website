@@ -15,6 +15,7 @@ import {
   conversationMembersQuery,
   conversationReactionsQuery,
   conversationRepliesQuery,
+  markConversationNotificationsRead,
   markConversationRead,
   messagesQuery,
   pinsQuery,
@@ -104,8 +105,11 @@ export function ConversationView({ conversationId, kind, description, teamId, te
     const latest = [...messages].reverse().find((message) => !isPendingMessage(message.id))
     if (!latest || document.hidden || !atBottom.current || markedId.current === latest.id) return
     markedId.current = latest.id
-    markConversationRead(conversationId, latest.id).catch((error: unknown) => console.error('[messaging] Could not mark read', error))
-  }, [messages, conversationId])
+    // Reading the conversation also clears its bell notifications.
+    markConversationRead(conversationId, latest.id)
+      .then(() => markConversationNotificationsRead(conversationId, user.id))
+      .catch((error: unknown) => console.error('[messaging] Could not mark read', error))
+  }, [messages, conversationId, user.id])
 
   useLayoutEffect(() => {
     const el = scroller.current
