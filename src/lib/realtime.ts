@@ -27,6 +27,8 @@ const AFFECTS: Record<string, QueryKey[]> = {
   issue_comments: [['issues', 'comments']],
   issue_activity: [['issues', 'activity']],
   issue_cycles: [['issues', 'cycles']],
+  issue_views: [['issues', 'views'], ['issues', 'pins']],
+  issue_pins: [['issues', 'pins']],
   issue_pull_requests: [['issues', 'pull-requests']],
   issue_branches: [['issues', 'branches']],
   repos: [['repos', 'team'], ['repos', 'workspace']],

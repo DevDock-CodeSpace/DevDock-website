@@ -17,6 +17,7 @@ import {
   SidebarRail,
   useSidebar,
 } from '@/components/ui/sidebar'
+import { PinnedNav } from '@/features/issues/components/PinnedNav'
 import { useUnread } from '@/features/messaging/hooks'
 import { UserMenu } from '@/features/auth/components/UserMenu'
 import { TeamSwitcher } from '@/features/teams/components/TeamSwitcher'
@@ -72,6 +73,8 @@ export function AppSidebar() {
             ))}
           </SidebarMenu>
         </SidebarGroup>
+
+        <PinnedNav onNavigate={close} />
 
         {sections.map(({ type, items }) => {
           const { shown } = pickSidebarItems(items, pins, visits, workspaceId)

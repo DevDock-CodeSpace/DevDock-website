@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { MoreHorizontal } from 'lucide-react'
 import { useState } from 'react'
-import { useNavigate } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { Button } from '@/components/ui/button'
@@ -15,7 +15,8 @@ import {
 import { PersonRow } from '@/components/PersonRow'
 import { useAuth } from '@/features/auth/hooks'
 import { useCurrentTeam, useCurrentWorkspace } from '@/features/teams/hooks'
-import { teamPath } from '@/features/teams/nav'
+import { issuesPath, teamPath } from '@/features/teams/nav'
+import { personHref } from '@/features/issues/views'
 import { workspaceRoleLabel } from '@/features/teams/permissions'
 import {
   removeWorkspaceMember,
@@ -99,6 +100,13 @@ export function WorkspaceMembersPage() {
                 isYou={isYou}
                 role={workspaceRoleLabel[member.role]}
                 highlight={member.role === 'lead'}
+                meta={
+                  workspace.modules.includes('issues') ? (
+                    <Link to={personHref(issuesPath(team.slug, workspace.id), member.user_id)} className="font-sans text-xs text-brand hover:underline">
+                      Issues
+                    </Link>
+                  ) : undefined
+                }
                 actions={
                   (canChangeRole || canRemove || canLeave) && (
                     <DropdownMenu>
