@@ -1,7 +1,14 @@
 import { connectGoogleCalendar } from '@/features/auth/api'
 import { clearCalendarToken, getCalendarToken } from '@/features/auth/google-calendar'
 import { DataError } from '@/lib/errors'
-import { fetchInvitees, fetchSeriesSessions, setCalendarEventId, setSeriesCalendarEventId, type LiveSession } from './api'
+import {
+  fetchInvitees,
+  fetchSeriesSessions,
+  saveRsvps,
+  setCalendarEventId,
+  setSeriesCalendarEventId,
+  type LiveSession,
+} from './api'
 import { toRdate } from './recurrence'
 
 // Google Calendar sync for live sessions. The organizer's own calendar holds
@@ -65,14 +72,18 @@ async function syncEvent(token: string, session: LiveSession, url: string): Prom
       method: 'PATCH',
       body,
     })
-    if (response.ok) return
+    if (response.ok) {
+      await storeRsvps([session.id], (await response.json()) as GoogleEvent)
+      return
+    }
     // Deleted in Google Calendar: make a new one below.
     if (response.status !== 404 && response.status !== 410) throw await googleError(response)
   }
   const response = await calendarFetch(token, '?sendUpdates=all', { method: 'POST', body })
   if (!response.ok) throw await googleError(response)
-  const event = (await response.json()) as { id: string }
+  const event = (await response.json()) as GoogleEvent
   await setCalendarEventId(session.id, event.id)
+  await storeRsvps([session.id], event)
 }
 
 /** Creates or updates the single recurring event behind a series. */
@@ -88,19 +99,54 @@ async function syncSeriesEvent(token: string, seriesId: string, url: string): Pr
       method: 'PATCH',
       body,
     })
-    if (response.ok) return
+    if (response.ok) {
+      await storeRsvps(series.map((s) => s.id), (await response.json()) as GoogleEvent)
+      return
+    }
     if (response.status !== 404 && response.status !== 410) throw await googleError(response)
   }
   const response = await calendarFetch(token, '?sendUpdates=all', { method: 'POST', body })
   if (!response.ok) throw await googleError(response)
-  const event = (await response.json()) as { id: string }
+  const event = (await response.json()) as GoogleEvent
   await setSeriesCalendarEventId(seriesId, event.id)
+  await storeRsvps(series.map((s) => s.id), event)
 }
 
 async function deleteEvent(token: string, eventId: string): Promise<void> {
   const response = await calendarFetch(token, `/${encodeURIComponent(eventId)}?sendUpdates=all`, { method: 'DELETE' })
   // Already gone is fine.
   if (!response.ok && response.status !== 404 && response.status !== 410) throw await googleError(response)
+}
+
+type GoogleEvent = { id: string; attendees?: { email?: string; responseStatus?: string; self?: boolean }[] }
+
+/**
+ * Mirrors the event's attendee replies into DevDock. The organizer is skipped
+ * (they're not an invitee), and only their own token is ever used, so nobody
+ * else has to connect a calendar for this to work.
+ */
+async function storeRsvps(sessionIds: string[], event: GoogleEvent): Promise<void> {
+  const responses = (event.attendees ?? [])
+    .filter((a) => !a.self && a.email)
+    .map((a) => ({ email: a.email as string, status: a.responseStatus ?? 'needsAction' }))
+  // Replies belong to every meeting of a series, which share one Google event.
+  for (const id of sessionIds) await saveRsvps(id, responses)
+}
+
+/** Reads the event again and refreshes the stored replies. Organizers only. */
+export async function refreshRsvps(session: LiveSession): Promise<boolean> {
+  const token = getCalendarToken()
+  if (!token || !session.calendar_event_id) return false
+  const response = await calendarFetch(token, `/${encodeURIComponent(session.calendar_event_id)}`, { method: 'GET' })
+  if (!response.ok) {
+    // Nothing to mirror (deleted in Google, or the token lost its scope).
+    if (response.status === 404 || response.status === 410) return false
+    throw await googleError(response)
+  }
+  const event = (await response.json()) as GoogleEvent
+  const ids = session.series_id ? (await fetchSeriesSessions(session.series_id)).map((s) => s.id) : [session.id]
+  await storeRsvps(ids, event)
+  return true
 }
 
 async function googleError(response: Response): Promise<DataError> {

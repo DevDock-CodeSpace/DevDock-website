@@ -5,13 +5,37 @@ import { supabase } from './supabase'
 // Live updates, like Linear: the database tells every open tab when a row
 // changes (Supabase Realtime, filtered by RLS), and the queries that show that
 // table are refetched. Changes made by other people, other tabs and the GitHub
-// webhook all arrive this way. No row data is taken from the event itself.
+// webhook all arrive this way. No row data is shown from the event itself; for
+// messages its ids only pick which queries to refetch (see `messageQueries`).
+
+type Change = { eventType: string; new: Record<string, unknown>; old: Record<string, unknown> }
+
+const id = (value: unknown) => (typeof value === 'string' && value ? value : undefined)
 
 /**
- * The query-key prefixes each table shows up in. A table must also be in the
+ * A chat message is the busiest change in the app, so it refetches only what it
+ * can alter: a new message touches its conversation's timeline and the unread
+ * counts, a new reply touches that conversation's threads (replies never count as
+ * unread). Edits and deletes can show in either. The conversation list has no
+ * column a message changes. Without the row (a hard delete, or one RLS hides) it
+ * falls back to every message query.
+ */
+function messageQueries({ eventType, new: row }: Change): QueryKey[] {
+  const conversation = id(row.conversation_id)
+  if (!conversation) return [['messaging', 'messages'], ['messaging', 'thread'], ['messaging', 'thread-unread'], ['messaging', 'unread']]
+  const team = id(row.team_id)
+  const timeline: QueryKey[] = [['messaging', 'messages', conversation], team ? ['messaging', 'unread', team] : ['messaging', 'unread']]
+  const threads: QueryKey[] = [['messaging', 'thread', conversation], ['messaging', 'thread-unread', conversation]]
+  if (eventType !== 'INSERT') return [...timeline, ...threads]
+  return row.parent_id == null ? timeline : threads
+}
+
+/**
+ * The query-key prefixes each table shows up in (or a function of the change, for
+ * tables busy enough to be worth narrowing). A table must also be in the
  * `supabase_realtime` publication (see the enable_realtime migration) to send events.
  */
-const AFFECTS: Record<string, QueryKey[]> = {
+const AFFECTS: Record<string, QueryKey[] | ((change: Change) => QueryKey[])> = {
   teams: [['teams']],
   team_members: [['teams'], ['workspaces']],
   workspaces: [['workspaces'], ['issues', 'team']],
@@ -38,7 +62,7 @@ const AFFECTS: Record<string, QueryKey[]> = {
   lesson_progress: [['learning', 'progress']],
   conversations: [['messaging', 'conversations']],
   conversation_members: [['messaging', 'conversations'], ['messaging', 'members'], ['messaging', 'unread']],
-  messages: [['messaging', 'conversations'], ['messaging', 'messages'], ['messaging', 'thread'], ['messaging', 'thread-unread'], ['messaging', 'unread']],
+  messages: messageQueries,
   message_reactions: [['messaging', 'reactions']],
   message_pins: [['messaging', 'pins']],
   message_attachments: [['messaging', 'attachments']],
@@ -63,7 +87,8 @@ let channels = 0
  * put an older value over an optimistic one.
  */
 export function startRealtimeSync(): () => void {
-  const changed = new Set<string>()
+  // Keyed by the serialized prefix, so a burst of events asks for each query once.
+  const changed = new Map<string, QueryKey>()
   let timer: number | undefined
   let joined = false
 
@@ -73,7 +98,7 @@ export function startRealtimeSync(): () => void {
       return
     }
     timer = undefined
-    const prefixes = [...changed].flatMap((table) => AFFECTS[table] ?? [])
+    const prefixes = [...changed.values()]
     changed.clear()
     if (prefixes.length === 0) return
     void queryClient.invalidateQueries({
@@ -85,8 +110,10 @@ export function startRealtimeSync(): () => void {
   const channel = supabase
     .channel(`db-changes-${++channels}`)
     .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
-      changed.add(payload.table)
-      timer ??= window.setTimeout(flush, BATCH_MS)
+      const affects = AFFECTS[payload.table]
+      const prefixes = typeof affects === 'function' ? affects(payload as Change) : (affects ?? [])
+      for (const prefix of prefixes) changed.set(JSON.stringify(prefix), prefix)
+      if (changed.size > 0) timer ??= window.setTimeout(flush, BATCH_MS)
     })
     .subscribe((status, error) => {
       if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') console.error('[realtime] Live updates are not connected', status, error)

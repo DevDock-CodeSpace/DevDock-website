@@ -4,8 +4,8 @@ import { toast } from 'sonner'
 import { useAuth } from '@/features/auth/hooks'
 import { useCanWriteDocs } from '@/features/docs/hooks'
 import { errorMessage } from '@/lib/errors'
-import { liveSessionQuery, seriesSessionsQuery } from './api'
-import { flushCalendarQueue, runCalendarOps, type CalendarOp } from './calendar'
+import { liveSessionQuery, seriesSessionsQuery, type LiveSession } from './api'
+import { flushCalendarQueue, refreshRsvps, runCalendarOps, type CalendarOp } from './calendar'
 
 /**
  * Who may schedule, edit and cancel sessions in a scope. The live_sessions
@@ -64,4 +64,24 @@ export function useCalendarQueue() {
 export function useSeriesSessions(seriesId: string | null) {
   const query = useQuery({ ...seriesSessionsQuery(seriesId ?? ''), enabled: seriesId !== null })
   return query.data ?? []
+}
+
+/**
+ * Pulls the invite replies from Google once when an organizer opens a meeting
+ * they can edit and has a live calendar token. Never for readers, never on a
+ * timer: the figures refresh when the organizer next looks at the page.
+ */
+export function useRefreshRsvps(session: LiveSession, enabled: boolean) {
+  const queryClient = useQueryClient()
+  const done = useRef<string | null>(null)
+  useEffect(() => {
+    if (!enabled || !session.calendar_event_id || done.current === session.id) return
+    done.current = session.id
+    refreshRsvps(session).then(
+      (updated) => {
+        if (updated) void queryClient.invalidateQueries({ queryKey: ['live', session.id] })
+      },
+      (error: unknown) => console.error('[live] Could not refresh invite replies', error),
+    )
+  }, [enabled, session, queryClient])
 }

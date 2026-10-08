@@ -14,16 +14,17 @@ import { livePath, liveSessionPath } from '@/features/teams/nav'
 import { errorMessage } from '@/lib/errors'
 import { timeAgo } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import { deleteLiveSeriesFrom, deleteLiveSession, fetchJaasToken, type LiveSession } from '../api'
+import { deleteLiveSeriesFrom, deleteLiveSession, fetchJaasToken, type LiveSession, type Rsvp } from '../api'
 import { useLiveCall } from '../call/context'
 import { buildIcs, downloadIcs, googleCalendarUrl, icsFileName, outlookCalendarUrl, seriesFitsLink } from '../ics'
-import { useSeriesSessions } from '../hooks'
+import { useRefreshRsvps, useSeriesSessions } from '../hooks'
 import { useCalendarOps, useCalendarQueue, useCanWriteLive, useNow } from '../hooks'
 import { canJoin, durationMinutes, EARLY_JOIN_MS, formatDay, formatDuration, formatTime, formatTimeRange, sessionStatus } from '../time'
+import { RsvpList } from './RsvpList'
 import { ScheduleSessionDialog } from './ScheduleSessionDialog'
 
 type LiveSessionViewProps = {
-  session: LiveSession
+  session: LiveSession & { rsvps?: Rsvp[] }
   /** Set when opened inside a workspace's Live tab. */
   workspaceId?: string
 }
@@ -42,6 +43,7 @@ export function LiveSessionView({ session, workspaceId }: LiveSessionViewProps) 
   const [confirmCancel, setConfirmCancel] = useState(false)
   const [cancelRest, setCancelRest] = useState(false)
   const series = useSeriesSessions(session.series_id)
+  const rsvps = session.rsvps ?? []
   const laterInSeries = series.filter((s) => Date.parse(s.starts_at) > Date.parse(session.starts_at)).length
   const wholeSeries = series.length > 1
   // A Google link carries a repeat rule; Outlook's cannot, and irregular dates have no rule.
@@ -50,6 +52,8 @@ export function LiveSessionView({ session, workspaceId }: LiveSessionViewProps) 
     : seriesFitsLink(series)
       ? `Google adds all ${series.length} meetings. Outlook adds this one.`
       : `These dates don’t follow a pattern, so the links add this meeting only. The .ics file has all ${series.length}.`
+
+  useRefreshRsvps(session, canWrite)
 
   const status = sessionStatus(session, now)
   const joinable = canJoin(session, now, canWrite)
@@ -288,9 +292,10 @@ export function LiveSessionView({ session, workspaceId }: LiveSessionViewProps) 
                 </span>
               )}
             </div>
-            {!canWrite && (
+            {!canWrite && rsvps.length === 0 && (
               <p className="text-xs text-muted-foreground">Leads and group admins send invites.</p>
             )}
+            <RsvpList rsvps={rsvps} />
           </div>
         </Detail>
         {session.description && (

@@ -1,5 +1,6 @@
 import { queryOptions } from '@tanstack/react-query'
 import { requireAffected, toDataError } from '@/lib/errors'
+import { SETTLED_STALE_MS } from '@/lib/query-client'
 import { supabase } from '@/lib/supabase'
 import type { Tables, TablesInsert } from '@/types/database.types'
 import type { IssueCycle } from './api'
@@ -40,6 +41,7 @@ export const workspaceViewsQuery = (workspaceId: string) =>
 export const teamViewsQuery = (teamId: string) =>
   queryOptions({
     queryKey: viewKeys.team(teamId),
+    staleTime: SETTLED_STALE_MS,
     queryFn: async (): Promise<IssueView[]> => {
       const { data, error } = await supabase.from('issue_views').select(VIEW_COLUMNS).eq('team_id', teamId).order('name')
       if (error) throw toDataError('load views', error)
@@ -51,6 +53,7 @@ export const teamViewsQuery = (teamId: string) =>
 export const teamPinsQuery = (teamId: string) =>
   queryOptions({
     queryKey: viewKeys.pins(teamId),
+    staleTime: SETTLED_STALE_MS,
     queryFn: async (): Promise<IssuePin[]> => {
       const { data, error } = await supabase.from('issue_pins').select(PIN_COLUMNS).eq('team_id', teamId).order('position').order('created_at')
       if (error) throw toDataError('load pins', error)

@@ -9,6 +9,7 @@ import { useAuth } from '@/features/auth/hooks'
 import type { TeamMember } from '@/features/teams/api'
 import { useOthersTyping } from '@/hooks/use-others-typing'
 import {
+  NOTIFICATION_LIMIT,
   PAGE_SIZE,
   conversationAttachmentsQuery,
   conversationKeys,
@@ -18,8 +19,10 @@ import {
   markConversationNotificationsRead,
   markConversationRead,
   messagesQuery,
+  notificationsQuery,
   pinsQuery,
   threadUnreadQuery,
+  unreadCountsQuery,
   type Message,
 } from '../api'
 import { useSendMessage, useSetNotificationMode } from '../hooks'
@@ -100,16 +103,37 @@ export function ConversationView({ conversationId, kind, description, teamId, te
   const lastId = last?.id
   const lastMine = last?.author_id === user.id
 
+  // Both are already loaded for the sidebar badge and the bell, so these add no request.
+  // They let reading skip the writes that would change nothing: every write here is
+  // echoed to each open tab as a refetch.
+  const counts = useQuery(unreadCountsQuery(teamId)).data
+  const unreadHere = counts === undefined ? undefined : (counts.find((row) => row.conversation_id === conversationId)?.unread_count ?? 0)
+  const notices = useQuery(notificationsQuery(teamId, user.id)).data
+
   const markedId = useRef<string | undefined>(undefined)
+  const opened = useRef(false)
+  const clearedNotices = useRef('')
   const markRead = useCallback(() => {
     const latest = [...messages].reverse().find((message) => !isPendingMessage(message.id))
-    if (!latest || document.hidden || !atBottom.current || markedId.current === latest.id) return
-    markedId.current = latest.id
-    // Reading the conversation also clears its bell notifications.
-    markConversationRead(conversationId, latest.id)
-      .then(() => markConversationNotificationsRead(conversationId, user.id))
-      .catch((error: unknown) => console.error('[messaging] Could not mark read', error))
-  }, [messages, conversationId, user.id])
+    if (!latest || document.hidden || !atBottom.current) return
+    // Nothing unread (your own message, or already read): the read position needn't move.
+    // The count can lag a new message by a moment; this runs again when it arrives.
+    if (markedId.current !== latest.id && unreadHere !== 0) {
+      markedId.current = latest.id
+      markConversationRead(conversationId, latest.id).catch((error: unknown) => console.error('[messaging] Could not mark read', error))
+    }
+    // Reading the conversation also clears its bell notifications: all of them when it
+    // opens, afterwards those for new messages (a reply's stays until its thread is read).
+    if (notices === undefined) return
+    const first = !opened.current
+    opened.current = true
+    const here = notices.filter((notice) => notice.conversation_id === conversationId && (first || !notice.message?.parent_id))
+    // At the limit the bell may not have loaded this conversation's, so clear once per new message.
+    const batch = here.length > 0 ? here.map((notice) => notice.id).join() : notices.length >= NOTIFICATION_LIMIT ? `latest:${latest.id}` : ''
+    if (!batch || batch === clearedNotices.current) return
+    clearedNotices.current = batch
+    markConversationNotificationsRead(conversationId, user.id).catch((error: unknown) => console.error('[messaging] Could not clear notifications', error))
+  }, [messages, conversationId, user.id, unreadHere, notices])
 
   useLayoutEffect(() => {
     const el = scroller.current

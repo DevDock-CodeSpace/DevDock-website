@@ -58,9 +58,9 @@ export function useSendMessage(conversationId: string, teamId: string, limit: nu
       queryClient.setQueryData(key, context?.previous)
       toast.error(errorMessage(error))
     },
-    onSettled: () => {
+    onSettled: (_message, _error, input) => {
       void queryClient.invalidateQueries({ queryKey: conversationKeys.messages(conversationId) })
-      void queryClient.invalidateQueries({ queryKey: conversationKeys.attachments(conversationId) })
+      if (input.files.length > 0) void queryClient.invalidateQueries({ queryKey: conversationKeys.attachments(conversationId) })
     },
   })
 }
@@ -97,9 +97,9 @@ export function useSendReply(conversationId: string, teamId: string, parentId: s
       return message
     },
     onError: (error) => toast.error(errorMessage(error)),
-    onSettled: () => {
+    onSettled: (_message, _error, input) => {
       void queryClient.invalidateQueries({ queryKey: conversationKeys.replies(conversationId) })
-      void queryClient.invalidateQueries({ queryKey: conversationKeys.attachments(conversationId) })
+      if (input.files.length > 0) void queryClient.invalidateQueries({ queryKey: conversationKeys.attachments(conversationId) })
     },
   })
 }
