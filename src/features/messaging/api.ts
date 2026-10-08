@@ -1,5 +1,6 @@
 import { queryOptions } from '@tanstack/react-query'
 import { toDataError } from '@/lib/errors'
+import { SETTLED_STALE_MS } from '@/lib/query-client'
 import { supabase } from '@/lib/supabase'
 import type { Database, Json, Tables } from '@/types/database.types'
 
@@ -29,6 +30,8 @@ export const MESSAGE_ATTACHMENT_TYPES = [
 export const MESSAGE_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024
 
 export const PAGE_SIZE = 50
+/** The bell loads this many unread notifications; at the limit there may be more it hasn't loaded. */
+export const NOTIFICATION_LIMIT = 20
 
 /** Teams whose #general channel was already ensured in this tab (the RPC writes, so don't repeat it on every refetch). */
 const ensuredTeams = new Set<string>()
@@ -183,6 +186,7 @@ export const unreadCountsQuery = (teamId: string) =>
 export const preferencesQuery = () =>
   queryOptions({
     queryKey: conversationKeys.preferences,
+    staleTime: SETTLED_STALE_MS,
     queryFn: async (): Promise<{ conversation_id: string; notification_mode: NotificationMode }[]> => {
       const { data, error } = await supabase.from('conversation_preferences').select('conversation_id, notification_mode')
       if (error) throw toDataError('load notification settings', error)
@@ -208,7 +212,7 @@ export const notificationsQuery = (teamId: string, userId: string) =>
         .eq('recipient_id', userId)
         .is('read_at', null)
         .order('created_at', { ascending: false })
-        .limit(20)
+        .limit(NOTIFICATION_LIMIT)
       if (error) throw toDataError('load notifications', error)
       return data
     },

@@ -1,5 +1,6 @@
 import { queryOptions } from '@tanstack/react-query'
 import { requireAffected, toDataError } from '@/lib/errors'
+import { SETTLED_STALE_MS } from '@/lib/query-client'
 import { supabase } from '@/lib/supabase'
 import type { Database, Tables } from '@/types/database.types'
 
@@ -22,6 +23,7 @@ export const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/
 export const myTeamsQuery = (userId: string) =>
   queryOptions({
     queryKey: ['teams', 'mine', userId],
+    staleTime: SETTLED_STALE_MS,
     queryFn: async (): Promise<TeamMembership[]> => {
       const { data, error } = await supabase
         .from('team_members')
@@ -36,6 +38,7 @@ export const myTeamsQuery = (userId: string) =>
 export const teamMembersQuery = (teamId: string) =>
   queryOptions({
     queryKey: ['teams', teamId, 'members'],
+    staleTime: SETTLED_STALE_MS,
     queryFn: async (): Promise<TeamMember[]> => {
       const { data, error } = await supabase
         .from('team_members')
