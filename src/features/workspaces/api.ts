@@ -1,6 +1,7 @@
 import { queryOptions } from '@tanstack/react-query'
 import type { PersonProfile } from '@/features/teams/api'
 import { requireAffected, toDataError } from '@/lib/errors'
+import { SETTLED_STALE_MS } from '@/lib/query-client'
 import { supabase } from '@/lib/supabase'
 import type { Database, Tables, TablesInsert } from '@/types/database.types'
 
@@ -31,6 +32,7 @@ export type WorkspaceMember = { user_id: string; role: WorkspaceRole; joined_at:
 export const teamWorkspacesQuery = (teamId: string) =>
   queryOptions({
     queryKey: ['workspaces', 'team', teamId],
+    staleTime: SETTLED_STALE_MS,
     queryFn: async (): Promise<WorkspaceSummary[]> => {
       const { data, error } = await supabase
         .from('workspaces')
@@ -57,6 +59,7 @@ export const teamWorkspacesQuery = (teamId: string) =>
 export const myWorkspaceRolesQuery = (teamId: string, userId: string) =>
   queryOptions({
     queryKey: ['workspaces', 'team', teamId, 'my-roles', userId],
+    staleTime: SETTLED_STALE_MS,
     queryFn: async (): Promise<Record<string, WorkspaceRole>> => {
       const { data, error } = await supabase
         .from('workspace_members')
@@ -197,6 +200,7 @@ export type WorkspacePin = { workspace_id: string; pinned_at: string }
 export const pinsQuery = (userId: string) =>
   queryOptions({
     queryKey: ['workspaces', 'pins', userId],
+    staleTime: SETTLED_STALE_MS,
     queryFn: async (): Promise<WorkspacePin[]> => {
       const { data, error } = await supabase
         .from('workspace_pins')
