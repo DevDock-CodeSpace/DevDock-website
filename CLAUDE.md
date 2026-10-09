@@ -126,7 +126,7 @@ supabase/
 ### Routing & data
 
 - **Routes.**
-  - Public: `/login`, `/auth/callback`, `/privacy` (privacy policy for Google's consent screen; keep it matching what the app stores).
+  - Public: `/login`, `/admin-login` (the admin account's password sign-in), `/auth/callback`, `/privacy` (privacy policy for Google's consent screen; keep it matching what the app stores).
   - Authenticated (under route id `app`):
     - `/app` redirects to the last-used team, or to `/onboarding` when the user has none.
     - `/onboarding`
@@ -264,7 +264,7 @@ supabase/
 
 ## Authentication
 
-- **Supabase Auth with Google only** (no email/password, magic links or other providers unless asked). PKCE flow (`flowType: 'pkce'` in `src/lib/supabase.ts`); `redirectTo` is always `window.location.origin + '/auth/callback'`, never a hardcoded host.
+- **Supabase Auth with Google** for everyone, plus **one email + password admin account** the owner asked for so the app can be opened without a Google round trip (testing, automated request counts): `/admin-login` (`AdminLoginPage`, `signInWithPassword`, linked from nowhere). The account is created in the Supabase dashboard (Authentication → Users), never in code, and its password is never committed. It has no special powers: what it sees comes from its group and workspace roles under RLS, so make it an admin of the group it should test. There is no sign-up or reset in the app. Enabling the Email provider means anyone can try passwords against the project's auth API, whatever the page URL; the owner accepted that. No magic links or other providers unless asked. PKCE flow (`flowType: 'pkce'` in `src/lib/supabase.ts`); `redirectTo` is always `window.location.origin + '/auth/callback'`, never a hardcoded host.
 - **All auth calls live in `src/features/auth/api.ts`.** Components use the hooks in `features/auth/hooks.ts` (`useAuth`, `useCurrentProfile`, `useUserIdentity`, `useSignInWithGoogle`, `useSignOut`) and never import `supabase` directly.
 - **Route protection happens in loaders, not components.** Any new authenticated route goes *under* the `app` route, whose loader (`src/layouts/app-loader.ts`) calls `requireUser(request)` before anything else. Child loaders that need the user call `requireUser` again (it's cheap; loaders run in parallel). Don't add `useEffect`-style redirect guards.
 - **Post-login destination:** `/login?next=` (validated by `safeNextPath`: same-site paths only). It's stored in sessionStorage across the Google round trip so the callback URL stays fixed.
