@@ -18,7 +18,7 @@ import type { Json } from '@/types/database.types'
 import { deleteDiagram, diagramQuery, updateDiagram, type Diagram } from '../api'
 import { DiagramEditor } from '../editor/DiagramEditor'
 import { parse } from '../editor/model'
-import { ownWrite } from '@/lib/realtime'
+import { ownSave } from '@/lib/realtime'
 
 const AUTOSAVE_MS = 1000
 const MIN_CANVAS_HEIGHT = 480
@@ -64,10 +64,11 @@ export default function DiagramView({ diagram, canWrite }: { diagram: Diagram; c
     const data = dataRef.current
     const renamed = nextTitle !== synced.current.title
     // Our own change: this view updates its cache below, so the echo needn't refetch it.
-    ownWrite('diagrams', diagram.id)
+    const saved = ownSave('diagrams', diagram.id)
     try {
-      await updateDiagram(diagram.id, { title: nextTitle, data })
+      saved(await updateDiagram(diagram.id, { title: nextTitle, data }))
     } catch (error) {
+      saved()
       setStatus('error')
       throw error
     }
@@ -94,7 +95,9 @@ export default function DiagramView({ diagram, canWrite }: { diagram: Diagram; c
     return run
   }, [save])
 
-  const { others, markTyping } = useOthersTyping(`diagram:${diagram.id}`, canWrite)
+  const { lockedBy, markTyping } = useOthersTyping(`diagram:${diagram.id}`, canWrite)
+  // Someone else has the canvas: read-only until they stop (see useOthersTyping).
+  const locked = lockedBy.length > 0
   const markChanged = useCallback(() => {
     version.current += 1
     markTyping()
@@ -257,6 +260,7 @@ export default function DiagramView({ diagram, canWrite }: { diagram: Diagram; c
           value={title}
           maxLength={200}
           aria-label="Title"
+          readOnly={locked}
           placeholder="Untitled diagram"
           onChange={(e) => {
             setTitle(e.target.value)
@@ -272,7 +276,7 @@ export default function DiagramView({ diagram, canWrite }: { diagram: Diagram; c
         <h1 className="mb-4 truncate text-2xl font-semibold tracking-tight">{diagram.title}</h1>
       )}
 
-      <OthersTypingAlert names={others} />
+      <OthersTypingAlert names={lockedBy} />
       <div
         ref={frame}
         style={fullscreen ? undefined : { height }}
@@ -283,7 +287,7 @@ export default function DiagramView({ diagram, canWrite }: { diagram: Diagram; c
       >
         <DiagramEditor
           initial={initial}
-          readOnly={!canWrite}
+          readOnly={!canWrite || locked}
           onChange={onChange}
           fullscreen={fullscreen}
           onFullscreen={setFullscreen}

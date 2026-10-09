@@ -102,22 +102,64 @@ function issueQueries(change: Change): QueryKey[] {
 
 // --- changes this tab made itself ---------------------------------------------
 // A save's own echo would refetch what the tab just wrote. The code that saves
-// says so here (before an update, whose id it knows; after an insert) and keeps
-// its own cache right; the echo is then dropped. Anyone else's change to the same
-// row inside the window is dropped with it and shows with the next event or
-// refetch, which editors tolerate already (they ignore the server while typing).
+// says so here and keeps its own cache right; the echo is then dropped.
+//
+// `ownSave` is exact: the database stamps every update with `updated_at`, the
+// save gets that stamp back, and only the event carrying it is dropped. Anyone
+// else's change to the same row has another stamp and always gets through.
+//
+// `ownWrite` is by time, for rows whose stamp the tab can't know: ones it just
+// inserted (matched by their id) and an issue's activity and branches (matched by
+// the issue). Someone else's activity on that issue inside the window is dropped
+// too, so the mutation must refetch those itself.
 const OWN_WRITE_MS = 5000
+/** A save that never reports back stops holding its row's events after this long. */
+const SAVE_TIMEOUT_MS = 15_000
+const STAMP_MS = 60_000
 const ownWrites = new Map<string, number>()
+const saving = new Map<string, number[]>()
+const stamps = new Map<string, number>()
 
 /** `key` is the row's id, or the issue's id for its activity and branches. */
 export function ownWrite(table: string, key: string, ms = OWN_WRITE_MS) {
   ownWrites.set(`${table}:${key}`, Date.now() + ms)
 }
 
+/**
+ * Call before saving a row; call the returned function when the save settles,
+ * with the `updated_at` it got back (nothing if it failed). Events for the row
+ * wait in between, so the echo can't slip through before its stamp is known.
+ */
+export function ownSave(table: string, rowId: string): (updatedAt?: string | null) => void {
+  const key = `${table}:${rowId}`
+  const started = Date.now()
+  saving.set(key, [...(saving.get(key) ?? []), started])
+  return (updatedAt) => {
+    const left = (saving.get(key) ?? []).filter((at) => at !== started)
+    if (left.length > 0) saving.set(key, left)
+    else saving.delete(key)
+    const at = instant(updatedAt)
+    if (!Number.isNaN(at)) stamps.set(`${key}:${at}`, Date.now() + STAMP_MS)
+  }
+}
+
+const rowOf = (change: Change) => (change.eventType === 'DELETE' ? change.old : change.new)
+
+/** A save of this row is still on its way: its event can't be judged yet. */
+function isBeingSaved(table: string, change: Change) {
+  const key = `${table}:${id(rowOf(change).id)}`
+  const now = Date.now()
+  const running = (saving.get(key) ?? []).filter((at) => now - at < SAVE_TIMEOUT_MS)
+  if (running.length === 0) saving.delete(key)
+  return running.length > 0
+}
+
 function isOwnWrite(table: string, change: Change) {
   const now = Date.now()
   for (const [key, until] of ownWrites) if (until < now) ownWrites.delete(key)
-  const row = change.eventType === 'DELETE' ? change.old : change.new
+  for (const [key, until] of stamps) if (until < now) stamps.delete(key)
+  const row = rowOf(change)
+  if (stamps.has(`${table}:${id(row.id)}:${instant(row.updated_at)}`)) return true
   return [row.id, row.issue_id].some((value) => id(value) !== undefined && ownWrites.has(`${table}:${id(value)}`))
 }
 
@@ -189,11 +231,18 @@ export function startRealtimeSync(): () => void {
     timer = undefined
     // Keyed by the serialized prefix, so a burst of events asks for each query once.
     const changed = new Map<string, QueryKey>()
-    for (const { table, change } of pending.splice(0)) {
+    for (const event of pending.splice(0)) {
+      const { table, change } = event
+      // Its save hasn't answered yet: look again on the next round.
+      if (isBeingSaved(table, change)) {
+        pending.push(event)
+        continue
+      }
       if (isOwnWrite(table, change)) continue
       const affects = AFFECTS[table]
       for (const prefix of typeof affects === 'function' ? affects(change) : (affects ?? [])) changed.set(JSON.stringify(prefix), prefix)
     }
+    if (pending.length > 0) timer = window.setTimeout(flush, BATCH_MS)
     const prefixes = [...changed.values()]
     if (prefixes.length === 0) return
     void queryClient.invalidateQueries({

@@ -95,7 +95,7 @@ export default function LessonView({ lesson }: { lesson: Lesson }) {
     setCached(patch.title === undefined ? patch : { ...patch, title: patch.title.trim() })
     inflight.current = inflight.current.then(save)
   }, [save, setCached])
-  const { others, markTyping } = useOthersTyping(`lesson:${lesson.id}`, canManage)
+  const { lockedBy, markTyping } = useOthersTyping(`lesson:${lesson.id}`, canManage)
   const queue = (patch: { title?: string; body?: Json | null }) => {
     pending.current = { ...pending.current, ...patch }
     markTyping()
@@ -143,6 +143,12 @@ export default function LessonView({ lesson }: { lesson: Lesson }) {
     onUpdate: ({ editor }) => queue({ body: editor.isEmpty ? null : (editor.getJSON() as Json) }),
   })
 
+  // Someone else has the text: read-only until they stop (see useOthersTyping). Not reported as an edit.
+  const locked = lockedBy.length > 0
+  useEffect(() => {
+    editor?.setEditable(canManage && !locked, false)
+  }, [editor, locked, canManage])
+
   // A lesson that changed on the server (the instructor editing it, another tab)
   // replaces what's shown here, unless there are unsaved edits.
   useEffect(() => {
@@ -188,6 +194,7 @@ export default function LessonView({ lesson }: { lesson: Lesson }) {
           rows={1}
           maxLength={200}
           aria-label="Lesson title"
+          readOnly={locked}
           placeholder="Lesson title"
           onChange={(e) => {
             const next = e.target.value.replace(/\n/g, ' ')
@@ -206,7 +213,7 @@ export default function LessonView({ lesson }: { lesson: Lesson }) {
         <h1 className="mb-6 text-3xl leading-tight font-bold tracking-tight">{lesson.title}</h1>
       )}
 
-      <OthersTypingAlert names={others} />
+      <OthersTypingAlert names={lockedBy} />
       {editor && canManage && (
         <>
           <FormatBubble editor={editor} />

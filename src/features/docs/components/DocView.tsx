@@ -11,7 +11,7 @@ import { OthersTypingAlert } from '@/components/OthersTypingAlert'
 import { PersonAvatar } from '@/components/PersonRow'
 import { Button } from '@/components/ui/button'
 import { useCurrentTeam } from '@/features/teams/hooks'
-import { ownWrite } from '@/lib/realtime'
+import { ownSave } from '@/lib/realtime'
 import { useOthersTyping } from '@/hooks/use-others-typing'
 import { docsPath } from '@/features/teams/nav'
 import type { Json } from '@/types/database.types'
@@ -105,10 +105,11 @@ export default function DocView({ doc, canEdit, canDelete }: { doc: Doc; canEdit
     const content = editor.getText({ blockSeparator: '\n' })
     const renamed = nextTitle !== synced.current.title
     // Our own change: this view updates its cache below, so the echo needn't refetch it.
-    ownWrite('documents', doc.id)
+    const saved = ownSave('documents', doc.id)
     try {
-      await updateDocument(doc.id, { title: nextTitle, body, content })
+      saved(await updateDocument(doc.id, { title: nextTitle, body, content }))
     } catch (error) {
+      saved()
       setStatus('error')
       throw error
     }
@@ -136,7 +137,7 @@ export default function DocView({ doc, canEdit, canDelete }: { doc: Doc; canEdit
     return run
   }, [save])
 
-  const { others, markTyping } = useOthersTyping(`doc:${doc.id}`, canEdit)
+  const { lockedBy, markTyping } = useOthersTyping(`doc:${doc.id}`, canEdit)
   const markChanged = useCallback(() => {
     version.current += 1
     markTyping()
@@ -188,6 +189,12 @@ export default function DocView({ doc, canEdit, canDelete }: { doc: Doc; canEdit
   useEffect(() => {
     editorRef.current = editor
   }, [editor])
+
+  // Someone else has the text: read-only until they stop (see useOthersTyping). Not reported as an edit.
+  const locked = lockedBy.length > 0
+  useEffect(() => {
+    editor?.setEditable(canEdit && !locked, false)
+  }, [editor, locked, canEdit])
 
   // A doc that changed on the server (someone else, another tab) replaces what's
   // shown here, unless there are unsaved edits.
@@ -303,6 +310,7 @@ export default function DocView({ doc, canEdit, canDelete }: { doc: Doc; canEdit
           maxLength={200}
           aria-label="Title"
           placeholder="Untitled"
+          readOnly={locked}
           onChange={(e) => {
             const next = e.target.value.replace(/\n/g, ' ')
             setTitle(next)
@@ -362,7 +370,7 @@ export default function DocView({ doc, canEdit, canDelete }: { doc: Doc; canEdit
           />
         </>
       )}
-      <OthersTypingAlert names={others} />
+      <OthersTypingAlert names={lockedBy} />
       <EditorContent editor={editor} className="pb-[30vh]" />
 
       <ConfirmDialog

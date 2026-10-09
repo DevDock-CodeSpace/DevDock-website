@@ -87,9 +87,11 @@ export async function updateDiagram(diagramId: string, input: { title: string; d
     .from('diagrams')
     .update({ title: input.title.trim(), data: input.data })
     .eq('id', diagramId)
-    .select('id')
+    .select('id, updated_at')
   if (error) throw toDataError('save the diagram', error, writeErrors)
   requireAffected(data, 'save diagram')
+  // The time the database gave this save: it identifies our own echo (lib/realtime `ownSave`).
+  return data[0]?.updated_at
 }
 
 export async function deleteDiagram(diagramId: string) {

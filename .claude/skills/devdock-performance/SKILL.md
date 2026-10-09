@@ -67,7 +67,7 @@ would make the app slower, **stop and ask the owner before building it** (see "S
 - After a mutation, invalidate only what it changed (sending without a file doesn't refetch attachments).
 - **Autosave is the costliest thing in the app**: a save fires about once a second while someone types. A save
   must cost exactly one request in the saving tab and none in tabs that don't have the item open. Call
-  `ownWrite(table, id)` before the request, update the cache yourself, and invalidate lists only for a change
+  `ownSave(table, id)` before the request (and its result with the returned `updated_at` after), update the cache yourself, and invalidate lists only for a change
   they show (a rename). `rowQueries` in `lib/realtime.ts` does the same judgment for other tabs.
 - **Don't refetch on return to the tab what live updates already deliver** (`lib/live.ts`). A query under a
   live root that reads an unpublished table must be added to `NOT_LIVE` or it will go stale.

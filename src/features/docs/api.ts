@@ -138,9 +138,11 @@ export async function updateDocument(docId: string, input: { title: string; body
     .from('documents')
     .update({ title: input.title.trim(), body: input.body, content: input.content })
     .eq('id', docId)
-    .select('id')
+    .select('id, updated_at')
   if (error) throw toDataError('save the doc', error, writeErrors)
   requireAffected(data, 'save doc')
+  // The time the database gave this save: it identifies our own echo (lib/realtime `ownSave`).
+  return data[0]?.updated_at
 }
 
 /**

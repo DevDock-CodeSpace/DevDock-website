@@ -18,7 +18,7 @@ import type { Json } from '@/types/database.types'
 import { IMAGE_TYPES } from '@/features/docs/api'
 import { issueKeys, updateIssue, type IssueDetail } from '../api'
 import { uploadIssueImage } from '../images'
-import { ownWrite } from '@/lib/realtime'
+import { ownSave } from '@/lib/realtime'
 
 function initialContent(body: Json | null): JSONContent | null {
   if (body && typeof body === 'object' && !Array.isArray(body) && body.type === 'doc') return body as JSONContent
@@ -35,7 +35,7 @@ function initialContent(body: Json | null): JSONContent | null {
  */
 export function IssueDescription({ issue }: { issue: IssueDetail }) {
   const queryClient = useQueryClient()
-  const { others, markTyping } = useOthersTyping(`issue:${issue.id}`, true)
+  const { lockedBy, markTyping } = useOthersTyping(`issue:${issue.id}`, true)
   const timer = useRef<number | undefined>(undefined)
   const pending = useRef<Json | null | undefined>(undefined) // edited, not sent yet
   const saving = useRef(false)
@@ -55,15 +55,16 @@ export function IssueDescription({ issue }: { issue: IssueDetail }) {
     if (description === undefined) return
     pending.current = undefined
     saving.current = true
+    // Our own change, and no list shows the description: nothing needs refetching for it.
+    const done = ownSave('issues', issue.id)
     try {
-      // Our own change, and no list shows the description: nothing needs refetching for it.
-      ownWrite('issues', issue.id)
-      await updateIssue(issue.id, { description })
+      done(await updateIssue(issue.id, { description }))
       saved.current = description
       // A refetch that started before this save still carries the old text: drop it.
       void queryClient.cancelQueries({ queryKey: detailKey })
       setCached(description)
     } catch (error) {
+      done()
       // Keep the text for the next attempt (the next edit, or leaving the issue).
       if (pending.current === undefined) pending.current = description
       // Nobody is left to retry: the cache goes back to what the server has.
@@ -137,6 +138,12 @@ export function IssueDescription({ issue }: { issue: IssueDetail }) {
     },
   })
 
+  // Someone else has the text: read-only until they stop (see useOthersTyping). Not reported as an edit.
+  const locked = lockedBy.length > 0
+  useEffect(() => {
+    editor?.setEditable(!locked, false)
+  }, [editor, locked])
+
   // A description that changed on the server (someone else, another tab) replaces
   // the text here, unless there are unsaved edits.
   useEffect(() => {
@@ -168,7 +175,7 @@ export function IssueDescription({ issue }: { issue: IssueDetail }) {
           />
         </>
       )}
-      <OthersTypingAlert names={others} />
+      <OthersTypingAlert names={lockedBy} />
       <EditorContent editor={editor} />
     </div>
   )

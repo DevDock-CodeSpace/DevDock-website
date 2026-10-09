@@ -19,7 +19,7 @@ import {
   type IssuePatch,
 } from './api'
 import { readFilters, writeFilters, type IssueFilters } from './filters'
-import { ownWrite } from '@/lib/realtime'
+import { ownSave, ownWrite } from '@/lib/realtime'
 
 /**
  * What issue screens need about the current workspace: its members (assignees),
@@ -47,8 +47,9 @@ export function useCreateIssueBranch() {
   const { workspace } = useCurrentWorkspace()
   return useMutation({
     mutationFn: (issue: Pick<Issue, 'id' | 'number'>) => {
-      // The function may set the issue's repo, and logs activity and the branch: all refetched below.
-      for (const table of ['issues', 'issue_activity', 'issue_branches']) ownWrite(table, issue.id, 15_000)
+      // The function logs activity and the branch, both refetched below. (It may also set the
+      // issue's repo; that echo isn't ours to recognise, so it refetches the issue once more.)
+      for (const table of ['issue_activity', 'issue_branches']) ownWrite(table, issue.id, 15_000)
       return createIssueBranch(issue.id)
     },
     onSuccess: ({ branch, created }) => {
@@ -82,10 +83,17 @@ export function useUpdateIssue() {
     scope: { id: `issues:${workspace.id}` },
     mutationFn: async ({ issue, patch, labelIds }: UpdateVars) => {
       // Shown optimistically and refetched below, so the echo of this save is dropped.
-      ownWrite('issues', issue.id)
       ownWrite('issue_activity', issue.id)
       if (labelIds) ownWrite('issue_label_links', issue.id)
-      if (patch && Object.keys(patch).length > 0) await updateIssue(issue.id, patch)
+      if (patch && Object.keys(patch).length > 0) {
+        const done = ownSave('issues', issue.id)
+        try {
+          done(await updateIssue(issue.id, patch))
+        } catch (error) {
+          done()
+          throw error
+        }
+      }
       if (labelIds) await setIssueLabels(issue.id, labelIds)
     },
     onMutate: async ({ issue, patch, labelIds }) => {
