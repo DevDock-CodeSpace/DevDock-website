@@ -19,7 +19,8 @@ export function CreateDocDialog({ workspaceId, folderId }: { workspaceId?: strin
       groupWideOnly={!workspaceId && !!folderId}
       canWrite={useCanEditDocs()}
       create={(input) => createDocument({ ...input, folderId: folderId ?? null })}
-      queryKey={['documents']}
+      queryKeys={[['documents', 'team'], ['documents', 'workspace']]}
+      table="documents"
       // Open it where it was created: inside the workspace tab, or in the team view.
       pathFor={(id) => docPath(team.slug, id, workspaceId)}
     />

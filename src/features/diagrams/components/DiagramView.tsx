@@ -18,6 +18,7 @@ import type { Json } from '@/types/database.types'
 import { deleteDiagram, diagramQuery, updateDiagram, type Diagram } from '../api'
 import { DiagramEditor } from '../editor/DiagramEditor'
 import { parse } from '../editor/model'
+import { ownSave, ownWrite } from '@/lib/realtime'
 
 const AUTOSAVE_MS = 1000
 const MIN_CANVAS_HEIGHT = 480
@@ -61,9 +62,13 @@ export default function DiagramView({ diagram, canWrite }: { diagram: Diagram; c
     }
     setStatus('saving')
     const data = dataRef.current
+    const renamed = nextTitle !== synced.current.title
+    // Our own change: this view updates its cache below, so the echo needn't refetch it.
+    const saved = ownSave('diagrams', diagram.id)
     try {
-      await updateDiagram(diagram.id, { title: nextTitle, data })
+      saved(await updateDiagram(diagram.id, { title: nextTitle, data }))
     } catch (error) {
+      saved()
       setStatus('error')
       throw error
     }
@@ -74,8 +79,11 @@ export default function DiagramView({ diagram, canWrite }: { diagram: Diagram; c
     queryClient.setQueryData(diagramQuery(diagram.id).queryKey, (old) =>
       old ? { ...old, title: nextTitle, data, updated_at: new Date().toISOString() } : old,
     )
-    void queryClient.invalidateQueries({ queryKey: ['diagrams', 'team'] })
-    void queryClient.invalidateQueries({ queryKey: ['diagrams', 'workspace'] })
+    // Lists show the title, not the canvas: only a rename needs them asked for again.
+    if (renamed) {
+      void queryClient.invalidateQueries({ queryKey: ['diagrams', 'team'] })
+      void queryClient.invalidateQueries({ queryKey: ['diagrams', 'workspace'] })
+    }
     setStatus(version.current === target ? 'saved' : 'pending')
   }, [diagram.id, queryClient])
 
@@ -87,7 +95,9 @@ export default function DiagramView({ diagram, canWrite }: { diagram: Diagram; c
     return run
   }, [save])
 
-  const { others, markTyping } = useOthersTyping(`diagram:${diagram.id}`, canWrite)
+  const { lockedBy, markTyping } = useOthersTyping(`diagram:${diagram.id}`, canWrite)
+  // Someone else has the canvas: read-only until they stop (see useOthersTyping).
+  const locked = lockedBy.length > 0
   const markChanged = useCallback(() => {
     version.current += 1
     markTyping()
@@ -166,13 +176,18 @@ export default function DiagramView({ diagram, canWrite }: { diagram: Diagram; c
     setDeleting(true)
     try {
       window.clearTimeout(timer.current)
+      ownWrite('diagrams', diagram.id, 15_000)
       await deleteDiagram(diagram.id)
       toast.success(`${diagram.title} was deleted`)
       // Leave the page before dropping its data (see useExitTeam for why).
       leaving.current = true
       await navigate(backTo, { replace: true })
       queryClient.removeQueries({ queryKey: ['diagrams', diagram.id] })
-      await queryClient.invalidateQueries({ queryKey: ['diagrams'] })
+      // Only the lists showed it.
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['diagrams', 'team'] }),
+        queryClient.invalidateQueries({ queryKey: ['diagrams', 'workspace'] }),
+      ])
     } catch (error) {
       toast.error(errorMessage(error))
       setDeleting(false)
@@ -250,6 +265,7 @@ export default function DiagramView({ diagram, canWrite }: { diagram: Diagram; c
           value={title}
           maxLength={200}
           aria-label="Title"
+          readOnly={locked}
           placeholder="Untitled diagram"
           onChange={(e) => {
             setTitle(e.target.value)
@@ -265,7 +281,7 @@ export default function DiagramView({ diagram, canWrite }: { diagram: Diagram; c
         <h1 className="mb-4 truncate text-2xl font-semibold tracking-tight">{diagram.title}</h1>
       )}
 
-      <OthersTypingAlert names={others} />
+      <OthersTypingAlert names={lockedBy} />
       <div
         ref={frame}
         style={fullscreen ? undefined : { height }}
@@ -276,7 +292,7 @@ export default function DiagramView({ diagram, canWrite }: { diagram: Diagram; c
       >
         <DiagramEditor
           initial={initial}
-          readOnly={!canWrite}
+          readOnly={!canWrite || locked}
           onChange={onChange}
           fullscreen={fullscreen}
           onFullscreen={setFullscreen}

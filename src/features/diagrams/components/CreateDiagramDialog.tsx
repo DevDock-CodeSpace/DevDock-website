@@ -14,7 +14,8 @@ export function CreateDiagramDialog({ workspaceId }: { workspaceId?: string }) {
       workspaceId={workspaceId}
       canWrite={useCanWriteDiagrams()}
       create={createDiagram}
-      queryKey={['diagrams']}
+      queryKeys={[['diagrams', 'team'], ['diagrams', 'workspace']]}
+      table="diagrams"
       pathFor={(id) => diagramPath(team.slug, id, workspaceId)}
     />
   )

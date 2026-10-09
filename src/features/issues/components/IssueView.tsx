@@ -20,6 +20,7 @@ import { IssueDevelopment } from './IssueDevelopment'
 import { IssueProperties } from './IssueProperties'
 import { ShortcutsDialog } from './ShortcutsDialog'
 import { SubIssues } from './SubIssues'
+import { ownWrite } from '@/lib/realtime'
 
 /**
  * The issue page (lazy-loaded with the description editor), laid out like
@@ -100,12 +101,17 @@ export default function IssueView({ issue }: { issue: IssueDetail }) {
   const remove = async () => {
     setDeleting(true)
     try {
+      ownWrite('issues', issue.id, 15_000)
       await deleteIssue(issue.id)
       toast.success(`${id} was deleted`)
       // Leave the page before dropping its data (see useExitTeam for why).
       await navigate(issuesPath(team.slug, workspace.id), { replace: true })
       queryClient.removeQueries({ queryKey: issueKeys.detail(workspace.id, issue.number) })
-      await queryClient.invalidateQueries({ queryKey: issueKeys.all })
+      // Only the lists showed it (its sub-issues come back in the same list).
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: issueKeys.workspace(workspace.id) }),
+        queryClient.invalidateQueries({ queryKey: ['issues', 'team'] }),
+      ])
     } catch (error) {
       toast.error(errorMessage(error))
       setDeleting(false)

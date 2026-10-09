@@ -4,42 +4,45 @@ import { supabase } from './supabase'
 // memory by the realtime server, nothing is stored). Editors here don't merge
 // two people's edits, so the page warns instead (OthersTypingAlert).
 
-type Meta = { userId?: unknown; name?: unknown; typing?: unknown; presence_ref?: string }
+type Meta = { userId?: unknown; name?: unknown; typing?: unknown; since?: unknown; presence_ref?: string }
 
-export type EditingRoom = { setTyping: (on: boolean) => void; leave: () => void }
+/** Someone else typing: `since` is when they started (their clock), `tab` breaks an exact tie. */
+export type Typist = { name: string; since: number; tab: string }
+export type EditingRoom = { tab: string; setTyping: (on: boolean, since?: number) => void; leave: () => void }
 
 /**
- * Joins the room for one piece of text (e.g. "doc:<id>"). `onOthers` gets the
- * names of everyone else typing in it; the user's own other tabs count too.
+ * Joins the room for one piece of text (e.g. "doc:<id>"). `onOthers` gets
+ * everyone else typing in it; the user's own other tabs count too.
  * Returns null while a previous visit to the same room is still closing.
  */
 export function joinEditing(
   topic: string,
   me: { userId: string; name: () => string },
-  onOthers: (names: string[]) => void,
+  onOthers: (others: Typist[]) => void,
 ): EditingRoom | null {
   // The same topic is still closing (left a moment ago): the caller tries again shortly.
   if (supabase.getChannels().some((c) => c.topic === `realtime:editing:${topic}`)) return null
   const tab = crypto.randomUUID()
   let typing = false
+  let since = 0
   let live = false
   const channel = supabase.channel(`editing:${topic}`, { config: { presence: { key: tab } } })
   const send = () => {
-    if (live) void channel.track({ userId: me.userId, name: me.name(), typing })
+    if (live) void channel.track({ userId: me.userId, name: me.name(), typing, since })
   }
 
   // Tracked from join/leave events: one entry per browser tab. (The client's own
   // presenceState() keeps entries that have left, so it can't be used for this.)
   const tabs = new Map<string, Meta>()
   const report = () => {
-    const names = new Set<string>()
+    const others: Typist[] = []
     for (const [key, meta] of tabs) {
       if (key === tab || meta.typing !== true) continue
       // Sent by other browsers: don't trust the shape.
       const name = typeof meta.name === 'string' && meta.name.trim() ? meta.name.trim().slice(0, 80) : 'Someone'
-      names.add(meta.userId === me.userId ? 'Another tab of yours' : name)
+      others.push({ name: meta.userId === me.userId ? 'Another tab of yours' : name, since: typeof meta.since === 'number' ? meta.since : 0, tab: key })
     }
-    onOthers([...names])
+    onOthers(others)
   }
 
   channel
@@ -60,9 +63,11 @@ export function joinEditing(
     })
 
   return {
-    setTyping(on) {
+    tab,
+    setTyping(on, startedAt = Date.now()) {
       if (on === typing) return
       typing = on
+      since = on ? startedAt : 0
       send()
     },
     leave() {
