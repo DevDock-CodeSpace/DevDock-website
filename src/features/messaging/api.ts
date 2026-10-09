@@ -88,6 +88,8 @@ export const teamConversationsQuery = (teamId: string) =>
         .from('conversations')
         .select('id, team_id, kind, name, description, is_archived, created_at, updated_at')
         .eq('team_id', teamId)
+        // Archived conversations are kept but not listed (the unread counts leave them out too).
+        .eq('is_archived', false)
         .order('updated_at', { ascending: false })
       if (error) throw toDataError('load conversations', error)
       return data

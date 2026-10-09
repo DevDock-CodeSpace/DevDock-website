@@ -129,13 +129,15 @@ Components that read several independent queries in a row (verify, then batch or
 `features/learning` and `features/docs`.
 
 A reader's unread counts are fetched twice per message (the message event, then the read-position write).
-Creating and deleting things (a doc, an issue, a channel) still refetch broadly and get their own echo; they
-are rare, so they were left alone. Changing an issue to In Progress costs about 9 requests because it also
-creates the GitHub branch.
+Creating or deleting something refetches the lists it appears in, never the whole feature
+(`invalidateQueries({ queryKey: ['documents'] })` also re-asks for folders and every open doc), and reports the
+new or deleted row with `ownWrite` so its echo isn't refetched as well. Changing an issue to In Progress costs
+about 7 requests because it also creates the GitHub branch.
 
 Measured October 2026 after these rules (requests in the acting tab / in a tab watching a list): doc save 1/0,
 diagram save 1/0, issue description save 1/0, issue field change 3/1, message 2/2, return to the tab 0 to 1.
 Before: 3/2, 2/1, 4/1, about 7/2, 4/2, and 10 to 12.
+Create a doc 3 (was 5), an issue 2 (was 8), a channel 12 (was 21); In Progress 7 (was 14).
 
 Scale limits (the app is sized for single-digit users): the Issues pages load every issue of a workspace in
 one query. Revisit (server-side filtering and paging) before a workspace passes about 500 issues.

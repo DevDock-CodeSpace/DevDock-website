@@ -7,7 +7,6 @@ import { useAuth } from '@/features/auth/hooks'
 import { teamMembersQuery } from '@/features/teams/api'
 import { useCurrentTeam } from '@/features/teams/hooks'
 import {
-  conversationKeys,
   searchMessagesQuery,
   teamConversationMembersQuery,
   teamConversationsQuery,
@@ -16,6 +15,7 @@ import { ConversationItem } from '@/features/messaging/components/ConversationIt
 import { NewConversationDialog } from '@/features/messaging/components/NewConversationDialog'
 import { useUnread } from '@/features/messaging/hooks'
 import { conversationTitle, displayName } from '@/features/messaging/names'
+import { ownWrite } from '@/lib/realtime'
 
 // The message editor (TipTap) is only needed once a conversation opens, so it loads on demand.
 const ConversationView = lazy(() => import('@/features/messaging/components/ConversationView').then((m) => ({ default: m.ConversationView })))
@@ -75,7 +75,12 @@ export function MessagesPage() {
             <h1 className="text-sm font-semibold">Messages</h1>
             <p className="truncate text-xs text-muted-foreground">{team.name}</p>
           </div>
-          <NewConversationDialog teamId={team.id} people={people} canCreateChannel={can.isAdmin} onCreated={(id) => { select(id); void queryClient.invalidateQueries({ queryKey: conversationKeys.all }) }} />
+          <NewConversationDialog teamId={team.id} people={people} canCreateChannel={can.isAdmin} onCreated={(id) => {
+              select(id)
+              // The list, who is in what, and the unread counts; not every open conversation's messages. Its own echo is dropped.
+              for (const table of ['conversations', 'conversation_members']) ownWrite(table, id)
+              for (const part of ['conversations', 'members', 'unread']) void queryClient.invalidateQueries({ queryKey: ['messaging', part] })
+            }} />
         </div>
         <label className="relative mx-2 mt-2 mb-1 block max-lg:hidden">
           <Search className="pointer-events-none absolute top-2 left-2.5 size-3.5 text-muted-foreground" />

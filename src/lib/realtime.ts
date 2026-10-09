@@ -120,7 +120,7 @@ const ownWrites = new Map<string, number>()
 const saving = new Map<string, number[]>()
 const stamps = new Map<string, number>()
 
-/** `key` is the row's id, or the issue's id for its activity and branches. */
+/** `key` is the row's id, or its issue's or conversation's id for the rows that hang off one. */
 export function ownWrite(table: string, key: string, ms = OWN_WRITE_MS) {
   ownWrites.set(`${table}:${key}`, Date.now() + ms)
 }
@@ -160,7 +160,7 @@ function isOwnWrite(table: string, change: Change) {
   for (const [key, until] of stamps) if (until < now) stamps.delete(key)
   const row = rowOf(change)
   if (stamps.has(`${table}:${id(row.id)}:${instant(row.updated_at)}`)) return true
-  return [row.id, row.issue_id].some((value) => id(value) !== undefined && ownWrites.has(`${table}:${id(value)}`))
+  return [row.id, row.issue_id, row.conversation_id].some((value) => id(value) !== undefined && ownWrites.has(`${table}:${id(value)}`))
 }
 
 /**

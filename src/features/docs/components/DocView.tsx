@@ -11,7 +11,7 @@ import { OthersTypingAlert } from '@/components/OthersTypingAlert'
 import { PersonAvatar } from '@/components/PersonRow'
 import { Button } from '@/components/ui/button'
 import { useCurrentTeam } from '@/features/teams/hooks'
-import { ownSave } from '@/lib/realtime'
+import { ownSave, ownWrite } from '@/lib/realtime'
 import { useOthersTyping } from '@/hooks/use-others-typing'
 import { docsPath } from '@/features/teams/nav'
 import type { Json } from '@/types/database.types'
@@ -238,13 +238,18 @@ export default function DocView({ doc, canEdit, canDelete }: { doc: Doc; canEdit
     setDeleting(true)
     try {
       window.clearTimeout(timer.current)
+      ownWrite('documents', doc.id, 15_000)
       await deleteDocument(team.id, doc.id)
       toast.success(`${doc.title} was deleted`)
       // Leave the page before dropping its data (see useExitTeam for why).
       leaving.current = true
       await navigate(backTo, { replace: true })
       queryClient.removeQueries({ queryKey: ['documents', doc.id] })
-      await queryClient.invalidateQueries({ queryKey: ['documents'] })
+      // Only the lists showed it.
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['documents', 'team'] }),
+        queryClient.invalidateQueries({ queryKey: ['documents', 'workspace'] }),
+      ])
     } catch (error) {
       toast.error(errorMessage(error))
       setDeleting(false)

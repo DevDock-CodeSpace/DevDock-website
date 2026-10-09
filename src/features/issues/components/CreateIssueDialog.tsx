@@ -24,6 +24,7 @@ import { PriorityIcon } from './PriorityIcon'
 import { PriorityPicker } from './PriorityPicker'
 import { StatusIcon } from './StatusIcon'
 import { StatusPicker } from './StatusPicker'
+import { ownWrite } from '@/lib/realtime'
 
 /**
  * Plain text (one paragraph per line) followed by the attached images → a
@@ -132,7 +133,7 @@ export function CreateIssueDialog({
       const paths: string[] = []
       try {
         for (const { file } of attachments) paths.push(await uploadIssueImage(workspace.id, file))
-        return await createIssue({
+        const made = await createIssue({
           workspaceId: workspace.id,
           title,
           description: toDoc(
@@ -147,6 +148,9 @@ export function CreateIssueDialog({
           repoId,
           labelIds,
         })
+        // Refetched below, so its own live-update echo (the issue, its labels, its first activity) isn't needed.
+        for (const table of ['issues', 'issue_label_links', 'issue_activity']) ownWrite(table, made.id)
+        return made
       } catch (error) {
         // Nothing points at the uploaded images: take them back.
         await removeIssueImages(paths)
@@ -154,7 +158,12 @@ export function CreateIssueDialog({
       }
     },
     onSuccess: async ({ number }) => {
-      await queryClient.invalidateQueries({ queryKey: issueKeys.all })
+      // The lists it shows up in, and an open parent (a new sub-issue).
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: issueKeys.workspace(workspace.id) }),
+        queryClient.invalidateQueries({ queryKey: ['issues', 'team'] }),
+        ...(parent ? [queryClient.invalidateQueries({ queryKey: issueKeys.detail(workspace.id, parent.number) })] : []),
+      ])
       const id = issueIdentifier(workspace.issue_key, number)
       toast.success(`${id} created`, {
         description: title.trim(),
