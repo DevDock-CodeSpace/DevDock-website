@@ -1,0 +1,29 @@
+name: Request check after deploy
+
+# A push to prod is a deploy (Vercel builds it). This tells the request-tests repo,
+# which counts the requests the live app makes and emails a summary. See
+# https://github.com/DevDock-CodeSpace/DevDock-request-tests
+on:
+  push:
+    branches: [prod]
+
+permissions: {}
+
+jobs:
+  notify:
+    name: Start the request check
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Tell the request-tests repo
+        env:
+          # A fine-grained token with Contents: read and write on DevDock-request-tests.
+          GH_TOKEN: ${{ secrets.REQUEST_TESTS_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "REQUEST_TESTS_TOKEN is not set, so the request check was not started."
+            exit 0
+          fi
+          gh api repos/DevDock-CodeSpace/DevDock-request-tests/dispatches \
+            -f event_type=prod-deployed \
+            -f "client_payload[sha]=${GITHUB_SHA::7}"

@@ -88,6 +88,8 @@ npm run db:types    # regenerate src/types/database.types.ts from the linked pro
 
 Supabase CLI (DB work only; the app doesn't need it): `supabase migration new <name>`, `supabase db push [--dry-run]`, `supabase migration list`. `supabase start` / `db reset` need Docker; nothing else does.
 
+**Request counts** are tested from a separate private repo, `DevDock-CodeSpace/DevDock-request-tests` (two signed-in browser sessions against the live site, a budget per action). `.github/workflows/request-check.yml` starts its quick set after every push to `prod`, the full suite runs weekly, and a summary is emailed. When a change is meant to alter how many requests an action makes, update that repo's `budgets.json`.
+
 Before calling a task done, run `npm run check` (lint, typecheck + build, then the performance budget). It must pass; GitHub Actions (`.github/workflows/ci.yml`) runs the same command on every pull request to `dev` and `prod`.
 
 ## Performance (read before coding)
