@@ -19,6 +19,7 @@ import {
   type IssuePatch,
 } from './api'
 import { readFilters, writeFilters, type IssueFilters } from './filters'
+import { ownWrite } from '@/lib/realtime'
 
 /**
  * What issue screens need about the current workspace: its members (assignees),
@@ -45,7 +46,11 @@ export function useCreateIssueBranch() {
   const queryClient = useQueryClient()
   const { workspace } = useCurrentWorkspace()
   return useMutation({
-    mutationFn: (issue: Pick<Issue, 'id' | 'number'>) => createIssueBranch(issue.id),
+    mutationFn: (issue: Pick<Issue, 'id' | 'number'>) => {
+      // The function may set the issue's repo, and logs activity and the branch: all refetched below.
+      for (const table of ['issues', 'issue_activity', 'issue_branches']) ownWrite(table, issue.id, 15_000)
+      return createIssueBranch(issue.id)
+    },
     onSuccess: ({ branch, created }) => {
       if (created) toast.success(`Created branch ${branch.name}`)
     },
@@ -76,6 +81,10 @@ export function useUpdateIssue() {
     // edit can't land on top of a newer one (optimistic updates still apply at once).
     scope: { id: `issues:${workspace.id}` },
     mutationFn: async ({ issue, patch, labelIds }: UpdateVars) => {
+      // Shown optimistically and refetched below, so the echo of this save is dropped.
+      ownWrite('issues', issue.id)
+      ownWrite('issue_activity', issue.id)
+      if (labelIds) ownWrite('issue_label_links', issue.id)
       if (patch && Object.keys(patch).length > 0) await updateIssue(issue.id, patch)
       if (labelIds) await setIssueLabels(issue.id, labelIds)
     },
@@ -118,11 +127,15 @@ export function useUpdateIssue() {
       const hasRepos = (queryClient.getQueryData(workspaceReposQuery(workspace.id).queryKey)?.length ?? 0) > 0
       if (patch?.status === 'in_progress' && before !== 'in_progress' && hasRepos) createBranch.mutate(issue)
     },
-    onSettled: (_data, _error, { issue }) => {
-      void queryClient.invalidateQueries({ queryKey: issueKeys.workspace(workspace.id) })
+    onSettled: (_data, error, { issue, patch }) => {
+      // The optimistic copy already shows the edit. The server adds only `completed_at`
+      // (on a status change) and the activity entry, so ask for no more than that;
+      // after a failure, ask for everything.
+      const lists = error !== null || patch?.status !== undefined
+      if (lists) void queryClient.invalidateQueries({ queryKey: issueKeys.workspace(workspace.id) })
+      // The group-wide Issues page (only marked stale unless it's open).
+      void queryClient.invalidateQueries({ queryKey: ['issues', 'team'], refetchType: lists ? 'active' : 'none' })
       void queryClient.invalidateQueries({ queryKey: issueKeys.detail(workspace.id, issue.number) })
-      // The group-wide Issues page.
-      void queryClient.invalidateQueries({ queryKey: ['issues', 'team'] })
       void queryClient.invalidateQueries({ queryKey: issueKeys.activity(issue.id) })
     },
   })

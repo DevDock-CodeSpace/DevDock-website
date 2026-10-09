@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { useAuth } from '@/features/auth/hooks'
 import { teamMembersQuery } from '@/features/teams/api'
 import { errorMessage } from '@/lib/errors'
+import { ownWrite } from '@/lib/realtime'
 import type { Json } from '@/types/database.types'
 import {
   conversationKeys,
@@ -32,6 +33,8 @@ export function useSendMessage(conversationId: string, teamId: string, limit: nu
   return useMutation({
     mutationFn: async (input: SendInput) => {
       const message = await sendMessage({ conversationId, clientId: input.clientId, content: input.content, body: input.body, mentionIds: input.mentionIds })
+      // Refetched in onSettled; your own message never changes your unread counts.
+      ownWrite('messages', message.id)
       for (const file of input.files) await uploadMessageAttachment({ teamId, conversationId, messageId: message.id, file })
       return message
     },
@@ -93,6 +96,7 @@ export function useSendReply(conversationId: string, teamId: string, parentId: s
   return useMutation({
     mutationFn: async (input: Omit<SendInput, 'clientId'> & { clientId: string }) => {
       const message = await sendMessage({ conversationId, parentId, clientId: input.clientId, content: input.content, body: input.body, mentionIds: input.mentionIds })
+      ownWrite('messages', message.id)
       for (const file of input.files) await uploadMessageAttachment({ teamId, conversationId, messageId: message.id, file })
       return message
     },

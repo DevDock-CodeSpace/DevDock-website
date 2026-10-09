@@ -11,6 +11,7 @@ import { OthersTypingAlert } from '@/components/OthersTypingAlert'
 import { PersonAvatar } from '@/components/PersonRow'
 import { Button } from '@/components/ui/button'
 import { useCurrentTeam } from '@/features/teams/hooks'
+import { ownWrite } from '@/lib/realtime'
 import { useOthersTyping } from '@/hooks/use-others-typing'
 import { docsPath } from '@/features/teams/nav'
 import type { Json } from '@/types/database.types'
@@ -102,6 +103,9 @@ export default function DocView({ doc, canEdit, canDelete }: { doc: Doc; canEdit
     setStatus('saving')
     const body = editor.getJSON() as Json
     const content = editor.getText({ blockSeparator: '\n' })
+    const renamed = nextTitle !== synced.current.title
+    // Our own change: this view updates its cache below, so the echo needn't refetch it.
+    ownWrite('documents', doc.id)
     try {
       await updateDocument(doc.id, { title: nextTitle, body, content })
     } catch (error) {
@@ -116,8 +120,11 @@ export default function DocView({ doc, canEdit, canDelete }: { doc: Doc; canEdit
     queryClient.setQueryData(documentQuery(doc.id).queryKey, (old) =>
       old ? { ...old, title: nextTitle, body, content, updated_at: new Date().toISOString() } : old,
     )
-    void queryClient.invalidateQueries({ queryKey: ['documents', 'team'] })
-    void queryClient.invalidateQueries({ queryKey: ['documents', 'workspace'] })
+    // Lists show the title, not the text: only a rename needs them asked for again.
+    if (renamed) {
+      void queryClient.invalidateQueries({ queryKey: ['documents', 'team'] })
+      void queryClient.invalidateQueries({ queryKey: ['documents', 'workspace'] })
+    }
     setStatus(version.current === target ? 'saved' : 'pending')
   }, [doc.id, queryClient])
 

@@ -18,6 +18,7 @@ import type { Json } from '@/types/database.types'
 import { IMAGE_TYPES } from '@/features/docs/api'
 import { issueKeys, updateIssue, type IssueDetail } from '../api'
 import { uploadIssueImage } from '../images'
+import { ownWrite } from '@/lib/realtime'
 
 function initialContent(body: Json | null): JSONContent | null {
   if (body && typeof body === 'object' && !Array.isArray(body) && body.type === 'doc') return body as JSONContent
@@ -55,12 +56,13 @@ export function IssueDescription({ issue }: { issue: IssueDetail }) {
     pending.current = undefined
     saving.current = true
     try {
+      // Our own change, and no list shows the description: nothing needs refetching for it.
+      ownWrite('issues', issue.id)
       await updateIssue(issue.id, { description })
       saved.current = description
-      // A refetch that started before this save still carries the old text: drop it and ask again.
+      // A refetch that started before this save still carries the old text: drop it.
       void queryClient.cancelQueries({ queryKey: detailKey })
       setCached(description)
-      void queryClient.invalidateQueries({ queryKey: detailKey })
     } catch (error) {
       // Keep the text for the next attempt (the next edit, or leaving the issue).
       if (pending.current === undefined) pending.current = description

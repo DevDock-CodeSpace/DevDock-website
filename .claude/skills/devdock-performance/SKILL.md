@@ -65,6 +65,12 @@ would make the app slower, **stop and ask the owner before building it** (see "S
   message to its conversation, and a reply to that conversation's threads). Use the event's ids only to choose
   queries; never show row data from an event.
 - After a mutation, invalidate only what it changed (sending without a file doesn't refetch attachments).
+- **Autosave is the costliest thing in the app**: a save fires about once a second while someone types. A save
+  must cost exactly one request in the saving tab and none in tabs that don't have the item open. Call
+  `ownWrite(table, id)` before the request, update the cache yourself, and invalidate lists only for a change
+  they show (a rename). `rowQueries` in `lib/realtime.ts` does the same judgment for other tabs.
+- **Don't refetch on return to the tab what live updates already deliver** (`lib/live.ts`). A query under a
+  live root that reads an unpublished table must be added to `NOT_LIVE` or it will go stale.
 
 **Bundle**
 - Anything over about 20 KB gzipped that isn't needed to paint the first screen is lazy-loaded
@@ -122,9 +128,14 @@ Components that read several independent queries in a row (verify, then batch or
 (docs + folders), `LearningProgressPage`, `AddWorkspaceMembersDialog`, and the hooks in `features/teams`,
 `features/learning` and `features/docs`.
 
-The sender's own message is fetched twice (the mutation's `onSettled`, then its realtime echo), and a reader's
-unread counts are fetched twice per message (the message event, then the read-position write). Both are kept
-so the UI stays correct when realtime is disconnected.
+A reader's unread counts are fetched twice per message (the message event, then the read-position write).
+Creating and deleting things (a doc, an issue, a channel) still refetch broadly and get their own echo; they
+are rare, so they were left alone. Changing an issue to In Progress costs about 9 requests because it also
+creates the GitHub branch.
+
+Measured October 2026 after these rules (requests in the acting tab / in a tab watching a list): doc save 1/0,
+diagram save 1/0, issue description save 1/0, issue field change 3/1, message 2/2, return to the tab 0 to 1.
+Before: 3/2, 2/1, 4/1, about 7/2, 4/2, and 10 to 12.
 
 Scale limits (the app is sized for single-digit users): the Issues pages load every issue of a workspace in
 one query. Revisit (server-side filtering and paging) before a workspace passes about 500 issues.

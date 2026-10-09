@@ -33,8 +33,30 @@ export const PAGE_SIZE = 50
 /** The bell loads this many unread notifications; at the limit there may be more it hasn't loaded. */
 export const NOTIFICATION_LIMIT = 20
 
-/** Teams whose #general channel was already ensured in this tab (the RPC writes, so don't repeat it on every refetch). */
+// Groups whose #general channel this browser has already made sure of. The RPC
+// writes even when the channel exists, and every write is announced to every open
+// tab, so it runs once per browser and group rather than on every page load.
 const ensuredTeams = new Set<string>()
+const ENSURED_KEY = 'devdock-general-channel'
+
+function alreadyEnsured(teamId: string) {
+  if (ensuredTeams.has(teamId)) return true
+  try {
+    return (JSON.parse(localStorage.getItem(ENSURED_KEY) ?? '[]') as unknown[]).includes(teamId)
+  } catch {
+    return false
+  }
+}
+
+function rememberEnsured(teamId: string) {
+  ensuredTeams.add(teamId)
+  try {
+    const saved = JSON.parse(localStorage.getItem(ENSURED_KEY) ?? '[]') as unknown[]
+    localStorage.setItem(ENSURED_KEY, JSON.stringify([...new Set([...saved, teamId])].slice(-50)))
+  } catch {
+    // Private mode or a full store: it is checked again on the next load, as before.
+  }
+}
 
 export const conversationKeys = {
   all: ['messaging'] as const,
@@ -57,10 +79,10 @@ export const teamConversationsQuery = (teamId: string) =>
   queryOptions({
     queryKey: conversationKeys.conversations(teamId),
     queryFn: async (): Promise<Conversation[]> => {
-      if (!ensuredTeams.has(teamId)) {
+      if (!alreadyEnsured(teamId)) {
         const { error: ensureError } = await supabase.rpc('ensure_general_channel', { p_team_id: teamId })
         if (ensureError) throw toDataError('prepare messages', ensureError)
-        ensuredTeams.add(teamId)
+        rememberEnsured(teamId)
       }
       const { data, error } = await supabase
         .from('conversations')
