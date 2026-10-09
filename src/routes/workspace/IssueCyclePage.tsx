@@ -12,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { deleteCycle, issueKeys, moveOpenIssues, workspaceIssuesQuery, type IssueStatus } from '@/features/issues/api'
+import { cycleChangeKeys, deleteCycle, moveOpenIssues, workspaceIssuesQuery, type IssueStatus } from '@/features/issues/api'
 import { CycleDialog } from '@/features/issues/components/CycleDialog'
 import { CycleInsights } from '@/features/issues/components/CycleInsights'
 import { CyclePinButton } from '@/features/issues/components/CyclePinButton'
@@ -32,6 +32,7 @@ import { cyclePath, cyclesPath } from '@/features/teams/nav'
 import { errorMessage } from '@/lib/errors'
 import { formatDate, localDateISO } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { ownWrite } from '@/lib/realtime'
 
 /** One cycle: dates, progress (scope / started / completed), its issues, and manager actions. */
 export function IssueCyclePage() {
@@ -88,7 +89,7 @@ export function IssueCyclePage() {
       const moved = await moveOpenIssues(cycle.id, to)
       const target = cycles.find((c) => c.id === to)
       toast.success(`${moved} ${moved === 1 ? 'issue' : 'issues'} moved ${target ? `to ${cycleTitle(target)}` : 'out of sprints'}`)
-      await queryClient.invalidateQueries({ queryKey: issueKeys.all })
+      await Promise.all(cycleChangeKeys(workspace.id).map((queryKey) => queryClient.invalidateQueries({ queryKey })))
     } catch (error) {
       toast.error(errorMessage(error))
     } finally {
@@ -99,11 +100,12 @@ export function IssueCyclePage() {
   const remove = async () => {
     setBusy(true)
     try {
+      ownWrite('issue_cycles', cycle.id, 15_000)
       await deleteCycle(cycle.id)
       toast.success(`${cycleTitle(cycle)} was deleted`)
       // Leave the page before dropping its data (see useExitTeam for why).
       await navigate(cyclesPath(team.slug, workspace.id), { replace: true })
-      await queryClient.invalidateQueries({ queryKey: issueKeys.all })
+      await Promise.all(cycleChangeKeys(workspace.id).map((queryKey) => queryClient.invalidateQueries({ queryKey })))
     } catch (error) {
       toast.error(errorMessage(error))
       setBusy(false)

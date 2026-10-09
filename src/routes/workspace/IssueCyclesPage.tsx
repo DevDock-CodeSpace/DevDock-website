@@ -11,7 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { deleteCycle, issueKeys, workspaceIssuesQuery, type IssueCycle } from '@/features/issues/api'
+import { cycleChangeKeys, deleteCycle, workspaceIssuesQuery, type IssueCycle } from '@/features/issues/api'
 import { CycleDialog } from '@/features/issues/components/CycleDialog'
 import { CycleProgress } from '@/features/issues/components/CycleProgress'
 import { IssuesNav } from '@/features/issues/components/IssuesNav'
@@ -22,6 +22,7 @@ import { cyclePath } from '@/features/teams/nav'
 import { errorMessage } from '@/lib/errors'
 import { formatShortDate, localDateISO } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { ownWrite } from '@/lib/realtime'
 
 const SECTIONS: { state: CycleState; title: string }[] = [
   { state: 'current', title: 'Current' },
@@ -115,9 +116,11 @@ function CycleRow({
   const remove = async () => {
     setDeleting(true)
     try {
+      ownWrite('issue_cycles', cycle.id, 15_000)
       await deleteCycle(cycle.id)
       toast.success(`${cycleTitle(cycle)} was deleted`)
-      await queryClient.invalidateQueries({ queryKey: issueKeys.all })
+      // Its issues are out of the sprint now, and pins that pointed at it are gone.
+      await Promise.all(cycleChangeKeys(workspace.id).map((queryKey) => queryClient.invalidateQueries({ queryKey })))
     } catch (error) {
       toast.error(errorMessage(error))
     } finally {
