@@ -346,9 +346,11 @@ export async function createIssue(input: NewIssue): Promise<{ id: string; number
 
 export async function updateIssue(issueId: string, patch: IssuePatch) {
   const update = patch.title === undefined ? patch : { ...patch, title: patch.title.trim() }
-  const { data, error } = await supabase.from('issues').update(update).eq('id', issueId).select('id')
+  const { data, error } = await supabase.from('issues').update(update).eq('id', issueId).select('id, updated_at')
   if (error) throw toDataError('save the issue', error, writeErrors)
   requireAffected(data, 'update issue')
+  // The time the database gave this save: it identifies our own echo (lib/realtime `ownSave`).
+  return data[0]?.updated_at
 }
 
 /** Replaces the issue's labels atomically (RPC, runs under RLS). */
@@ -411,7 +413,7 @@ export async function createCycle(workspaceId: string, input: CycleInput) {
   const { data, error } = await supabase
     .from('issue_cycles')
     .insert(row as TablesInsert<'issue_cycles'>)
-    .select('number')
+    .select('id, number')
     .single()
   if (error) throw toDataError('create the sprint', error, cycleErrors)
   return data
@@ -432,6 +434,16 @@ export async function deleteCycle(cycleId: string) {
   const { data, error } = await supabase.from('issue_cycles').delete().eq('id', cycleId).select('id')
   if (error) throw toDataError('delete the sprint', error, cycleErrors)
   requireAffected(data, 'delete sprint')
+}
+
+/**
+ * What a change to a cycle's issues can alter: the workspace's issue list, the
+ * cycle charts and (after a delete) the pins that pointed at the cycle. The
+ * group-wide list is only marked stale unless it's open. Labels, saved views,
+ * comments and the other issues queries are untouched.
+ */
+export function cycleChangeKeys(workspaceId: string) {
+  return [issueKeys.cycles(workspaceId), issueKeys.workspace(workspaceId), ['issues', 'cycle-history', workspaceId], ['issues', 'pins'], ['issues', 'team']] as const
 }
 
 /** Moves a cycle's unfinished issues to another cycle (or out of cycles). Returns how many moved. */

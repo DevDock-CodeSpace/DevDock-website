@@ -16,6 +16,7 @@ import { localDateISO } from '@/lib/format'
 import { createCycle, issueKeys, updateCycle, type IssueCycle } from '../api'
 import { addDays, cycleTitle, daysBetween } from '../cycles'
 import { useIssueContext } from '../hooks'
+import { ownWrite } from '@/lib/realtime'
 
 const LENGTHS = [7, 14, 21]
 
@@ -45,8 +46,14 @@ export function CycleDialog({
 
   const save = useMutation({
     mutationFn: async () => {
-      if (cycle) await updateCycle(cycle.id, { name, startsOn, endsOn })
-      else await createCycle(workspace.id, { name, startsOn, endsOn })
+      // Refetched below, so its own live-update echo isn't needed.
+      if (cycle) {
+        ownWrite('issue_cycles', cycle.id)
+        await updateCycle(cycle.id, { name, startsOn, endsOn })
+      } else {
+        const made = await createCycle(workspace.id, { name, startsOn, endsOn })
+        ownWrite('issue_cycles', made.id)
+      }
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: issueKeys.cycles(workspace.id) })

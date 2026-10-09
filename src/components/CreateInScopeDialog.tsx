@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useCurrentTeam } from '@/features/teams/hooks'
 import { workspaceTypes } from '@/features/teams/permissions'
 import { teamWorkspacesQuery } from '@/features/workspaces/api'
+import { ownWrite } from '@/lib/realtime'
 
 const TEAM_WIDE = 'team'
 
@@ -32,8 +33,10 @@ type CreateInScopeDialogProps = {
   /** Who may create in a scope (null = team-wide). Mirrors RLS; UI only. */
   canWrite: (workspaceId: string | null) => boolean
   create: (input: { teamId: string; workspaceId: string | null; title: string }) => Promise<{ id: string }>
-  /** Query key prefix to invalidate after creating. */
-  queryKey: readonly string[]
+  /** The lists the new item shows up in, refetched after creating. */
+  queryKeys: readonly (readonly string[])[]
+  /** The table it is inserted into, so its own live-update echo isn't refetched as well. */
+  table: string
   /** Where to go after creating. */
   pathFor: (id: string) => string
 }
@@ -49,7 +52,8 @@ export function CreateInScopeDialog({
   groupWideOnly = false,
   canWrite,
   create: createItem,
-  queryKey,
+  queryKeys,
+  table,
   pathFor,
 }: CreateInScopeDialogProps) {
   const { team } = useCurrentTeam()
@@ -71,9 +75,13 @@ export function CreateInScopeDialog({
   const [scope, setScope] = useState(options[0] ?? TEAM_WIDE)
 
   const create = useMutation({
-    mutationFn: () => createItem({ teamId: team.id, workspaceId: scope === TEAM_WIDE ? null : scope, title }),
+    mutationFn: async () => {
+      const made = await createItem({ teamId: team.id, workspaceId: scope === TEAM_WIDE ? null : scope, title })
+      ownWrite(table, made.id)
+      return made
+    },
     onSuccess: async ({ id }) => {
-      await queryClient.invalidateQueries({ queryKey })
+      await Promise.all(queryKeys.map((queryKey) => queryClient.invalidateQueries({ queryKey })))
       setOpen(false)
       navigate(pathFor(id))
     },

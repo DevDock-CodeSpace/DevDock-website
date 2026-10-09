@@ -1,5 +1,6 @@
 import type { Session, User } from '@supabase/supabase-js'
 import { queryOptions } from '@tanstack/react-query'
+import { SETTLED_STALE_MS } from '@/lib/query-client'
 import { supabase, supabasePublishableKey, supabaseUrl } from '@/lib/supabase'
 import type { Tables } from '@/types/database.types'
 import { AuthFlowError } from './errors'
@@ -118,6 +119,8 @@ export const profileQuery = (userId: string) =>
   queryOptions({
     queryKey: ['auth', 'profile', userId],
     queryFn: () => getCurrentProfile(userId),
+    // Your own name and photo: nothing in the app changes them, so don't re-request them on every return to the tab.
+    staleTime: SETTLED_STALE_MS,
     retry: 1,
   })
 

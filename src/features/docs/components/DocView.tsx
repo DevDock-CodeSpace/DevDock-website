@@ -11,6 +11,7 @@ import { OthersTypingAlert } from '@/components/OthersTypingAlert'
 import { PersonAvatar } from '@/components/PersonRow'
 import { Button } from '@/components/ui/button'
 import { useCurrentTeam } from '@/features/teams/hooks'
+import { ownSave, ownWrite } from '@/lib/realtime'
 import { useOthersTyping } from '@/hooks/use-others-typing'
 import { docsPath } from '@/features/teams/nav'
 import type { Json } from '@/types/database.types'
@@ -102,9 +103,13 @@ export default function DocView({ doc, canEdit, canDelete }: { doc: Doc; canEdit
     setStatus('saving')
     const body = editor.getJSON() as Json
     const content = editor.getText({ blockSeparator: '\n' })
+    const renamed = nextTitle !== synced.current.title
+    // Our own change: this view updates its cache below, so the echo needn't refetch it.
+    const saved = ownSave('documents', doc.id)
     try {
-      await updateDocument(doc.id, { title: nextTitle, body, content })
+      saved(await updateDocument(doc.id, { title: nextTitle, body, content }))
     } catch (error) {
+      saved()
       setStatus('error')
       throw error
     }
@@ -116,8 +121,11 @@ export default function DocView({ doc, canEdit, canDelete }: { doc: Doc; canEdit
     queryClient.setQueryData(documentQuery(doc.id).queryKey, (old) =>
       old ? { ...old, title: nextTitle, body, content, updated_at: new Date().toISOString() } : old,
     )
-    void queryClient.invalidateQueries({ queryKey: ['documents', 'team'] })
-    void queryClient.invalidateQueries({ queryKey: ['documents', 'workspace'] })
+    // Lists show the title, not the text: only a rename needs them asked for again.
+    if (renamed) {
+      void queryClient.invalidateQueries({ queryKey: ['documents', 'team'] })
+      void queryClient.invalidateQueries({ queryKey: ['documents', 'workspace'] })
+    }
     setStatus(version.current === target ? 'saved' : 'pending')
   }, [doc.id, queryClient])
 
@@ -129,7 +137,7 @@ export default function DocView({ doc, canEdit, canDelete }: { doc: Doc; canEdit
     return run
   }, [save])
 
-  const { others, markTyping } = useOthersTyping(`doc:${doc.id}`, canEdit)
+  const { lockedBy, markTyping } = useOthersTyping(`doc:${doc.id}`, canEdit)
   const markChanged = useCallback(() => {
     version.current += 1
     markTyping()
@@ -182,6 +190,12 @@ export default function DocView({ doc, canEdit, canDelete }: { doc: Doc; canEdit
     editorRef.current = editor
   }, [editor])
 
+  // Someone else has the text: read-only until they stop (see useOthersTyping). Not reported as an edit.
+  const locked = lockedBy.length > 0
+  useEffect(() => {
+    editor?.setEditable(canEdit && !locked, false)
+  }, [editor, locked, canEdit])
+
   // A doc that changed on the server (someone else, another tab) replaces what's
   // shown here, unless there are unsaved edits.
   useEffect(() => {
@@ -224,13 +238,18 @@ export default function DocView({ doc, canEdit, canDelete }: { doc: Doc; canEdit
     setDeleting(true)
     try {
       window.clearTimeout(timer.current)
+      ownWrite('documents', doc.id, 15_000)
       await deleteDocument(team.id, doc.id)
       toast.success(`${doc.title} was deleted`)
       // Leave the page before dropping its data (see useExitTeam for why).
       leaving.current = true
       await navigate(backTo, { replace: true })
       queryClient.removeQueries({ queryKey: ['documents', doc.id] })
-      await queryClient.invalidateQueries({ queryKey: ['documents'] })
+      // Only the lists showed it.
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['documents', 'team'] }),
+        queryClient.invalidateQueries({ queryKey: ['documents', 'workspace'] }),
+      ])
     } catch (error) {
       toast.error(errorMessage(error))
       setDeleting(false)
@@ -296,6 +315,7 @@ export default function DocView({ doc, canEdit, canDelete }: { doc: Doc; canEdit
           maxLength={200}
           aria-label="Title"
           placeholder="Untitled"
+          readOnly={locked}
           onChange={(e) => {
             const next = e.target.value.replace(/\n/g, ' ')
             setTitle(next)
@@ -355,7 +375,7 @@ export default function DocView({ doc, canEdit, canDelete }: { doc: Doc; canEdit
           />
         </>
       )}
-      <OthersTypingAlert names={others} />
+      <OthersTypingAlert names={lockedBy} />
       <EditorContent editor={editor} className="pb-[30vh]" />
 
       <ConfirmDialog

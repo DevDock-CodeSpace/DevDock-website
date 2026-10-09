@@ -19,6 +19,7 @@ import {
   type IssuePatch,
 } from './api'
 import { readFilters, writeFilters, type IssueFilters } from './filters'
+import { ownSave, ownWrite } from '@/lib/realtime'
 
 /**
  * What issue screens need about the current workspace: its members (assignees),
@@ -45,19 +46,26 @@ export function useCreateIssueBranch() {
   const queryClient = useQueryClient()
   const { workspace } = useCurrentWorkspace()
   return useMutation({
-    mutationFn: (issue: Pick<Issue, 'id' | 'number'>) => createIssueBranch(issue.id),
+    mutationFn: (issue: Pick<Issue, 'id' | 'number'>) => {
+      // The function logs activity and the branch, both refetched below. (It may also set the
+      // issue's repo; that echo isn't ours to recognise, so it refetches the issue once more.)
+      for (const table of ['issue_activity', 'issue_branches']) ownWrite(table, issue.id, 15_000)
+      return createIssueBranch(issue.id)
+    },
     onSuccess: ({ branch, created }) => {
       if (created) toast.success(`Created branch ${branch.name}`)
     },
     onError: (error) => toast.error(errorMessage(error)),
-    onSettled: (_data, _error, issue) =>
-      Promise.all([
+    onSettled: (_data, _error, issue) => {
+      // The project's only repo becomes the issue's repo when it had none; only then do the lists change.
+      const hadRepo = queryClient.getQueryData<Issue[]>(issueKeys.workspace(workspace.id))?.find((i) => i.id === issue.id)?.repo_id != null
+      return Promise.all([
         queryClient.invalidateQueries({ queryKey: issueKeys.branches(issue.id) }),
         queryClient.invalidateQueries({ queryKey: issueKeys.activity(issue.id) }),
-        // The project's only repo may have become the issue's repo.
         queryClient.invalidateQueries({ queryKey: issueKeys.detail(workspace.id, issue.number) }),
-        queryClient.invalidateQueries({ queryKey: issueKeys.workspace(workspace.id) }),
-      ]),
+        queryClient.invalidateQueries({ queryKey: issueKeys.workspace(workspace.id), refetchType: hadRepo ? 'none' : 'active' }),
+      ])
+    },
   })
 }
 
@@ -70,13 +78,30 @@ export function useUpdateIssue() {
   const queryClient = useQueryClient()
   const { workspace } = useCurrentWorkspace()
   const createBranch = useCreateIssueBranch()
+  /** Moving into In Progress creates the issue's branch, when the project has repos. */
+  const startsBranch = (issue: Pick<Issue, 'id'>, patch: UpdateVars['patch'], context: { previousList?: Issue[]; previousDetail?: IssueDetail | null } | undefined) => {
+    const before = context?.previousDetail?.status ?? context?.previousList?.find((i) => i.id === issue.id)?.status
+    const hasRepos = (queryClient.getQueryData(workspaceReposQuery(workspace.id).queryKey)?.length ?? 0) > 0
+    return patch?.status === 'in_progress' && before !== 'in_progress' && hasRepos
+  }
 
   return useMutation({
     // One save at a time per workspace, in the order they were made, so an older
     // edit can't land on top of a newer one (optimistic updates still apply at once).
     scope: { id: `issues:${workspace.id}` },
     mutationFn: async ({ issue, patch, labelIds }: UpdateVars) => {
-      if (patch && Object.keys(patch).length > 0) await updateIssue(issue.id, patch)
+      // Shown optimistically and refetched below, so the echo of this save is dropped.
+      ownWrite('issue_activity', issue.id)
+      if (labelIds) ownWrite('issue_label_links', issue.id)
+      if (patch && Object.keys(patch).length > 0) {
+        const done = ownSave('issues', issue.id)
+        try {
+          done(await updateIssue(issue.id, patch))
+        } catch (error) {
+          done()
+          throw error
+        }
+      }
       if (labelIds) await setIssueLabels(issue.id, labelIds)
     },
     onMutate: async ({ issue, patch, labelIds }) => {
@@ -113,16 +138,22 @@ export function useUpdateIssue() {
       toast.error(errorMessage(error))
     },
     onSuccess: (_data, { issue, patch }, context) => {
-      const before =
-        context?.previousDetail?.status ?? context?.previousList?.find((i) => i.id === issue.id)?.status
-      const hasRepos = (queryClient.getQueryData(workspaceReposQuery(workspace.id).queryKey)?.length ?? 0) > 0
-      if (patch?.status === 'in_progress' && before !== 'in_progress' && hasRepos) createBranch.mutate(issue)
+      if (startsBranch(issue, patch, context)) createBranch.mutate(issue)
     },
-    onSettled: (_data, _error, { issue }) => {
-      void queryClient.invalidateQueries({ queryKey: issueKeys.workspace(workspace.id) })
+    onSettled: (_data, error, { issue, patch }, context) => {
+      // Creating the branch refetches the issue, its activity and (if needed) the list when it finishes.
+      if (error === null && startsBranch(issue, patch, context)) {
+        void queryClient.invalidateQueries({ queryKey: ['issues', 'team'], refetchType: 'none' })
+        return
+      }
+      // The optimistic copy already shows the edit. The server adds only `completed_at`
+      // (on a status change) and the activity entry, so ask for no more than that;
+      // after a failure, ask for everything.
+      const lists = error !== null || patch?.status !== undefined
+      if (lists) void queryClient.invalidateQueries({ queryKey: issueKeys.workspace(workspace.id) })
+      // The group-wide Issues page (only marked stale unless it's open).
+      void queryClient.invalidateQueries({ queryKey: ['issues', 'team'], refetchType: lists ? 'active' : 'none' })
       void queryClient.invalidateQueries({ queryKey: issueKeys.detail(workspace.id, issue.number) })
-      // The group-wide Issues page.
-      void queryClient.invalidateQueries({ queryKey: ['issues', 'team'] })
       void queryClient.invalidateQueries({ queryKey: issueKeys.activity(issue.id) })
     },
   })
