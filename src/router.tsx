@@ -56,6 +56,14 @@ export const router = createBrowserRouter([
     hydrateFallbackElement: <AuthLoading />,
     errorElement: <RouteErrorPage />,
   },
+  // Email + password for the admin account (testing without a Google round trip). Loaded on demand, linked from nowhere.
+  {
+    path: '/admin-login',
+    loader: loginLoader,
+    lazy: async () => ({ Component: (await import('@/routes/AdminLoginPage')).AdminLoginPage }),
+    hydrateFallbackElement: <AuthLoading />,
+    errorElement: <RouteErrorPage />,
+  },
   // Public: no loader, so no session is needed (linked from Google's consent screen).
   { path: '/privacy', element: <PrivacyPage />, errorElement: <RouteErrorPage /> },
   {

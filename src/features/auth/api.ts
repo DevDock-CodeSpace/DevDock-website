@@ -71,6 +71,21 @@ export async function connectGoogleCalendar(next: string, email: string | undefi
   }
 }
 
+/**
+ * Email + password, for the admin account only (/admin-login). Everyone else
+ * signs in with Google. The account is created in the Supabase dashboard; there
+ * is no sign-up or password reset in the app. What it can see is decided by its
+ * group and workspace roles under RLS, like any other user.
+ */
+export async function signInWithPassword(email: string, password: string): Promise<void> {
+  const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
+  if (error) {
+    console.error('[auth] signInWithPassword failed', error)
+    // A wrong password, an unknown email and a disabled provider all answer 400; network trouble has no status.
+    throw new AuthFlowError(error.status === undefined || error.status >= 500 ? 'unavailable' : 'credentials', { cause: error })
+  }
+}
+
 /** Signs out this browser only. Other devices keep their sessions. */
 export async function signOut(): Promise<void> {
   clearCalendarToken()
