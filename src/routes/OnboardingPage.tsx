@@ -188,7 +188,7 @@ function JoinTeamCard() {
     <Card>
       <CardHeader>
         <CardTitle>Join with an invite code</CardTitle>
-        <CardDescription>You’ll join as a member. Workspace access is granted separately.</CardDescription>
+        <CardDescription>You’ll join as a member. You’ll see what is open to the whole group; the rest is granted separately.</CardDescription>
       </CardHeader>
       <CardContent>
         <form className="space-y-4" onSubmit={submit}>

@@ -1924,6 +1924,90 @@ export type Database = {
           },
         ]
       }
+      workspace_collection_members: {
+        Row: {
+          added_at: string
+          collection_id: string
+          team_id: string
+          user_id: string
+        }
+        Insert: {
+          added_at?: string
+          collection_id: string
+          team_id: string
+          user_id: string
+        }
+        Update: {
+          added_at?: string
+          collection_id?: string
+          team_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_collection_members_collection_fkey"
+            columns: ["collection_id", "team_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_collections"
+            referencedColumns: ["id", "team_id"]
+          },
+          {
+            foreignKeyName: "workspace_collection_members_team_member_fkey"
+            columns: ["team_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["team_id", "user_id"]
+          },
+          {
+            foreignKeyName: "workspace_collection_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workspace_collections: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          position: number
+          team_id: string
+          type: Database["public"]["Enums"]["team_type"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          position?: number
+          team_id: string
+          type?: Database["public"]["Enums"]["team_type"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          position?: number
+          team_id?: string
+          type?: Database["public"]["Enums"]["team_type"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_collections_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_members: {
         Row: {
           joined_at: string
@@ -2073,6 +2157,8 @@ export type Database = {
       }
       workspaces: {
         Row: {
+          access: Database["public"]["Enums"]["workspace_access"]
+          collection_id: string | null
           created_at: string
           created_by: string | null
           description: string | null
@@ -2084,6 +2170,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          access?: Database["public"]["Enums"]["workspace_access"]
+          collection_id?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -2095,6 +2183,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          access?: Database["public"]["Enums"]["workspace_access"]
+          collection_id?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -2106,6 +2196,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "workspaces_collection_fkey"
+            columns: ["collection_id", "team_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_collections"
+            referencedColumns: ["id", "team_id"]
+          },
           {
             foreignKeyName: "workspaces_team_id_fkey"
             columns: ["team_id"]
@@ -2169,6 +2266,18 @@ export type Database = {
       }
       create_workspace: {
         Args: {
+          p_description: string
+          p_modules: Database["public"]["Enums"]["workspace_module"][]
+          p_team_id: string
+          p_title: string
+          p_type: Database["public"]["Enums"]["workspace_type"]
+        }
+        Returns: string
+      }
+      create_workspace_in: {
+        Args: {
+          p_access: Database["public"]["Enums"]["workspace_access"]
+          p_collection_id: string
           p_description: string
           p_modules: Database["public"]["Enums"]["workspace_module"][]
           p_team_id: string
@@ -2303,6 +2412,17 @@ export type Database = {
         Args: { p_responses: Json; p_session_id: string }
         Returns: number
       }
+      set_workspace_access: {
+        Args: {
+          p_access: Database["public"]["Enums"]["workspace_access"]
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
+      set_workspace_collection: {
+        Args: { p_collection_id: string; p_workspace_id: string }
+        Returns: undefined
+      }
       set_workspace_modules: {
         Args: {
           p_modules: Database["public"]["Enums"]["workspace_module"][]
@@ -2318,6 +2438,17 @@ export type Database = {
           unread_count: number
         }[]
       }
+      workspace_people: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          avatar_url: string
+          display_name: string
+          joined_at: string
+          role: Database["public"]["Enums"]["workspace_role"]
+          user_id: string
+          via: string
+        }[]
+      }
     }
     Enums: {
       issue_status:
@@ -2329,6 +2460,7 @@ export type Database = {
         | "canceled"
       team_role: "owner" | "admin" | "member"
       team_type: "development" | "learning" | "general"
+      workspace_access: "members" | "collection" | "group"
       workspace_module:
         | "issues"
         | "docs"
@@ -2477,6 +2609,7 @@ export const Constants = {
       ],
       team_role: ["owner", "admin", "member"],
       team_type: ["development", "learning", "general"],
+      workspace_access: ["members", "collection", "group"],
       workspace_module: [
         "issues",
         "docs",

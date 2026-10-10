@@ -29,7 +29,8 @@ export function AddWorkspaceMembersDialog() {
   const teamMembers = useSuspenseQuery(teamMembersQuery(team.id)).data
   const workspaceMembers = useSuspenseQuery(workspaceMembersQuery(workspace.id)).data
   const [role, setRole] = useState<WorkspaceRole>('member')
-  const inWorkspace = new Set(workspaceMembers.map((m) => m.user_id))
+  // People let in by the access setting can still be added, which gives them a row of their own.
+  const inWorkspace = new Set(workspaceMembers.filter((m) => m.via === 'member').map((m) => m.user_id))
   const candidates = teamMembers.filter((m) => !inWorkspace.has(m.user_id))
 
   const add = useMutation({

@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuth } from '@/features/auth/hooks'
 import { TeamReposSection } from '@/features/repos/components/TeamReposSection'
 import { deleteTeam, removeTeamMember, updateTeam, type TeamType } from '@/features/teams/api'
+import { CollectionsSection } from '@/features/collections/components/CollectionsSection'
 import { useCurrentTeam, useExitTeam } from '@/features/teams/hooks'
 import { defaultWorkspaceType, teamRoleLabel, teamTypes, workspaceTypes } from '@/features/teams/permissions'
 import { errorMessage } from '@/lib/errors'
@@ -24,6 +25,7 @@ export function TeamSettingsPage() {
       <PageHeader title="Group settings" description={`${team.name} · your role: ${teamRoleLabel[role]}`} />
       <div>
         <GeneralSection key={team.id} />
+        {can.canManageWorkspaces && <CollectionsSection />}
         <TeamReposSection />
         {(can.canLeave || can.canDelete) && <DangerSection />}
       </div>
