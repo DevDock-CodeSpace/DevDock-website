@@ -1,5 +1,6 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { ChevronRight, Pin, Plus } from 'lucide-react'
+import { useEffect } from 'react'
 import { Link, matchPath, useLocation, useParams } from 'react-router'
 import { TruncatedText } from '@/components/TruncatedText'
 import {
@@ -24,8 +25,10 @@ import { UserMenu } from '@/features/auth/components/UserMenu'
 import { TeamSwitcher } from '@/features/teams/components/TeamSwitcher'
 import { useCurrentTeam } from '@/features/teams/hooks'
 import { getTeamNav, hasTeamIssues, teamPath, workspacePath, type NavItem } from '@/features/teams/nav'
-import { workspaceTypeOrder, workspaceTypes } from '@/features/teams/permissions'
-import { teamCollectionsQuery, teamWorkspacesQuery } from '@/features/workspaces/api'
+import { collectionTypeOrder, workspaceTypeOrder, workspaceTypes } from '@/features/teams/permissions'
+import { useCollectionView } from '@/features/collections/hooks'
+import { rememberCollectionView } from '@/features/collections/view'
+import { teamWorkspacesQuery } from '@/features/workspaces/api'
 import { CreateWorkspaceDialog } from '@/features/workspaces/components/CreateWorkspaceDialog'
 import { usePins, useRecentVisits } from '@/features/workspaces/hooks'
 import { pickSidebarItems } from '@/features/workspaces/recent'
@@ -43,35 +46,37 @@ const activeIcon = 'data-active:[&_svg]:text-brand'
  */
 export function AppSidebar({ sidebarWidth }: { sidebarWidth: SidebarWidth }) {
   const { team, can } = useCurrentTeam()
-  // Both read one cache entry (teamContents), so this is a single request and never a waterfall.
-  const workspaces = useSuspenseQuery(teamWorkspacesQuery(team.id)).data
-  const collections = useSuspenseQuery(teamCollectionsQuery(team.id)).data
+  // One collection at a time: the sidebar shows what is in the one being looked at (everything, in a
+  // group without collections). Reads the cache entry the shell loaded, so it adds no request.
+  const { collection, workspaces } = useCollectionView()
+  const everything = useSuspenseQuery(teamWorkspacesQuery(team.id)).data
   const { pathname } = useLocation()
   const { workspaceId } = useParams()
   const { isMobile, setOpenMobile } = useSidebar()
   const { pins, isPinned, setPinned } = usePins()
   const visits = useRecentVisits(team.id)
-  const nav = getTeamNav(team.slug, hasTeamIssues(team.type, workspaces))
+  // Inside a collection its own type and contents decide whether Issues shows, not the group's.
+  const nav = getTeamNav(team.slug, hasTeamIssues(collection?.type ?? team.type, workspaces))
   const unreadMessages = useUnread(team.id).total
-  // One section per collection, then one per workspace type for what sits outside any collection
-  // (the team type only decides which type comes first). Empty sections are hidden.
+  // One section per workspace type that has items; the collection's type (else the group's) decides
+  // which comes first.
   const base = teamPath(team.slug)
-  const sections = [
-    ...collections.map((collection) => ({
-      key: collection.id,
-      title: collection.name,
-      allTitle: `Everything in ${collection.name}`,
-      allHref: `${base}?collection=${collection.id}`,
-      items: workspaces.filter((w) => w.collection_id === collection.id),
-    })),
-    ...workspaceTypeOrder(team.type).map((type) => ({
+  const sections = (collection ? collectionTypeOrder(collection.type) : workspaceTypeOrder(team.type))
+    .map((type) => ({
       key: type,
       title: workspaceTypes[type].plural,
       allTitle: `All ${workspaceTypes[type].plural.toLowerCase()}`,
       allHref: `${base}?type=${type}`,
-      items: workspaces.filter((w) => w.type === type && !collections.some((c) => c.id === w.collection_id)),
-    })),
-  ].filter((section) => section.items.length > 0)
+      items: workspaces.filter((w) => w.type === type),
+    }))
+    .filter((section) => section.items.length > 0)
+  // Opening something from another collection (a link, a pin, a notification) switches the view to
+  // it, so the sidebar always shows where you are.
+  const openCollectionId = everything.find((w) => w.id === workspaceId)?.collection_id ?? null
+  const viewId = collection?.id ?? null
+  useEffect(() => {
+    if (openCollectionId && viewId && openCollectionId !== viewId) rememberCollectionView(team.id, openCollectionId)
+  }, [openCollectionId, viewId, team.id])
   const close = () => isMobile && setOpenMobile(false)
 
   return (

@@ -3,6 +3,7 @@ import { PageHeader } from '@/components/PageHeader'
 import { teamLiveSessionsQuery } from '@/features/live/api'
 import { MeetingsView } from '@/features/live/components/MeetingsView'
 import { useCalendarQueue, useNow } from '@/features/live/hooks'
+import { useCollectionView } from '@/features/collections/hooks'
 import { useCurrentTeam } from '@/features/teams/hooks'
 import { liveSessionPath } from '@/features/teams/nav'
 
@@ -10,14 +11,15 @@ import { liveSessionPath } from '@/features/teams/nav'
 export function TeamLivePage() {
   useCalendarQueue()
   const { team, can } = useCurrentTeam()
-  const sessions = useSuspenseQuery(teamLiveSessionsQuery(team.id)).data
+  const { collection, inView } = useCollectionView()
+  const sessions = useSuspenseQuery(teamLiveSessionsQuery(team.id)).data.filter((s) => inView(s.workspace_id))
   const now = useNow()
 
   return (
     <>
       <PageHeader
         title="Meetings"
-        description={`Video meetings in ${team.name}: for the whole group, and for the workspaces you can access.`}
+        description={`Video meetings in ${team.name}: for the whole group, and for the workspaces you can access${collection ? ` in ${collection.name}` : ''}.`}
       />
       <MeetingsView
         sessions={sessions}

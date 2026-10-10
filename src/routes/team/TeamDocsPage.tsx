@@ -4,6 +4,7 @@ import { foldersQuery, teamDocsQuery } from '@/features/docs/api'
 import { DocBrowser } from '@/features/docs/components/DocBrowser'
 import { DocList } from '@/features/docs/components/DocList'
 import { useCanEditDocs, useCanWriteDocs } from '@/features/docs/hooks'
+import { useCollectionView } from '@/features/collections/hooks'
 import { useCurrentTeam } from '@/features/teams/hooks'
 import { docPath } from '@/features/teams/nav'
 
@@ -18,14 +19,16 @@ export function TeamDocsPage() {
   const canWrite = useCanWriteDocs()
   const canEdit = useCanEditDocs()
   const groupWide = docs.filter((d) => d.workspace_id === null)
-  const inWorkspaces = docs.filter((d) => d.workspace_id !== null)
+  // Group-wide docs belong to everyone; workspace docs follow the collection being looked at.
+  const { collection, inView } = useCollectionView()
+  const inWorkspaces = docs.filter((d) => d.workspace_id !== null && inView(d.workspace_id))
 
   return (
     <>
       {/* Every group member can create group-wide docs, so "New doc" lives in the browser. */}
       <PageHeader
         title="Docs"
-        description={`Group-wide docs in ${team.name}, plus docs from the workspaces you can access.`}
+        description={`Group-wide docs in ${team.name}, plus docs from the workspaces you can access${collection ? ` in ${collection.name}` : ''}.`}
       />
 
       <DocBrowser

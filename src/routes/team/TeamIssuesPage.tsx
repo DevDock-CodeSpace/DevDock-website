@@ -1,4 +1,4 @@
-import { useSuspenseQueries } from '@tanstack/react-query'
+import { useSuspenseQuery } from '@tanstack/react-query'
 import { CircleUserRound } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/PageHeader'
 import { PersonAvatar } from '@/components/PersonRow'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useAuth } from '@/features/auth/hooks'
+import { useCollectionView } from '@/features/collections/hooks'
 import { teamIssuesQuery, type TeamIssue } from '@/features/issues/api'
 import { PriorityIcon } from '@/features/issues/components/PriorityIcon'
 import { StatusIcon } from '@/features/issues/components/StatusIcon'
@@ -13,7 +14,6 @@ import { applyFilters, ISSUE_TABS, NO_FILTERS, readTab } from '@/features/issues
 import { compareIssues, isClosed, issueIdentifier, STATUS_ORDER, statusLabel } from '@/features/issues/meta'
 import { useCurrentTeam } from '@/features/teams/hooks'
 import { hasTeamIssues, issuePath, teamIssuesPath } from '@/features/teams/nav'
-import { teamWorkspacesQuery } from '@/features/workspaces/api'
 import { timeAgo } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
@@ -27,16 +27,17 @@ const ALL = 'all'
 export function TeamIssuesPage() {
   const { user } = useAuth()
   const { team } = useCurrentTeam()
-  const [{ data: all }, { data: workspaces }] = useSuspenseQueries({
-    queries: [teamIssuesQuery(team.id), teamWorkspacesQuery(team.id)],
-  })
+  // Inside a collection the page covers that collection's projects only.
+  const { collection, workspaces, inView } = useCollectionView()
+  const all = useSuspenseQuery(teamIssuesQuery(team.id)).data.filter((issue) => inView(issue.workspace.id))
+  const where = collection ? collection.name : team.name
   const [params, setParams] = useSearchParams()
   const [now] = useState(Date.now)
 
-  if (!hasTeamIssues(team.type, workspaces)) {
+  if (!hasTeamIssues(collection?.type ?? team.type, workspaces)) {
     return (
       <p className="py-16 text-center text-sm text-muted-foreground">
-        Issues from every project show here once this group has a project.
+        Issues from every project show here once {where} has a project.
       </p>
     )
   }
@@ -60,7 +61,7 @@ export function TeamIssuesPage() {
 
   return (
     <>
-      <PageHeader title="Issues" description={`Issues from every project in ${team.name} you can access.`} />
+      <PageHeader title="Issues" description={`Issues from every project in ${where} you can access.`} />
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <nav aria-label="Issue views" className="flex items-center gap-0.5">

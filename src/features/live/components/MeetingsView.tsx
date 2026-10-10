@@ -1,10 +1,8 @@
-import { useSuspenseQuery } from '@tanstack/react-query'
 import { CalendarDays, List } from 'lucide-react'
 import { lazy, Suspense, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router'
 import { cn } from '@/lib/utils'
-import { useCurrentTeam } from '@/features/teams/hooks'
-import { teamWorkspacesQuery } from '@/features/workspaces/api'
+import { useCollectionView } from '@/features/collections/hooks'
 import type { LiveSession } from '../api'
 import { readCursor, type CalendarMode } from '../calendarView'
 import { useCanWriteLive } from '../hooks'
@@ -34,8 +32,8 @@ type MeetingsViewProps = {
  * here, a "New meeting" button plus click-to-create on the calendar.
  */
 export function MeetingsView({ sessions, now, href, showScope, workspaceId, empty, lead }: MeetingsViewProps) {
-  const { team } = useCurrentTeam()
-  const workspaces = useSuspenseQuery(teamWorkspacesQuery(team.id)).data
+  // Only the collection being looked at (everything, in a group without collections).
+  const { workspaces } = useCollectionView()
   const canWrite = useCanWriteLive()
   const [params, setParams] = useSearchParams()
   const [creating, setCreating] = useState<Date | null>(null)

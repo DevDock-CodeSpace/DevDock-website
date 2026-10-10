@@ -4,19 +4,21 @@ import { PageHeader } from '@/components/PageHeader'
 import { teamDiagramsQuery } from '@/features/diagrams/api'
 import { CreateDiagramDialog } from '@/features/diagrams/components/CreateDiagramDialog'
 import { DocList } from '@/features/docs/components/DocList'
+import { useCollectionView } from '@/features/collections/hooks'
 import { useCurrentTeam } from '@/features/teams/hooks'
 import { diagramPath } from '@/features/teams/nav'
 
 /** Team → Diagrams: team-wide diagrams plus diagrams from every workspace the user can see (RLS). */
 export function TeamDiagramsPage() {
   const { team, can } = useCurrentTeam()
-  const diagrams = useSuspenseQuery(teamDiagramsQuery(team.id)).data
+  const { collection, inView } = useCollectionView()
+  const diagrams = useSuspenseQuery(teamDiagramsQuery(team.id)).data.filter((d) => inView(d.workspace_id))
 
   return (
     <>
       <PageHeader
         title="Diagrams"
-        description={`Group-wide diagrams in ${team.name}, plus diagrams from the workspaces you can access.`}
+        description={`Group-wide diagrams in ${team.name}, plus diagrams from the workspaces you can access${collection ? ` in ${collection.name}` : ''}.`}
       >
         <CreateDiagramDialog />
       </PageHeader>

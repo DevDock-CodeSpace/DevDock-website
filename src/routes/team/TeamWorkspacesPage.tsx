@@ -7,13 +7,15 @@ import { AvatarStack } from '@/components/PersonRow'
 import { useAuth } from '@/features/auth/hooks'
 import { useCurrentTeam } from '@/features/teams/hooks'
 import { teamPath, workspacePath } from '@/features/teams/nav'
-import { allowedWorkspaceTypes, workspaceRoleLabel, workspaceTypeOrder, workspaceTypes } from '@/features/teams/permissions'
 import {
-  myWorkspaceRolesQuery,
-  teamCollectionsQuery,
-  teamWorkspacesQuery,
-  type WorkspaceType,
-} from '@/features/workspaces/api'
+  allowedWorkspaceTypes,
+  collectionTypeOrder,
+  workspaceRoleLabel,
+  workspaceTypeOrder,
+  workspaceTypes,
+} from '@/features/teams/permissions'
+import { useCollectionView } from '@/features/collections/hooks'
+import { myWorkspaceRolesQuery, type WorkspaceType } from '@/features/workspaces/api'
 import { CreateWorkspaceDialog } from '@/features/workspaces/components/CreateWorkspaceDialog'
 import { usePins } from '@/features/workspaces/hooks'
 import { timeAgo } from '@/lib/format'
@@ -25,37 +27,36 @@ const TYPES: WorkspaceType[] = ['course', 'project', 'general']
 
 /**
  * Team home: a dense, scannable list of the workspaces the user can see,
- * filterable by type (?type=course, linked from the sidebar's "All courses") or
- * by collection (?collection=<id>), with a pin toggle per row. Pinned ones are listed first.
+ * filterable by type (?type=course, linked from the sidebar's "All courses"),
+ * with a pin toggle per row. In a group with collections it lists the one being
+ * looked at (useCollectionView). Pinned ones are listed first.
  */
 export function TeamWorkspacesPage() {
   const { user } = useAuth()
   const { team, can } = useCurrentTeam()
-  const workspaces = useSuspenseQuery(teamWorkspacesQuery(team.id)).data
-  // Same cache entry as the workspaces (one request for both).
-  const collections = useSuspenseQuery(teamCollectionsQuery(team.id)).data
+  // The collection being looked at (null in a group without collections) and what is in it.
+  const { collection, workspaces } = useCollectionView()
   const myRoles = useSuspenseQuery(myWorkspaceRolesQuery(team.id, user.id)).data
   const { isPinned, setPinned } = usePins()
   const [now] = useState(Date.now)
   const [params] = useSearchParams()
   const typeParam = params.get('type')
   const type = TYPES.find((t) => t === typeParam) ?? null
-  const presentTypes = workspaceTypeOrder(team.type).filter((t) => workspaces.some((w) => w.type === t))
-  // Only collections with something the viewer can see; an unknown id shows everything.
-  const presentCollections = collections.filter((c) => workspaces.some((w) => w.collection_id === c.id))
-  const collection = presentCollections.find((c) => c.id === params.get('collection')) ?? null
-  const collectionName = (id: string | null) => collections.find((c) => c.id === id)?.name
+  const presentTypes = (collection ? collectionTypeOrder(collection.type) : workspaceTypeOrder(team.type)).filter((t) =>
+    workspaces.some((w) => w.type === t),
+  )
   const shown = workspaces
     .filter((w) => !type || w.type === type)
-    .filter((w) => !collection || w.collection_id === collection.id)
     .sort((a, b) => Number(isPinned(b.id)) - Number(isPinned(a.id)))
 
   return (
     <>
       <PageHeader
-        title={team.name}
+        title={collection ? collection.name : team.name}
         description={
-          can.canManageWorkspaces
+          collection
+            ? `What you can open in ${collection.name}, part of ${team.name}. Switch collections from the group menu at the top left.`
+            : can.canManageWorkspaces
             ? `All ${allowedWorkspaceTypes[team.type].map((t) => workspaceTypes[t].plural.toLowerCase()).join(', ').replace(/, ([^,]*)$/, ' and $1')} in this group.`
             : 'What you can open in this group.'
         }
@@ -69,27 +70,13 @@ export function TeamWorkspacesPage() {
             <Link
               key={t ?? 'all'}
               to={t ? `${teamPath(team.slug)}?type=${t}` : teamPath(team.slug)}
-              aria-current={t === type && !collection ? 'page' : undefined}
+              aria-current={t === type ? 'page' : undefined}
               className={cn(
                 'rounded-md px-2.5 py-1 text-xs transition-colors',
-                t === type && !collection ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground hover:text-foreground',
+                t === type ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground hover:text-foreground',
               )}
             >
               {t ? workspaceTypes[t].plural : 'All'}
-            </Link>
-          ))}
-          {presentCollections.length > 0 && <span aria-hidden className="mx-1.5 h-3.5 w-px bg-border" />}
-          {presentCollections.map((c) => (
-            <Link
-              key={c.id}
-              to={`${teamPath(team.slug)}?collection=${c.id}`}
-              aria-current={c.id === collection?.id ? 'page' : undefined}
-              className={cn(
-                'max-w-40 truncate rounded-md px-2.5 py-1 text-xs transition-colors',
-                c.id === collection?.id ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              {c.name}
             </Link>
           ))}
         </nav>
@@ -134,10 +121,8 @@ export function TeamWorkspacesPage() {
                         >
                           {workspace.title}
                         </Link>
-                        {(workspace.description || collectionName(workspace.collection_id)) && (
-                          <p className="truncate text-xs text-muted-foreground">
-                            {[collectionName(workspace.collection_id), workspace.description].filter(Boolean).join(' · ')}
-                          </p>
+                        {workspace.description && (
+                          <p className="truncate text-xs text-muted-foreground">{workspace.description}</p>
                         )}
                       </div>
                     </div>
