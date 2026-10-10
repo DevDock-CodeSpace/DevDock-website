@@ -19,11 +19,11 @@ export type CycleEvent = {
 /** An issue that is, or once was, in the cycle. */
 export type HistoryIssue = Pick<Issue, 'id' | 'created_at' | 'estimate' | 'status'>
 
-export type Metric = 'issues' | 'points'
+export type Metric = 'issues' | 'hours'
 export type SeriesPoint = { date: string; scope: number; started: number; completed: number }
 
 const MAX_DAYS = 120
-const weight = (issue: Pick<Issue, 'estimate'>, metric: Metric) => (metric === 'points' ? (issue.estimate ?? 0) : 1)
+const weight = (issue: Pick<Issue, 'estimate'>, metric: Metric) => (metric === 'hours' ? (issue.estimate ?? 0) : 1)
 
 /** The end of a local calendar day ("YYYY-MM-DD"), as a timestamp. */
 const endOfDay = (date: string) => new Date(+date.slice(0, 4), +date.slice(5, 7) - 1, +date.slice(8, 10), 23, 59, 59, 999).getTime()
@@ -189,7 +189,7 @@ export function cycleTotals(issues: Pick<Issue, 'status' | 'estimate'>[], metric
   return { scope, started, completed }
 }
 
-/** True when at least one issue has an estimate (so "points" means something). */
+/** True when at least one issue has an estimate (so "hours" means something). */
 export const hasEstimates = (issues: Pick<Issue, 'estimate'>[]) => issues.some((issue) => issue.estimate !== null && issue.estimate > 0)
 
 /** Whole-number share, "0%" for an empty cycle. */

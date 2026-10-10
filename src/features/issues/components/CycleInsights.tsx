@@ -13,8 +13,8 @@ const stateLabel = { current: 'Current', upcoming: 'Upcoming', past: 'Past' } as
 /** The details panel of a cycle page: dates, scope / started / completed, the burn-up chart and the breakdowns. */
 export function CycleInsights({ cycle, issues, today }: { cycle: IssueCycle; issues: Issue[]; today: string }) {
   const [metric, setMetric] = useState<Metric>('issues')
-  const points = hasEstimates(issues)
-  const effective: Metric = points ? metric : 'issues'
+  const estimated = hasEstimates(issues)
+  const effective: Metric = estimated ? metric : 'issues'
   const history = useQuery(cycleHistoryQuery(cycle.workspace_id, cycle.id, issues.map((issue) => issue.id))).data
   const totals = cycleTotals(issues, effective)
   const series = useMemo(
@@ -45,9 +45,9 @@ export function CycleInsights({ cycle, issues, today }: { cycle: IssueCycle; iss
       <section aria-label="Progress">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-xs font-medium text-muted-foreground">Progress</h3>
-          {points && (
+          {estimated && (
             <div role="group" aria-label="Count by" className="flex rounded-md border p-0.5 text-xs">
-              {(['issues', 'points'] as const).map((option) => (
+              {(['issues', 'hours'] as const).map((option) => (
                 <button
                   key={option}
                   type="button"
