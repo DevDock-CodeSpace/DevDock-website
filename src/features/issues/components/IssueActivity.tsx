@@ -29,7 +29,7 @@ import {
 } from '../api'
 import { cycleTitle } from '../cycles'
 import { useIssueContext } from '../hooks'
-import { issueIdentifier, priorityLabel, statusLabel } from '../meta'
+import { hoursLabel, issueIdentifier, priorityLabel, statusLabel } from '../meta'
 import { PriorityIcon } from './PriorityIcon'
 import { StatusIcon } from './StatusIcon'
 
@@ -185,7 +185,7 @@ function useDescribeActivity() {
         return to === null ? <>removed the issue from {strong(name)}</> : <>moved the issue to {strong(name)}</>
       }
       case 'estimate':
-        return to === null ? 'removed the estimate' : <>set the estimate to {strong(`${to} ${to === '1' ? 'point' : 'points'}`)}</>
+        return to === null ? 'removed the estimate' : <>set the estimate to {strong(hoursLabel(Number(to)))}</>
       case 'due_date':
         return to === null ? 'removed the due date' : <>set the due date to {strong(formatShortDate(to))}</>
       case 'repo': {

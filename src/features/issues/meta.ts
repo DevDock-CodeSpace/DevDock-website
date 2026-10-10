@@ -26,6 +26,12 @@ export const priorityLabel: Record<IssuePriority, string> = {
   4: 'Low',
 }
 
+/** Whole-hour estimate buckets offered in the estimate picker. */
+export const ESTIMATE_HOURS = [1, 2, 4, 8, 16, 24, 40]
+
+/** "1 hour" / "5 hours". */
+export const hoursLabel = (hours: number) => `${hours} ${hours === 1 ? 'hour' : 'hours'}`
+
 export const LABEL_COLORS: LabelColor[] = ['default', 'blue', 'teal', 'green', 'amber', 'orange', 'red', 'pink', 'violet']
 
 /** The dot in front of a label. */

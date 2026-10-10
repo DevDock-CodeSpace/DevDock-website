@@ -474,7 +474,7 @@ Migration `20260925001632_add_workspace_invites.sql`: tested locally (28 checks)
   - **Issue page** (lazy-loaded):
     - An editable title, and the description in the Docs editor (no images; autosaves).
     - Sub-issues with a progress bar and "Add sub-issue", comments (⌘↵, edit/delete).
-    - Properties panel: status, priority, assignee, labels, estimate (1–13 points), due date (native picker, readable date), and parent (excludes itself and its sub-issues).
+    - Properties panel: status, priority, assignee, labels, estimate (whole-hour buckets), due date (native picker, readable date), and parent (excludes itself and its sub-issues).
     - Breadcrumb `Issues › parent › CAP-3`; delete for managers.
   - **Edits are optimistic:** the list, board and issue page update at once and roll back with a toast if the save fails.
   - **Workspace settings → Issues:** edit the key (with an ID preview), and add, rename, recolor or delete labels.
