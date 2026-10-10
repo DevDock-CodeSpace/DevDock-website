@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Globe, LoaderCircle, Plus } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
@@ -17,7 +17,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useCurrentTeam } from '@/features/teams/hooks'
 import { workspaceTypes } from '@/features/teams/permissions'
-import { teamWorkspacesQuery } from '@/features/workspaces/api'
+import { useCollectionView } from '@/features/collections/hooks'
 import { ownWrite } from '@/lib/realtime'
 
 const TEAM_WIDE = 'team'
@@ -57,7 +57,8 @@ export function CreateInScopeDialog({
   pathFor,
 }: CreateInScopeDialogProps) {
   const { team } = useCurrentTeam()
-  const workspaces = useSuspenseQuery(teamWorkspacesQuery(team.id)).data
+  // Only the collection being looked at (everything, in a group without collections).
+  const { workspaces } = useCollectionView()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
 

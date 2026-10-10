@@ -84,6 +84,15 @@ export function workspaceTypeOrder(teamType: TeamType): WorkspaceType[] {
   return [first, ...allowedWorkspaceTypes[teamType].filter((t) => t !== first)]
 }
 
+/**
+ * Section order inside a collection: its type's own workspace type first, then the others. A
+ * collection's type is a label, not a rule, so no type is left out.
+ */
+export function collectionTypeOrder(collectionType: TeamType): WorkspaceType[] {
+  const first = defaultWorkspaceType[collectionType]
+  return [first, ...(['course', 'project', 'general'] as const).filter((t) => t !== first)]
+}
+
 /** Sensible default workspace type for a team of this type. */
 export const defaultWorkspaceType: Record<TeamType, WorkspaceType> = {
   learning: 'course',

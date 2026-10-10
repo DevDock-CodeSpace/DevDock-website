@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { CalendarPlus, Globe, LoaderCircle, Repeat } from 'lucide-react'
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { useNavigate } from 'react-router'
@@ -20,7 +20,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { useCurrentTeam } from '@/features/teams/hooks'
 import { liveSessionPath } from '@/features/teams/nav'
 import { workspaceTypes } from '@/features/teams/permissions'
-import { teamWorkspacesQuery } from '@/features/workspaces/api'
+import { useCollectionView } from '@/features/collections/hooks'
 import { errorMessage } from '@/lib/errors'
 import { createLiveSeries, createLiveSession, updateLiveSession, type LiveSession } from '../api'
 import { useCalendarOps, useCanWriteLive } from '../hooks'
@@ -79,7 +79,8 @@ export function ScheduleSessionDialog({
   defaultStart,
 }: ScheduleSessionDialogProps) {
   const { team } = useCurrentTeam()
-  const workspaces = useSuspenseQuery(teamWorkspacesQuery(team.id)).data
+  // Only the collection being looked at (everything, in a group without collections).
+  const { workspaces } = useCollectionView()
   const canWrite = useCanWriteLive()
   const calendarOps = useCalendarOps()
   const queryClient = useQueryClient()

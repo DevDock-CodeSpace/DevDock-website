@@ -18,6 +18,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { useCurrentTeam } from '@/features/teams/hooks'
 import { defaultModules, workspacePath } from '@/features/teams/nav'
 import { allowedWorkspaceTypes, defaultWorkspaceType, workspaceTypes } from '@/features/teams/permissions'
+import { useCollectionView } from '@/features/collections/hooks'
 import { CollectionSelect } from '@/features/collections/components/CollectionSelect'
 import { defaultAccess } from '../access'
 import { createWorkspace, teamCollectionsQuery, type WorkspaceAccess, type WorkspaceModule, type WorkspaceType } from '../api'
@@ -36,13 +37,19 @@ export function CreateWorkspaceDialog({ trigger }: { trigger?: ReactNode }) {
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const [type, setType] = useState<WorkspaceType>(defaultWorkspaceType[team.type])
-  const [modules, setModules] = useState<WorkspaceModule[]>(defaultModules[defaultWorkspaceType[team.type]])
+  // A new one starts in the collection being looked at, with that collection's usual type (when the
+  // group allows it).
+  const view = useCollectionView()
+  const wanted = defaultWorkspaceType[view.collection?.type ?? team.type]
+  const startType = allowedWorkspaceTypes[team.type].includes(wanted) ? wanted : defaultWorkspaceType[team.type]
+  const startCollection = view.collection?.id ?? null
+  const [type, setType] = useState<WorkspaceType>(startType)
+  const [modules, setModules] = useState<WorkspaceModule[]>(defaultModules[startType])
   // Type → default tools, until the user picks tools themselves.
   const [modulesEdited, setModulesEdited] = useState(false)
   // Collections come with the workspace list the shell already has, so this never waits.
   const collections = useSuspenseQuery(teamCollectionsQuery(team.id)).data
-  const [collectionId, setCollectionId] = useState<string | null>(null)
+  const [collectionId, setCollectionId] = useState<string | null>(startCollection)
   // Who sees it follows the type and collection until the user chooses.
   const [chosenAccess, setChosenAccess] = useState<WorkspaceAccess | null>(null)
   const collection = collections.find((c) => c.id === collectionId)
@@ -73,16 +80,15 @@ export function CreateWorkspaceDialog({ trigger }: { trigger?: ReactNode }) {
       open={open}
       onOpenChange={(next) => {
         setOpen(next)
-        if (!next) {
-          setTitle('')
-          setDescription('')
-          setType(defaultWorkspaceType[team.type])
-          setModules(defaultModules[defaultWorkspaceType[team.type]])
-          setModulesEdited(false)
-          setCollectionId(null)
-          setChosenAccess(null)
-          create.reset()
-        }
+        // Start clean each time, from wherever the person is looking now.
+        setTitle('')
+        setDescription('')
+        setType(startType)
+        setModules(defaultModules[startType])
+        setModulesEdited(false)
+        setCollectionId(startCollection)
+        setChosenAccess(null)
+        if (!next) create.reset()
       }}
     >
       <DialogTrigger asChild>

@@ -8,7 +8,7 @@ import { SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuAction, Sideba
 import { teamMembersQuery } from '@/features/teams/api'
 import { useCurrentTeam } from '@/features/teams/hooks'
 import { cyclePath, cyclesPath, issuesPath } from '@/features/teams/nav'
-import { teamWorkspacesQuery } from '@/features/workspaces/api'
+import { useCollectionView } from '@/features/collections/hooks'
 import { FACETS, ISSUE_TABS, readFilters, readTab } from '../filters'
 import { personHref, personOf, readViewState, tabHref, viewHref, VIEW_PARAM } from '../views'
 import { cycleTitle } from '../cycles'
@@ -29,16 +29,17 @@ export function PinnedNav({ onNavigate }: { onNavigate: () => void }) {
   const { pathname, search } = useLocation()
   const { pins, remove, reorder } = usePins(team.id)
   const views = useQuery(teamViewsQuery(team.id)).data
-  const workspaces = useQuery(teamWorkspacesQuery(team.id)).data
+  // Pins follow the collection being looked at, like the rest of the sidebar.
+  const { workspaces } = useCollectionView()
   const people = useQuery(teamMembersQuery(team.id)).data
   const cycles = useQuery(pinnedCyclesQuery(pins.flatMap((pin) => (pin.cycle_id ? [pin.cycle_id] : [])))).data
   const [expanded, setExpanded] = useState(false)
   // The project's name only helps when there is more than one to tell apart.
-  const showWhere = (workspaces?.length ?? 0) > 1
+  const showWhere = workspaces.length > 1
   const params = new URLSearchParams(search)
 
   const items: Item[] = pins.flatMap((pin): Item[] => {
-    const workspace = workspaces?.find((item) => item.id === pin.workspace_id)
+    const workspace = workspaces.find((item) => item.id === pin.workspace_id)
     if (!workspace) return []
     const base = issuesPath(team.slug, workspace.id)
     const here = pathname === base
