@@ -49,7 +49,7 @@ export const workspaceRoleLabel: Record<WorkspaceRole, string> = { lead: 'Lead',
 export const teamTypes: Record<TeamType, { label: string; hint: string; icon: LucideIcon }> = {
   learning: { label: 'Learning', hint: 'Courses, cohorts, study groups', icon: GraduationCap },
   development: { label: 'Development', hint: 'Projects and code', icon: Code2 },
-  general: { label: 'General', hint: 'Anything else', icon: Shapes },
+  general: { label: 'General', hint: 'Courses and projects together, for an organization', icon: Shapes },
 }
 
 export const workspaceTypes: Record<

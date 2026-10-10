@@ -61,7 +61,7 @@ function GeneralSection() {
             ? 'Development groups have projects and spaces (no courses), and an Issues page across all projects.'
             : type === 'learning'
               ? `Learning groups have courses, plus projects and spaces for student work. New items default to a ${workspaceTypes[defaultWorkspaceType[type]].noun}.`
-              : 'General groups can have courses, projects and spaces.'
+              : 'General groups suit an organization that teaches and builds: courses, projects and spaces together, with an Issues page across all projects.'
           : 'Only owners and admins can change these.'
       }
     >
