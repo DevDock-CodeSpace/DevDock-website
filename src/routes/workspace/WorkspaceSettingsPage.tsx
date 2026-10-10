@@ -22,6 +22,7 @@ import {
 } from '@/features/workspaces/api'
 import { IssueSettingsSection } from '@/features/issues/components/IssueSettingsSection'
 import { allowedWorkspaceTypes } from '@/features/teams/permissions'
+import { AccessSection } from '@/features/workspaces/components/AccessSection'
 import { ModulePicker } from '@/features/workspaces/components/ModulePicker'
 import { WorkspaceTypeSelect } from '@/features/workspaces/components/WorkspaceTypeSelect'
 import { errorMessage } from '@/lib/errors'
@@ -40,6 +41,7 @@ export function WorkspaceSettingsPage() {
   return (
     <div>
       <DetailsSection key={workspace.updated_at} />
+      {can.canChangeAccess && <AccessSection />}
       <ToolsSection key={workspace.modules.join()} />
       {workspace.modules.includes('issues') && <IssueSettingsSection key={workspace.issue_key} />}
       {can.canDelete && <DangerSection />}

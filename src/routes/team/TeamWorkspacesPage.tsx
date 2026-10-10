@@ -8,7 +8,12 @@ import { useAuth } from '@/features/auth/hooks'
 import { useCurrentTeam } from '@/features/teams/hooks'
 import { teamPath, workspacePath } from '@/features/teams/nav'
 import { allowedWorkspaceTypes, workspaceRoleLabel, workspaceTypeOrder, workspaceTypes } from '@/features/teams/permissions'
-import { myWorkspaceRolesQuery, teamWorkspacesQuery, type WorkspaceType } from '@/features/workspaces/api'
+import {
+  myWorkspaceRolesQuery,
+  teamCollectionsQuery,
+  teamWorkspacesQuery,
+  type WorkspaceType,
+} from '@/features/workspaces/api'
 import { CreateWorkspaceDialog } from '@/features/workspaces/components/CreateWorkspaceDialog'
 import { usePins } from '@/features/workspaces/hooks'
 import { timeAgo } from '@/lib/format'
@@ -20,13 +25,15 @@ const TYPES: WorkspaceType[] = ['course', 'project', 'general']
 
 /**
  * Team home: a dense, scannable list of the workspaces the user can see,
- * filterable by type (?type=course, linked from the sidebar's "All courses"),
- * with a pin toggle per row. Pinned ones are listed first.
+ * filterable by type (?type=course, linked from the sidebar's "All courses") or
+ * by collection (?collection=<id>), with a pin toggle per row. Pinned ones are listed first.
  */
 export function TeamWorkspacesPage() {
   const { user } = useAuth()
   const { team, can } = useCurrentTeam()
   const workspaces = useSuspenseQuery(teamWorkspacesQuery(team.id)).data
+  // Same cache entry as the workspaces (one request for both).
+  const collections = useSuspenseQuery(teamCollectionsQuery(team.id)).data
   const myRoles = useSuspenseQuery(myWorkspaceRolesQuery(team.id, user.id)).data
   const { isPinned, setPinned } = usePins()
   const [now] = useState(Date.now)
@@ -34,8 +41,13 @@ export function TeamWorkspacesPage() {
   const typeParam = params.get('type')
   const type = TYPES.find((t) => t === typeParam) ?? null
   const presentTypes = workspaceTypeOrder(team.type).filter((t) => workspaces.some((w) => w.type === t))
+  // Only collections with something the viewer can see; an unknown id shows everything.
+  const presentCollections = collections.filter((c) => workspaces.some((w) => w.collection_id === c.id))
+  const collection = presentCollections.find((c) => c.id === params.get('collection')) ?? null
+  const collectionName = (id: string | null) => collections.find((c) => c.id === id)?.name
   const shown = workspaces
     .filter((w) => !type || w.type === type)
+    .filter((w) => !collection || w.collection_id === collection.id)
     .sort((a, b) => Number(isPinned(b.id)) - Number(isPinned(a.id)))
 
   return (
@@ -45,7 +57,7 @@ export function TeamWorkspacesPage() {
         description={
           can.canManageWorkspaces
             ? `All ${allowedWorkspaceTypes[team.type].map((t) => workspaceTypes[t].plural.toLowerCase()).join(', ').replace(/, ([^,]*)$/, ' and $1')} in this group.`
-            : 'What you’ve been added to in this group.'
+            : 'What you can open in this group.'
         }
       >
         {can.canManageWorkspaces && <CreateWorkspaceDialog />}
@@ -57,13 +69,27 @@ export function TeamWorkspacesPage() {
             <Link
               key={t ?? 'all'}
               to={t ? `${teamPath(team.slug)}?type=${t}` : teamPath(team.slug)}
-              aria-current={t === type ? 'page' : undefined}
+              aria-current={t === type && !collection ? 'page' : undefined}
               className={cn(
                 'rounded-md px-2.5 py-1 text-xs transition-colors',
-                t === type ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground hover:text-foreground',
+                t === type && !collection ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground hover:text-foreground',
               )}
             >
               {t ? workspaceTypes[t].plural : 'All'}
+            </Link>
+          ))}
+          {presentCollections.length > 0 && <span aria-hidden className="mx-1.5 h-3.5 w-px bg-border" />}
+          {presentCollections.map((c) => (
+            <Link
+              key={c.id}
+              to={`${teamPath(team.slug)}?collection=${c.id}`}
+              aria-current={c.id === collection?.id ? 'page' : undefined}
+              className={cn(
+                'max-w-40 truncate rounded-md px-2.5 py-1 text-xs transition-colors',
+                c.id === collection?.id ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {c.name}
             </Link>
           ))}
         </nav>
@@ -74,7 +100,7 @@ export function TeamWorkspacesPage() {
         <p className="border-y py-10 text-center text-sm text-muted-foreground">
           {can.canManageWorkspaces
             ? `Nothing here yet. Create a ${allowedWorkspaceTypes[team.type].map((t) => workspaceTypes[t].noun).join(', ').replace(/, ([^,]*)$/, ' or $1')}, then add people from this group to it.`
-            : 'You haven’t been added to anything in this group yet. Ask a group owner or admin.'}
+            : 'Nothing in this group is open to you yet. Ask a group owner or admin.'}
         </p>
       ) : (
         <div className="border-y">
@@ -108,8 +134,10 @@ export function TeamWorkspacesPage() {
                         >
                           {workspace.title}
                         </Link>
-                        {workspace.description && (
-                          <p className="truncate text-xs text-muted-foreground">{workspace.description}</p>
+                        {(workspace.description || collectionName(workspace.collection_id)) && (
+                          <p className="truncate text-xs text-muted-foreground">
+                            {[collectionName(workspace.collection_id), workspace.description].filter(Boolean).join(' · ')}
+                          </p>
                         )}
                       </div>
                     </div>
@@ -130,7 +158,7 @@ export function TeamWorkspacesPage() {
                       {workspace.memberCount}
                     </span>
                     <span className={`text-xs ${myRole === 'lead' ? 'font-medium text-brand' : 'text-muted-foreground'}`}>
-                      {myRole ? workspaceRoleLabel[myRole] : 'Admin'}
+                      {myRole ? workspaceRoleLabel[myRole] : can.isAdmin ? 'Admin' : workspaceRoleLabel.member}
                     </span>
                     <span className="hidden text-right font-mono text-xs text-muted-foreground md:block">
                       {timeAgo(workspace.updated_at, now)}

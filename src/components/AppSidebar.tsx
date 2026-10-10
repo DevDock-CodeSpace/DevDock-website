@@ -25,7 +25,7 @@ import { TeamSwitcher } from '@/features/teams/components/TeamSwitcher'
 import { useCurrentTeam } from '@/features/teams/hooks'
 import { getTeamNav, hasTeamIssues, teamPath, workspacePath, type NavItem } from '@/features/teams/nav'
 import { workspaceTypeOrder, workspaceTypes } from '@/features/teams/permissions'
-import { teamWorkspacesQuery } from '@/features/workspaces/api'
+import { teamCollectionsQuery, teamWorkspacesQuery } from '@/features/workspaces/api'
 import { CreateWorkspaceDialog } from '@/features/workspaces/components/CreateWorkspaceDialog'
 import { usePins, useRecentVisits } from '@/features/workspaces/hooks'
 import { pickSidebarItems } from '@/features/workspaces/recent'
@@ -43,7 +43,9 @@ const activeIcon = 'data-active:[&_svg]:text-brand'
  */
 export function AppSidebar({ sidebarWidth }: { sidebarWidth: SidebarWidth }) {
   const { team, can } = useCurrentTeam()
+  // Both read one cache entry (teamContents), so this is a single request and never a waterfall.
   const workspaces = useSuspenseQuery(teamWorkspacesQuery(team.id)).data
+  const collections = useSuspenseQuery(teamCollectionsQuery(team.id)).data
   const { pathname } = useLocation()
   const { workspaceId } = useParams()
   const { isMobile, setOpenMobile } = useSidebar()
@@ -51,10 +53,25 @@ export function AppSidebar({ sidebarWidth }: { sidebarWidth: SidebarWidth }) {
   const visits = useRecentVisits(team.id)
   const nav = getTeamNav(team.slug, hasTeamIssues(team.type, workspaces))
   const unreadMessages = useUnread(team.id).total
-  // One section per workspace type that has items; the team type only decides which comes first.
-  const sections = workspaceTypeOrder(team.type)
-    .map((type) => ({ type, items: workspaces.filter((w) => w.type === type) }))
-    .filter((section) => section.items.length > 0)
+  // One section per collection, then one per workspace type for what sits outside any collection
+  // (the team type only decides which type comes first). Empty sections are hidden.
+  const base = teamPath(team.slug)
+  const sections = [
+    ...collections.map((collection) => ({
+      key: collection.id,
+      title: collection.name,
+      allTitle: `Everything in ${collection.name}`,
+      allHref: `${base}?collection=${collection.id}`,
+      items: workspaces.filter((w) => w.collection_id === collection.id),
+    })),
+    ...workspaceTypeOrder(team.type).map((type) => ({
+      key: type,
+      title: workspaceTypes[type].plural,
+      allTitle: `All ${workspaceTypes[type].plural.toLowerCase()}`,
+      allHref: `${base}?type=${type}`,
+      items: workspaces.filter((w) => w.type === type && !collections.some((c) => c.id === w.collection_id)),
+    })),
+  ].filter((section) => section.items.length > 0)
   const close = () => isMobile && setOpenMobile(false)
 
   return (
@@ -78,21 +95,20 @@ export function AppSidebar({ sidebarWidth }: { sidebarWidth: SidebarWidth }) {
 
         <PinnedNav onNavigate={close} />
 
-        {sections.map(({ type, items }) => {
+        {sections.map(({ key, title, allTitle, allHref, items }) => {
           const { shown } = pickSidebarItems(items, pins, visits, workspaceId)
-          const allHref = `${teamPath(team.slug)}?type=${type}`
           return (
-            <SidebarGroup key={type} className="pb-0">
+            <SidebarGroup key={key} className="pb-0">
               {/* The title opens the full list of this type. */}
               <SidebarGroupLabel asChild>
                 <Link
                   to={allHref}
                   onClick={close}
-                  title={`All ${workspaceTypes[type].plural.toLowerCase()}`}
+                  title={allTitle}
                   className="group/label gap-1 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                 >
-                  {workspaceTypes[type].plural}
-                  <span className="font-mono text-[10px] opacity-70">· {items.length}</span>
+                  <TruncatedText text={title} />
+                  <span className="shrink-0 font-mono text-[10px] opacity-70">· {items.length}</span>
                   <ChevronRight className="ml-auto opacity-0 transition-opacity group-hover/label:opacity-100" />
                 </Link>
               </SidebarGroupLabel>
@@ -136,7 +152,7 @@ export function AppSidebar({ sidebarWidth }: { sidebarWidth: SidebarWidth }) {
             <SidebarMenu>
               {workspaces.length === 0 && !can.canManageWorkspaces && (
                 <li className="px-2 py-1 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
-                  You haven’t been added to anything in this group yet.
+                  Nothing in this group is open to you yet.
                 </li>
               )}
               {can.canManageWorkspaces && (

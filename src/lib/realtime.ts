@@ -173,6 +173,8 @@ const AFFECTS: Record<string, QueryKey[] | ((change: Change) => QueryKey[])> = {
   team_members: [['teams'], ['workspaces']],
   workspaces: [['workspaces'], ['issues', 'team']],
   workspace_members: [['workspaces']],
+  workspace_collections: [['workspaces']],
+  workspace_collection_members: [['workspaces']],
   workspace_modules: [['workspaces']],
   workspace_pins: [['workspaces', 'pins']],
   documents: (change) => rowQueries(change, DOC_LISTS, (row) => (id(row.id) ? ['documents', id(row.id)] : undefined), [['documents']], true),
