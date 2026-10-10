@@ -1,4 +1,4 @@
-import { CircleUserRound, GitBranch, IterationCw } from 'lucide-react'
+import { CircleUserRound, GitBranch, Gauge, IterationCw } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { PersonAvatar } from '@/components/PersonRow'
@@ -9,18 +9,27 @@ import { cn } from '@/lib/utils'
 import type { Issue } from '../api'
 import { cycleTitle } from '../cycles'
 import { useIssueContext, useUpdateIssue } from '../hooks'
-import { isClosed, issueIdentifier, priorityLabel, statusLabel } from '../meta'
+import { ESTIMATE_HOURS, hoursLabel, isClosed, issueIdentifier, priorityLabel, statusLabel } from '../meta'
 import { useRowNav } from '../nav-context'
 import { AssigneePicker } from './AssigneePicker'
+import { CyclePicker } from './CyclePicker'
+import { DueDatePicker } from './DueDatePicker'
 import { HiddenRowMenus } from './HiddenRowMenus'
 import { LabelChip } from './LabelChip'
+import { Picker } from './Picker'
 import { PriorityIcon } from './PriorityIcon'
 import { PriorityPicker } from './PriorityPicker'
+import { RepoPicker } from './RepoPicker'
 import { StatusIcon } from './StatusIcon'
 import { StatusPicker } from './StatusPicker'
 
 const iconButton =
   'relative z-10 flex size-6 shrink-0 items-center justify-center rounded-sm hover:bg-muted focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none'
+
+/** A compact, clickable property chip that sits above the row's stretched title link. */
+const chip =
+  'relative z-10 hidden shrink-0 items-center gap-1 rounded-sm px-1 font-mono text-[11px] text-muted-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none'
+const NONE = 'none'
 
 /**
  * One list row, like Linear's: priority · ID · status · title · sub-issue
@@ -87,19 +96,35 @@ export function IssueRow({ issue, subIssues }: { issue: Issue; subIssues?: { don
       )}
       <span className="flex-1" />
       {cycle && (
-        <span className="hidden shrink-0 items-center gap-1 font-mono text-[11px] text-muted-foreground lg:flex" title={cycleTitle(cycle)}>
-          <IterationCw className="size-3" />
-          {cycle.number}
-        </span>
+        <CyclePicker
+          value={issue.cycle_id}
+          cycles={cycles}
+          align="end"
+          onChange={(cycle_id) => update.mutate({ issue, patch: { cycle_id } })}
+        >
+          <button type="button" className={cn(chip, 'lg:flex')} title={cycleTitle(cycle)} aria-label={`Sprint: ${cycleTitle(cycle)}`}>
+            <IterationCw className="size-3" />
+            {cycle.number}
+          </button>
+        </CyclePicker>
       )}
       {repo && (
-        <span
-          className="hidden max-w-32 shrink-0 items-center gap-1 font-mono text-[11px] text-muted-foreground lg:flex"
-          title={`Repository: ${repo.owner}/${repo.name}`}
+        <RepoPicker
+          value={issue.repo_id}
+          repos={repos}
+          align="end"
+          onChange={(repo_id) => update.mutate({ issue, patch: { repo_id } })}
         >
-          <GitBranch className="size-3 shrink-0" />
-          <span className="truncate">{repo.name}</span>
-        </span>
+          <button
+            type="button"
+            className={cn(chip, 'max-w-32 lg:flex')}
+            title={`Repository: ${repo.owner}/${repo.name}`}
+            aria-label={`Repository: ${repo.name}`}
+          >
+            <GitBranch className="size-3 shrink-0" />
+            <span className="truncate">{repo.name}</span>
+          </button>
+        </RepoPicker>
       )}
       <span className="hidden items-center gap-1 md:flex">
         {issueLabels.slice(0, 2).map((l) => (
@@ -110,17 +135,40 @@ export function IssueRow({ issue, subIssues }: { issue: Issue; subIssues?: { don
         )}
       </span>
       {issue.due_date && (
-        <span
-          className={cn(
-            'hidden shrink-0 rounded-sm border px-1.5 font-mono text-[11px] sm:inline',
-            !isClosed(issue.status) && issue.due_date < today
-              ? 'border-red-500/40 text-red-600 dark:text-red-400'
-              : 'text-muted-foreground',
+        <DueDatePicker value={issue.due_date} onChange={(due_date) => update.mutate({ issue, patch: { due_date } })}>
+          {(open) => (
+            <button
+              type="button"
+              onClick={open}
+              aria-label={`Due date: ${formatShortDate(issue.due_date!)}`}
+              className={cn(
+                'relative z-10 hidden shrink-0 items-center rounded-sm border px-1.5 font-mono text-[11px] hover:bg-muted focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none sm:inline-flex',
+                !isClosed(issue.status) && issue.due_date! < today
+                  ? 'border-red-500/40 text-red-600 dark:text-red-400'
+                  : 'text-muted-foreground',
+              )}
+            >
+              {formatShortDate(issue.due_date!)}
+            </button>
           )}
-          title="Due date"
+        </DueDatePicker>
+      )}
+      {issue.estimate !== null && (
+        <Picker
+          placeholder="Set estimate…"
+          align="end"
+          selected={[String(issue.estimate)]}
+          onSelect={(v) => update.mutate({ issue, patch: { estimate: v === NONE ? null : Number(v) } })}
+          options={[
+            { value: NONE, label: 'No estimate' },
+            ...ESTIMATE_HOURS.map((e) => ({ value: String(e), label: hoursLabel(e) })),
+          ]}
         >
-          {formatShortDate(issue.due_date)}
-        </span>
+          <button type="button" className={cn(chip, 'sm:flex')} aria-label={`Estimate: ${hoursLabel(issue.estimate)}`}>
+            <Gauge className="size-3" />
+            {issue.estimate}h
+          </button>
+        </Picker>
       )}
       <AssigneePicker
         value={issue.assignee_id}

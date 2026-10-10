@@ -1,16 +1,17 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { CalendarDays, CircleUserRound, Gauge, GitBranch, GitPullRequestArrow, IterationCw, Tag, X } from 'lucide-react'
-import { useRef, useState, type ComponentProps, type ReactNode } from 'react'
+import { useState, type ComponentProps, type ReactNode } from 'react'
 import { PersonAvatar } from '@/components/PersonRow'
 import { formatDate, localDateISO, timeAgo } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { workspaceIssuesQuery, type IssueDetail } from '../api'
 import { cycleTitle } from '../cycles'
 import { useIssueContext, useUpdateIssue } from '../hooks'
-import { issueIdentifier, priorityLabel, statusLabel } from '../meta'
+import { ESTIMATE_HOURS, hoursLabel, issueIdentifier, priorityLabel, statusLabel } from '../meta'
 import type { MenuKind } from '../nav-context'
 import { AssigneePicker } from './AssigneePicker'
 import { CyclePicker } from './CyclePicker'
+import { DueDatePicker } from './DueDatePicker'
 import { LabelChip } from './LabelChip'
 import { LabelPicker } from './LabelPicker'
 import { Picker } from './Picker'
@@ -20,8 +21,7 @@ import { RepoPicker } from './RepoPicker'
 import { StatusIcon } from './StatusIcon'
 import { StatusPicker } from './StatusPicker'
 
-/** Linear's point scale (Fibonacci). */
-const ESTIMATES = [1, 2, 3, 5, 8, 13]
+/** Whole-hour estimate buckets. */
 const NONE = 'none'
 
 /**
@@ -164,12 +164,12 @@ export function IssueProperties({
           onSelect={(v) => update.mutate({ issue, patch: { estimate: v === NONE ? null : Number(v) } })}
           options={[
             { value: NONE, label: 'No estimate' },
-            ...ESTIMATES.map((e) => ({ value: String(e), label: `${e} ${e === 1 ? 'point' : 'points'}` })),
+            ...ESTIMATE_HOURS.map((e) => ({ value: String(e), label: hoursLabel(e) })),
           ]}
         >
           <Value muted={issue.estimate === null}>
             <Gauge className="size-4" />
-            {issue.estimate === null ? 'No estimate' : `${issue.estimate} ${issue.estimate === 1 ? 'point' : 'points'}`}
+            {issue.estimate === null ? 'No estimate' : hoursLabel(issue.estimate)}
           </Value>
         </Picker>
       </Row>
@@ -247,35 +247,22 @@ function Value({ muted, className, children, ...props }: { muted?: boolean } & C
 
 function DueDate({ value, onChange }: { value: string | null; onChange: (date: string | null) => void }) {
   const [today] = useState(() => localDateISO(new Date()))
-  const input = useRef<HTMLInputElement>(null)
   const overdue = value !== null && value < today
   return (
     <div className="group/due relative flex items-center">
-      {/* The native date input sits invisibly under the button so its picker opens in place. */}
-      <input
-        ref={input}
-        type="date"
-        tabIndex={-1}
-        aria-hidden
-        value={value ?? ''}
-        onChange={(e) => onChange(e.target.value || null)}
-        className="pointer-events-none absolute inset-0 opacity-0 dark:scheme-dark"
-      />
-      <Value
-        muted={!value}
-        aria-label={value ? `Due date: ${formatDate(value)}` : 'Set due date'}
-        onClick={() => {
-          try {
-            input.current?.showPicker()
-          } catch {
-            input.current?.focus()
-          }
-        }}
-        className={cn(overdue && 'text-red-600 dark:text-red-400')}
-      >
-        <CalendarDays className={cn('size-4 shrink-0', overdue ? 'text-red-500' : 'text-muted-foreground')} />
-        {value ? formatDate(value) : 'Set due date'}
-      </Value>
+      <DueDatePicker value={value} onChange={onChange} className="flex-1">
+        {(open) => (
+          <Value
+            muted={!value}
+            aria-label={value ? `Due date: ${formatDate(value)}` : 'Set due date'}
+            onClick={open}
+            className={cn(overdue && 'text-red-600 dark:text-red-400')}
+          >
+            <CalendarDays className={cn('size-4 shrink-0', overdue ? 'text-red-500' : 'text-muted-foreground')} />
+            {value ? formatDate(value) : 'Set due date'}
+          </Value>
+        )}
+      </DueDatePicker>
       {value && (
         <button
           type="button"
