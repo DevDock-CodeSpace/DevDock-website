@@ -71,16 +71,25 @@ export function isTeamTool(tool: string): tool is TeamToolId {
   return (TEAM_TOOLS as string[]).includes(tool)
 }
 
-/** Group-wide issues (development groups): every project's issues in one list. */
+/** Group-wide issues: every project's issues in one list. */
 export const teamIssuesPath = (slug: string) => `${teamPath(slug)}/issues`
 
 /**
- * Sidebar team links: Home + team tools on top (plus Issues for development
- * groups, below Meetings), then the workspaces, then Members/Settings.
+ * Whether the group has a group-wide Issues page: development groups always,
+ * any other group once it has a project the caller can see.
+ */
+export function hasTeamIssues(type: TeamType, workspaces: readonly { type: WorkspaceType }[]): boolean {
+  return type === 'development' || workspaces.some((w) => w.type === 'project')
+}
+
+/**
+ * Sidebar team links: Home + team tools on top (plus Issues below Meetings
+ * when `issues` is set, see hasTeamIssues), then the workspaces, then
+ * Members/Settings.
  */
 export function getTeamNav(
   slug: string,
-  type?: TeamType,
+  issues = false,
 ): {
   home: NavItem
   tools: (NavItem & { id: TeamToolId | 'issues' })[]
@@ -99,7 +108,7 @@ export function getTeamNav(
         icon: workspaceTabDefs[id].icon,
         to: `${base}/${id}`,
       })),
-      ...(type === 'development'
+      ...(issues
         ? [{ id: 'issues' as const, title: 'Issues', icon: workspaceTabDefs.issues.icon, to: teamIssuesPath(slug) }]
         : []),
     ],

@@ -75,7 +75,7 @@ type Crumb = { label: string; to: string }
 
 function TeamBreadcrumb() {
   const { team } = useCurrentTeam()
-  const { tools, members, settings, messages } = getTeamNav(team.slug, team.type)
+  const { tools, members, settings, messages } = getTeamNav(team.slug, true)
   const section = useSection([messages, ...tools, members, settings])
   const item = useItemCrumb()
   return <Crumbs crumbs={[{ label: team.name, to: teamPath(team.slug) }, ...section, ...item]} />
