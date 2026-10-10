@@ -1,8 +1,9 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { LoaderCircle } from 'lucide-react'
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
+import { LogoMark } from '@/components/Logo'
 import { PageHeader } from '@/components/PageHeader'
 import { DangerRow, SettingsSection } from '@/components/SettingsSection'
 import { Button } from '@/components/ui/button'
@@ -11,7 +12,15 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useAuth } from '@/features/auth/hooks'
 import { TeamReposSection } from '@/features/repos/components/TeamReposSection'
-import { deleteTeam, removeTeamMember, updateTeam, type TeamType } from '@/features/teams/api'
+import {
+  deleteTeam,
+  removeTeamLogo,
+  removeTeamMember,
+  teamLogoUrl,
+  updateTeam,
+  uploadTeamLogo,
+  type TeamType,
+} from '@/features/teams/api'
 import { CollectionsSection } from '@/features/collections/components/CollectionsSection'
 import { useCurrentTeam, useExitTeam } from '@/features/teams/hooks'
 import { defaultWorkspaceType, teamRoleLabel, teamTypes, workspaceTypes } from '@/features/teams/permissions'
@@ -25,6 +34,7 @@ export function TeamSettingsPage() {
       <PageHeader title="Group settings" description={`${team.name} · your role: ${teamRoleLabel[role]}`} />
       <div>
         <GeneralSection key={team.id} />
+        <BrandingSection />
         {can.canManageWorkspaces && <CollectionsSection />}
         <TeamReposSection />
         {(can.canLeave || can.canDelete) && <DangerSection />}
@@ -109,6 +119,77 @@ function GeneralSection() {
           </Button>
         )}
       </form>
+    </SettingsSection>
+  )
+}
+
+function BrandingSection() {
+  const { team, can } = useCurrentTeam()
+  const queryClient = useQueryClient()
+  const input = useRef<HTMLInputElement>(null)
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['teams'] })
+
+  const upload = useMutation({
+    mutationFn: (file: File) => uploadTeamLogo(team.id, team.logo_path, file),
+    onSuccess: () => {
+      toast.success('Logo updated')
+      return invalidate()
+    },
+    onError: (error) => toast.error(errorMessage(error)),
+  })
+  const remove = useMutation({
+    mutationFn: () => removeTeamLogo(team.id, team.logo_path ?? ''),
+    onSuccess: () => {
+      toast.success('Logo removed')
+      return invalidate()
+    },
+    onError: (error) => toast.error(errorMessage(error)),
+  })
+
+  const pick = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (file) upload.mutate(file)
+  }
+
+  return (
+    <SettingsSection
+      title="Logo"
+      description={
+        can.canEditTeam
+          ? 'Shown in the sidebar in place of the DevDock mark. A square PNG, JPG or WebP works best (max 2 MB).'
+          : 'Only owners and admins can change the logo.'
+      }
+    >
+      <div className="flex items-center gap-4">
+        <div className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-muted">
+          {team.logo_path ? (
+            <img src={teamLogoUrl(team.logo_path)} alt="" className="size-full object-cover" />
+          ) : (
+            <LogoMark className="size-9 object-contain" />
+          )}
+        </div>
+        {can.canEditTeam && (
+          <div className="flex items-center gap-2">
+            <input
+              ref={input}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="hidden"
+              onChange={pick}
+            />
+            <Button type="button" variant="outline" size="sm" disabled={upload.isPending} onClick={() => input.current?.click()}>
+              {upload.isPending && <LoaderCircle className="animate-spin" />}
+              {team.logo_path ? 'Change' : 'Upload'}
+            </Button>
+            {team.logo_path && (
+              <Button type="button" variant="ghost" size="sm" disabled={remove.isPending} onClick={() => remove.mutate()}>
+                Remove
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
     </SettingsSection>
   )
 }

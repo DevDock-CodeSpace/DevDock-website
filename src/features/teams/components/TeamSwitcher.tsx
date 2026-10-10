@@ -1,7 +1,9 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { Check, ChevronsUpDown, Plus } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { LogoMark } from '@/components/Logo'
+import { cn } from '@/lib/utils'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,6 +20,7 @@ import { useAuth } from '@/features/auth/hooks'
 import { useCollectionView } from '@/features/collections/hooks'
 import { availableCollections, pickCollection, readCollectionView, rememberCollectionView } from '@/features/collections/view'
 import { teamCollectionsQuery, teamWorkspacesQuery } from '@/features/workspaces/api'
+import { teamLogoUrl, type Team } from '../api'
 import { useCurrentTeam, useMyTeams } from '../hooks'
 import { teamPath } from '../nav'
 import { teamPermissions, teamRoleLabel, teamTypes } from '../permissions'
@@ -51,7 +54,7 @@ export function TeamSwitcher() {
               tooltip={view.collection ? `${team.name} · ${view.collection.name}` : team.name}
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
-              <LogoMark className="size-8 object-contain" />
+              <GroupIcon team={team} className="size-8" fallback={<LogoMark className="size-8 object-contain" />} />
               <div className="grid flex-1 text-left leading-tight">
                 <span className="truncate font-semibold">{team.name}</span>
                 <span className="truncate font-mono text-xs text-muted-foreground">
@@ -83,7 +86,7 @@ export function TeamSwitcher() {
                 : pickCollection(collections, readCollectionView(m.team.id), user.id)
               const row = (
                 <>
-                  <Icon className="text-muted-foreground" />
+                  <GroupIcon team={m.team} className="size-4" fallback={<Icon className="text-muted-foreground" />} />
                   <span className="flex-1 truncate">{m.team.name}</span>
                   <span className="font-mono text-xs text-muted-foreground">{teamRoleLabel[m.role].toLowerCase()}</span>
                   {current && collections.length === 0 && <Check className="size-4" />}
@@ -126,4 +129,10 @@ export function TeamSwitcher() {
       </SidebarMenuItem>
     </SidebarMenu>
   )
+}
+
+/** A group's custom icon logo when it has one, else the given fallback (the DevDock mark or type icon). */
+function GroupIcon({ team, className, fallback }: { team: Team; className?: string; fallback: ReactNode }) {
+  if (!team.logo_path) return fallback
+  return <img src={teamLogoUrl(team.logo_path)} alt="" className={cn('shrink-0 rounded-md object-cover', className)} />
 }
