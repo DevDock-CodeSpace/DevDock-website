@@ -1856,6 +1856,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          logo_path: string | null
           name: string
           slug: string
           type: Database["public"]["Enums"]["team_type"]
@@ -1865,6 +1866,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          logo_path?: string | null
           name: string
           slug: string
           type?: Database["public"]["Enums"]["team_type"]
@@ -1874,6 +1876,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          logo_path?: string | null
           name?: string
           slug?: string
           type?: Database["public"]["Enums"]["team_type"]

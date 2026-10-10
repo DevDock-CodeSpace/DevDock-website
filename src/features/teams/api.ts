@@ -1,12 +1,12 @@
 import { queryOptions } from '@tanstack/react-query'
-import { requireAffected, toDataError } from '@/lib/errors'
+import { DataError, requireAffected, toDataError } from '@/lib/errors'
 import { SETTLED_STALE_MS } from '@/lib/query-client'
 import { supabase } from '@/lib/supabase'
 import type { Database, Tables } from '@/types/database.types'
 
 export type TeamRole = Database['public']['Enums']['team_role']
 export type TeamType = Database['public']['Enums']['team_type']
-export type Team = Pick<Tables<'teams'>, 'id' | 'name' | 'slug' | 'type'>
+export type Team = Pick<Tables<'teams'>, 'id' | 'name' | 'slug' | 'type' | 'logo_path'>
 export type TeamMembership = { role: TeamRole; joinedAt: string; team: Team }
 export type Invite = Pick<
   Tables<'team_invites'>,
@@ -27,7 +27,7 @@ export const myTeamsQuery = (userId: string) =>
     queryFn: async (): Promise<TeamMembership[]> => {
       const { data, error } = await supabase
         .from('team_members')
-        .select('role, joined_at, team:teams(id, name, slug, type)')
+        .select('role, joined_at, team:teams(id, name, slug, type, logo_path)')
         .eq('user_id', userId)
         .order('joined_at')
       if (error) throw toDataError('load your groups', error)
@@ -70,7 +70,7 @@ export async function createTeam(input: { name: string; slug: string; type: Team
   const { data, error } = await supabase
     .from('teams')
     .insert({ name: input.name.trim(), slug: input.slug, type: input.type })
-    .select('id, name, slug, type')
+    .select('id, name, slug, type, logo_path')
     .single()
   if (error) {
     throw toDataError('create the group', error, {
@@ -110,6 +110,46 @@ export async function deleteTeam(teamId: string) {
   const { data, error } = await supabase.from('teams').delete().eq('id', teamId).select('id')
   if (error) throw toDataError('delete the group', error)
   requireAffected(data, 'delete group')
+}
+
+// ---------------------------------------------------------------- branding
+
+const TEAM_LOGO_BUCKET = 'team-logos'
+const LOGO_MAX_BYTES = 2 * 1024 * 1024
+const LOGO_TYPES = ['image/png', 'image/jpeg', 'image/webp']
+
+/** Public URL for a group logo path, built client-side (no request). */
+export function teamLogoUrl(path: string): string {
+  return supabase.storage.from(TEAM_LOGO_BUCKET).getPublicUrl(path).data.publicUrl
+}
+
+/** Uploads a new logo, points the team at it, and deletes the old file. Owners/admins only (RLS). */
+export async function uploadTeamLogo(teamId: string, currentPath: string | null, file: File): Promise<string> {
+  if (!LOGO_TYPES.includes(file.type)) throw new DataError('Use a PNG, JPG or WebP image.')
+  if (file.size > LOGO_MAX_BYTES) throw new DataError('The logo can be at most 2 MB.')
+  const ext = file.type.split('/')[1].replace('jpeg', 'jpg')
+  const path = `${teamId}/${crypto.randomUUID()}.${ext}`
+  const { error: uploadError } = await supabase.storage
+    .from(TEAM_LOGO_BUCKET)
+    .upload(path, file, { contentType: file.type, upsert: false })
+  if (uploadError) throw toDataError('upload the logo', { message: uploadError.message })
+  const { data, error } = await supabase.from('teams').update({ logo_path: path }).eq('id', teamId).select('id')
+  if (error) {
+    // The row update was rejected (not an admin): don't leave an orphan file.
+    await supabase.storage.from(TEAM_LOGO_BUCKET).remove([path])
+    throw toDataError('save the logo', error)
+  }
+  requireAffected(data, 'save logo')
+  if (currentPath) await supabase.storage.from(TEAM_LOGO_BUCKET).remove([currentPath])
+  return path
+}
+
+/** Clears the logo and deletes its file. */
+export async function removeTeamLogo(teamId: string, currentPath: string) {
+  const { data, error } = await supabase.from('teams').update({ logo_path: null }).eq('id', teamId).select('id')
+  if (error) throw toDataError('remove the logo', error)
+  requireAffected(data, 'remove logo')
+  await supabase.storage.from(TEAM_LOGO_BUCKET).remove([currentPath])
 }
 
 export async function setTeamRole(teamId: string, userId: string, role: Exclude<TeamRole, 'owner'>) {
