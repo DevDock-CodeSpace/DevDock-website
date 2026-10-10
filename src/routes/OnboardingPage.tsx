@@ -88,7 +88,7 @@ function CreateTeamCard() {
     <Card>
       <CardHeader>
         <CardTitle>Create a group</CardTitle>
-        <CardDescription>For your class, cohort, or project group. You’ll be its owner.</CardDescription>
+        <CardDescription>For your class, cohort, project group or organization. You’ll be its owner.</CardDescription>
       </CardHeader>
       <CardContent>
         <form className="space-y-4" onSubmit={submit}>

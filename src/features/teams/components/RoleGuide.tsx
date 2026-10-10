@@ -25,9 +25,9 @@ const typical: Record<TeamType, Record<TeamRole | WorkspaceRole, string>> = {
   },
   general: {
     owner: 'Runs the group',
-    admin: 'Helps run the group',
+    admin: 'Managers, instructors and team leads',
     member: 'Everyone else',
-    lead: 'Runs this workspace',
+    lead: 'Leads this course, project or space',
   },
 }
 
@@ -37,7 +37,7 @@ const typical: Record<TeamType, Record<TeamRole | WorkspaceRole, string>> = {
  * group's type; the viewer's own role is marked.
  */
 export function RoleGuide({ type, myRole }: { type: TeamType; myRole: TeamRole }) {
-  const noun = workspaceTypes[defaultWorkspaceType[type]].noun // course / project / workspace
+  const noun = workspaceTypes[defaultWorkspaceType[type]].noun // course / project / space
   const nouns = `${noun}s`
   const who = typical[type]
 
@@ -90,6 +90,8 @@ export function RoleGuide({ type, myRole }: { type: TeamType; myRole: TeamRole }
         'Link the group’s repositories to it, and set their branches',
         'Move any issue to In Review or Done by hand (overriding GitHub)',
         ...(type === 'learning' ? ['Build the course in Learning and see the class’s progress'] : []),
+        // A general group holds courses beside projects and spaces, so the course lines say so.
+        ...(type === 'general' ? ['In a course: build it in Learning and see the class’s progress'] : []),
       ],
     },
     {
@@ -100,6 +102,7 @@ export function RoleGuide({ type, myRole }: { type: TeamType; myRole: TeamRole }
         'Creates and updates issues (including their repository), and comments',
         'On issues in a connected repo, In Review and Done come from GitHub: open a PR, then merge it',
         ...(type === 'learning' ? ['Takes lessons and tracks their own progress'] : []),
+        ...(type === 'general' ? ['In a course: takes lessons and tracks their own progress'] : []),
       ],
     },
   ]

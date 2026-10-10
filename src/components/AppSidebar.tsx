@@ -23,7 +23,7 @@ import { useUnread } from '@/features/messaging/hooks'
 import { UserMenu } from '@/features/auth/components/UserMenu'
 import { TeamSwitcher } from '@/features/teams/components/TeamSwitcher'
 import { useCurrentTeam } from '@/features/teams/hooks'
-import { getTeamNav, teamPath, workspacePath, type NavItem } from '@/features/teams/nav'
+import { getTeamNav, hasTeamIssues, teamPath, workspacePath, type NavItem } from '@/features/teams/nav'
 import { workspaceTypeOrder, workspaceTypes } from '@/features/teams/permissions'
 import { teamWorkspacesQuery } from '@/features/workspaces/api'
 import { CreateWorkspaceDialog } from '@/features/workspaces/components/CreateWorkspaceDialog'
@@ -49,7 +49,7 @@ export function AppSidebar({ sidebarWidth }: { sidebarWidth: SidebarWidth }) {
   const { isMobile, setOpenMobile } = useSidebar()
   const { pins, isPinned, setPinned } = usePins()
   const visits = useRecentVisits(team.id)
-  const nav = getTeamNav(team.slug, team.type)
+  const nav = getTeamNav(team.slug, hasTeamIssues(team.type, workspaces))
   const unreadMessages = useUnread(team.id).total
   // One section per workspace type that has items; the team type only decides which comes first.
   const sections = workspaceTypeOrder(team.type)

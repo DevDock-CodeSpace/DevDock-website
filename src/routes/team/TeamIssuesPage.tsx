@@ -1,4 +1,4 @@
-import { useSuspenseQuery } from '@tanstack/react-query'
+import { useSuspenseQueries } from '@tanstack/react-query'
 import { CircleUserRound } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
@@ -12,26 +12,33 @@ import { StatusIcon } from '@/features/issues/components/StatusIcon'
 import { applyFilters, ISSUE_TABS, NO_FILTERS, readTab } from '@/features/issues/filters'
 import { compareIssues, isClosed, issueIdentifier, STATUS_ORDER, statusLabel } from '@/features/issues/meta'
 import { useCurrentTeam } from '@/features/teams/hooks'
-import { issuePath, teamIssuesPath } from '@/features/teams/nav'
+import { hasTeamIssues, issuePath, teamIssuesPath } from '@/features/teams/nav'
+import { teamWorkspacesQuery } from '@/features/workspaces/api'
 import { timeAgo } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 const ALL = 'all'
 
 /**
- * Group → Issues (development groups): issues from every project you can see,
+ * Group → Issues (groups with a project): issues from every project you can see,
  * grouped by status. Tabs (All / Active / Backlog / My issues) and a project
  * filter live in the URL. Rows open the issue inside its project, where it's edited.
  */
 export function TeamIssuesPage() {
   const { user } = useAuth()
   const { team } = useCurrentTeam()
-  const all = useSuspenseQuery(teamIssuesQuery(team.id)).data
+  const [{ data: all }, { data: workspaces }] = useSuspenseQueries({
+    queries: [teamIssuesQuery(team.id), teamWorkspacesQuery(team.id)],
+  })
   const [params, setParams] = useSearchParams()
   const [now] = useState(Date.now)
 
-  if (team.type !== 'development') {
-    return <p className="py-16 text-center text-sm text-muted-foreground">Issues across projects are for development groups.</p>
+  if (!hasTeamIssues(team.type, workspaces)) {
+    return (
+      <p className="py-16 text-center text-sm text-muted-foreground">
+        Issues from every project show here once this group has a project.
+      </p>
+    )
   }
 
   const tab = readTab(params)
