@@ -36,6 +36,8 @@ export function workspacePermissions(teamRole: TeamRole, workspaceRole: Workspac
   return {
     canEdit: isTeamAdmin || isLead,
     canDelete: isTeamAdmin,
+    /** Opening a workspace admits everyone who joins later, so leads can't (set_workspace_access). */
+    canChangeAccess: isTeamAdmin,
     canAddMembers: isTeamAdmin || isLead,
     /** Only team owners/admins can make someone a lead. */
     canAssignLeads: isTeamAdmin,

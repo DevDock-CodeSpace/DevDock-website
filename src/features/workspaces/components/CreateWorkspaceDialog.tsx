@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { LoaderCircle, Plus } from 'lucide-react'
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { useNavigate } from 'react-router'
@@ -18,7 +18,10 @@ import { Textarea } from '@/components/ui/textarea'
 import { useCurrentTeam } from '@/features/teams/hooks'
 import { defaultModules, workspacePath } from '@/features/teams/nav'
 import { allowedWorkspaceTypes, defaultWorkspaceType, workspaceTypes } from '@/features/teams/permissions'
-import { createWorkspace, type WorkspaceModule, type WorkspaceType } from '../api'
+import { CollectionSelect } from '@/features/collections/components/CollectionSelect'
+import { defaultAccess } from '../access'
+import { createWorkspace, teamCollectionsQuery, type WorkspaceAccess, type WorkspaceModule, type WorkspaceType } from '../api'
+import { AccessSelect } from './AccessSelect'
 import { ModulePicker } from './ModulePicker'
 import { WorkspaceTypeSelect } from './WorkspaceTypeSelect'
 
@@ -37,6 +40,14 @@ export function CreateWorkspaceDialog({ trigger }: { trigger?: ReactNode }) {
   const [modules, setModules] = useState<WorkspaceModule[]>(defaultModules[defaultWorkspaceType[team.type]])
   // Type → default tools, until the user picks tools themselves.
   const [modulesEdited, setModulesEdited] = useState(false)
+  // Collections come with the workspace list the shell already has, so this never waits.
+  const collections = useSuspenseQuery(teamCollectionsQuery(team.id)).data
+  const [collectionId, setCollectionId] = useState<string | null>(null)
+  // Who sees it follows the type and collection until the user chooses.
+  const [chosenAccess, setChosenAccess] = useState<WorkspaceAccess | null>(null)
+  const collection = collections.find((c) => c.id === collectionId)
+  const suggested = defaultAccess(team.type, type, collectionId)
+  const access = chosenAccess === 'collection' && !collection ? suggested : (chosenAccess ?? suggested)
   const noun = workspaceTypes[type].noun
   const changeType = (next: WorkspaceType) => {
     setType(next)
@@ -44,7 +55,7 @@ export function CreateWorkspaceDialog({ trigger }: { trigger?: ReactNode }) {
   }
 
   const create = useMutation({
-    mutationFn: () => createWorkspace(team.id, { title, description, type, modules }),
+    mutationFn: () => createWorkspace(team.id, { title, description, type, modules, access, collectionId }),
     onSuccess: async ({ id }) => {
       await queryClient.invalidateQueries({ queryKey: ['workspaces'] })
       setOpen(false)
@@ -68,6 +79,8 @@ export function CreateWorkspaceDialog({ trigger }: { trigger?: ReactNode }) {
           setType(defaultWorkspaceType[team.type])
           setModules(defaultModules[defaultWorkspaceType[team.type]])
           setModulesEdited(false)
+          setCollectionId(null)
+          setChosenAccess(null)
           create.reset()
         }
       }}
@@ -83,9 +96,7 @@ export function CreateWorkspaceDialog({ trigger }: { trigger?: ReactNode }) {
         <form onSubmit={submit} className="space-y-4">
           <DialogHeader>
             <DialogTitle>New {noun}</DialogTitle>
-            <DialogDescription>
-              Only group owners and admins see it until you add people to it.
-            </DialogDescription>
+            <DialogDescription>Group owners and admins always see it. You choose who else does.</DialogDescription>
           </DialogHeader>
           <div className="space-y-1.5">
             <Label htmlFor="ws-type">Type</Label>
@@ -113,6 +124,16 @@ export function CreateWorkspaceDialog({ trigger }: { trigger?: ReactNode }) {
               placeholder={`What is this ${workspaceTypes[type].noun} for?`}
               onChange={(e) => setDescription(e.target.value)}
             />
+          </div>
+          {collections.length > 0 && (
+            <div className="space-y-1.5">
+              <Label htmlFor="ws-collection">Collection</Label>
+              <CollectionSelect id="ws-collection" value={collectionId} onChange={setCollectionId} collections={collections} />
+            </div>
+          )}
+          <div className="space-y-1.5">
+            <Label htmlFor="ws-access">Who can see it</Label>
+            <AccessSelect id="ws-access" value={access} onChange={setChosenAccess} collection={collection} />
           </div>
           <div className="space-y-1.5">
             <Label>Tools</Label>
