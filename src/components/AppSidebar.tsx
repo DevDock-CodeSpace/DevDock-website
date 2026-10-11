@@ -1,6 +1,6 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { ChevronRight, Pin, Plus } from 'lucide-react'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { Link, matchPath, useLocation, useParams } from 'react-router'
 import { TruncatedText } from '@/components/TruncatedText'
 import {
@@ -74,9 +74,16 @@ export function AppSidebar({ sidebarWidth }: { sidebarWidth: SidebarWidth }) {
   // it, so the sidebar always shows where you are.
   const openCollectionId = everything.find((w) => w.id === workspaceId)?.collection_id ?? null
   const viewId = collection?.id ?? null
+  // Once per workspace opened, not on every change of view: choosing another collection in the group
+  // menu while a workspace is open changes the view first and navigates after, and following the
+  // still-open workspace at that moment would undo the choice.
+  const followed = useRef<string | null>(null)
   useEffect(() => {
+    const opened = workspaceId ?? null
+    if (followed.current === opened) return
+    followed.current = opened
     if (openCollectionId && viewId && openCollectionId !== viewId) rememberCollectionView(team.id, openCollectionId)
-  }, [openCollectionId, viewId, team.id])
+  }, [workspaceId, openCollectionId, viewId, team.id])
   const close = () => isMobile && setOpenMobile(false)
 
   return (
