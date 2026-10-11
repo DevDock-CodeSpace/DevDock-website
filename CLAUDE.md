@@ -85,6 +85,7 @@ npm run build       # typecheck + production build to dist/
 npm run perf        # after a build: fails if the first load got heavier (budgets: scripts/check-performance.mjs)
 npm run check       # everything below in one go: lint, typecheck + build, perf (CI runs this on every PR)
 npm run preview     # serve dist/
+npm run test:ai     # Deno tests for the ai-agent Edge Function (needs Deno; database tests: see docs/AI_AGENT.md)
 npm run db:types    # regenerate src/types/database.types.ts from the linked project (Supabase CLI)
 ```
 
@@ -255,6 +256,16 @@ supabase/
   - Access: a team member who is removed loses DMs and groups too (`can_read_conversation`/`can_read_message` require team membership). `send_message` has one overload (with `p_mention_ids`); `add_group_member` uses `v_`-prefixed variables because a variable named like a column made it fail.
   - Bodies are only checked to be JSON objects on the server, so `MessageBody` must tolerate anything (null children, odd marks, deep nesting).
   - Not built yet: instant calls from a conversation (the `jaas-token` function only mints tokens for `live_sessions`; a conversation-scoped room needs its own audience rule and an Edge Function change). `public.messages` still has a column UPDATE grant from the first migration; revoke it (`revoke update on public.messages from authenticated` and drop the "Authors can edit messages" policy) in a later migration once every open client uses `edit_message`/`delete_message`.
+- **Ask DevDock (AI)** (`features/ai/`, the `ai-agent` Edge Function; full record in `docs/AI_AGENT.md`, read it before touching either):
+  - The model is an interface, not the backend. It picks **tools**; each tool calls the same table, RPC or Edge Function the UI calls, **with the caller's token**, so RLS, grants and triggers decide. No tool uses the service role, and the prompt holds no permission rules.
+  - Function layout: `agent/` (context, runner, prompt, validation; knows no provider and no feature), `providers/` (`AiProvider`; `gemini.ts`), `tools/` (`registry.ts` + one file per feature, registered in `tools/index.ts`), `safety/confirmation.ts`. **A new feature adds a `tools/<feature>.ts` and one line in `tools/index.ts`; the runner never changes.**
+  - A tool is a definition (what the model sees) plus an executor with `risk` (`read`/`write`/`external`/`destructive`), `domain` and `capability`. External and destructive tools are never run from the model's call: `prepare` checks them, the arguments wait in `ai_pending_actions` (service role only, 10 min, claimed once), and the person confirms on a card. `send_message` is the only one today; its `client_id` is the pending action's id.
+  - Tools never take the signed-in user's id (use `context.userId`), take human references (`CAP-12`, a project or label name) and return candidates instead of guessing, and return small results.
+  - **Kept UI behaviour:** moving an issue into In Progress calls the `github` function's `create_branch`, as `useUpdateIssue` does. When the UI gains another side effect outside the database, add it to the tool and to the mapping table in the doc.
+  - Browser: `AskDevDockButton` in the header (⌘K / Ctrl+K, hidden unless `VITE_AI_ENABLED=true`) lazy-loads `AskDevDockPanel`. Nothing AI-related loads or is requested until it is opened. The chat lives in the tab only; the last 12 turns and the open page's identifiers (`page-context.ts`) go with each request. Changes made by a tool reach the caches through Realtime, like any other write.
+  - Secrets: `GEMINI_API_KEY`, optional `GEMINI_MODEL`, `GEMINI_BASE_URL`, `AI_PROVIDER`, `AI_ENABLED`. Never `VITE_` vars.
+  - Tests: `npm run test:ai` (no database) and `sh supabase/functions/ai-agent/tests/run-local.sh` (local stack only; it refuses a hosted URL). Statuses and priorities are copied into `tools/issues.ts`; a drift test compares them with the database enum and `meta.ts`.
+  - `/privacy` describes what is sent to the model; keep it true when a tool starts reading something new.
 - **Meetings** (the UI name for live sessions; code, routes `…/live`, table and query keys still say live):
   - **Repeating meetings:** `recurrence.ts` expands a rule (daily / weekdays / weekends / weekly days / specific dates; ends after N or on a date; max 60) into start times in the browser. `rpc('create_live_series')` inserts them as ordinary `live_sessions` rows sharing `series_id`, so each can be edited or cancelled alone. Cancelling offers "also the later meetings" (`deleteLiveSeriesFrom`).
   - **Google Calendar for a series:** one recurring event (`RDATE` list) whose id is stored on every row (`sync_series` op, `setSeriesCalendarEventId`). Never PATCH that event with a single meeting's times; use `sync_series`. Cancelling a single meeting doesn't touch Google until "Update invites".
@@ -308,7 +319,7 @@ supabase/
 ## Environment & secrets
 
 - Env vars live in `.env.local` (git-ignored). `.env.example` lists variable names only (no values) and is committed. Declare new `VITE_` vars in `src/env.d.ts` too.
-- Current vars: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, and optional `VITE_GITHUB_APP_SLUG` (public; hides Connect GitHub when unset). Live/JaaS keys (`JAAS_APP_ID`, `JAAS_KEY_ID`, `JAAS_PRIVATE_KEY`) and GitHub App keys (`GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY` as PKCS#8, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_WEBHOOK_SECRET`) are **Edge Function secrets**, set with `supabase secrets set`, never `VITE_` vars.
+- Current vars: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, optional `VITE_GITHUB_APP_SLUG` (public; hides Connect GitHub when unset) and optional `VITE_AI_ENABLED` (`true` shows Ask DevDock; its keys are Edge Function secrets, see Ask DevDock above). Live/JaaS keys (`JAAS_APP_ID`, `JAAS_KEY_ID`, `JAAS_PRIVATE_KEY`) and GitHub App keys (`GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY` as PKCS#8, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_WEBHOOK_SECRET`) are **Edge Function secrets**, set with `supabase secrets set`, never `VITE_` vars.
 - Only `VITE_`-prefixed vars reach the browser, and **everything in the bundle is public**. Never put a service-role/secret key or any other secret in a `VITE_` var or in client code.
 - Security must come from Supabase RLS policies, not client-side checks.
 

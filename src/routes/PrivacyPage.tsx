@@ -3,7 +3,7 @@ import { Link } from 'react-router'
 import { LogoMark, LogoWordmark } from '@/components/Logo'
 import { ThemeToggle } from '@/components/ThemeToggle'
 
-const UPDATED = 'September 28, 2026'
+const UPDATED = 'October 11, 2026'
 
 /**
  * Public privacy policy at /privacy (no sign-in needed; linked from the login
@@ -69,6 +69,33 @@ export function PrivacyPage() {
           </p>
         </Section>
 
+        <Section title="If you use Ask DevDock (AI)">
+          <p>
+            Ask DevDock lets you type a request in your own words, such as “show my open issues” or “tell Sree I’ll be
+            late”. It is only used when you open it and send something. To answer, DevDock sends to an AI model run by
+            Google (Gemini):
+          </p>
+          <ul>
+            <li>what you typed, and the last few messages of that Ask DevDock chat;</li>
+            <li>your name, your group’s name, the date and your time zone, and the name of the page you have open;</li>
+            <li>
+              the DevDock details needed for that one request, for example the titles and status of matching issues, the
+              names of people in your group, or the title and time of a meeting.
+            </li>
+          </ul>
+          <p>
+            It can only see and do what you are allowed to see and do, and it asks you before sending a message.
+            DevDock does not send your email address, your sign-in, your documents or your chat history to the model,
+            and it does not keep a record of your Ask DevDock chats: they exist only in your browser tab until you close
+            it. A message you ask it to prepare is held for up to ten minutes while it waits for your confirmation.
+          </p>
+          <p>
+            Google processes these requests under the terms of its Gemini API. On the free plan DevDock currently uses,
+            Google may also use them to improve its products, so don’t put anything in a request that you wouldn’t want
+            shared that way.
+          </p>
+        </Section>
+
         <Section title="In your browser">
           <p>
             DevDock keeps your sign-in session and a few preferences in your browser: light or dark theme, the last
@@ -86,7 +113,8 @@ export function PrivacyPage() {
               <strong>Vercel</strong>: hosts the website;
             </li>
             <li>
-              <strong>Google</strong>: the “Sign in with Google” step;
+              <strong>Google</strong>: the “Sign in with Google” step, and the AI model behind Ask DevDock when you use
+              it;
             </li>
             <li>
               <strong>GitHub</strong>: only if your group connects it, for the repositories it was given access to.

@@ -3,6 +3,7 @@ import { Fragment, type CSSProperties } from 'react'
 import { Link, matchPath, Outlet, useLocation, useParams } from 'react-router'
 import { AppSidebar } from '@/components/AppSidebar'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { AskDevDockButton } from '@/features/ai/components/AskDevDockButton'
 import { NotificationBell } from '@/features/messaging/components/NotificationBell'
 import {
   Breadcrumb,
@@ -59,6 +60,7 @@ function AppShell() {
           <Separator orientation="vertical" className="mr-2 h-4 data-vertical:self-center" />
           {workspaceId ? <WorkspaceBreadcrumb /> : <TeamBreadcrumb />}
           <div className="ml-auto flex items-center gap-1">
+            <AskDevDockButton />
             <NotificationBell />
             <ThemeToggle />
           </div>
