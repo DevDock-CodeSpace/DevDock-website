@@ -7,9 +7,6 @@ import { supabase } from '@/lib/supabase'
 // the browser sends what was typed and where the person is, and never a user id.
 // How it works: docs/AI_AGENT.md.
 
-/** Off unless the deployment turns it on; the function has its own switch too (AI_ENABLED). */
-export const aiEnabled = import.meta.env.VITE_AI_ENABLED === 'true'
-
 /** What is open, as identifiers only. The function re-reads it under RLS. */
 export type AiPageEntity =
   | { type: 'issue'; workspaceId: string; number: number }
