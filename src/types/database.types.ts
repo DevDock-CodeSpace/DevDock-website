@@ -14,6 +14,64 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_pending_actions: {
+        Row: {
+          args: Json
+          created_at: string
+          executed_at: string | null
+          expires_at: string
+          id: string
+          team_id: string
+          tool_name: string
+          user_id: string
+          workspace_id: string | null
+        }
+        Insert: {
+          args: Json
+          created_at?: string
+          executed_at?: string | null
+          expires_at: string
+          id?: string
+          team_id: string
+          tool_name: string
+          user_id: string
+          workspace_id?: string | null
+        }
+        Update: {
+          args?: Json
+          created_at?: string
+          executed_at?: string | null
+          expires_at?: string
+          id?: string
+          team_id?: string
+          tool_name?: string
+          user_id?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_pending_actions_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_pending_actions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_pending_actions_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversation_members: {
         Row: {
           conversation_id: string

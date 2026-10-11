@@ -396,3 +396,8 @@ verify_jwt = false
 # webhook signature (GITHUB_WEBHOOK_SECRET) instead.
 [functions.github-webhook]
 verify_jwt = false
+
+# Ask DevDock. Same as jaas-token: the function checks the caller itself
+# (auth.getUser), then runs every tool as that caller under RLS.
+[functions.ai-agent]
+verify_jwt = false
