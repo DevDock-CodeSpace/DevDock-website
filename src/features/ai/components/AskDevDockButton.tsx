@@ -3,7 +3,6 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useCurrentTeam } from '@/features/teams/hooks'
-import { aiEnabled } from '../api'
 
 // The panel (and everything it needs) loads the first time it is opened, so
 // the header carries only this button.
@@ -11,7 +10,10 @@ const AskDevDockPanel = lazy(() => import('./AskDevDockPanel'))
 
 const isMac = typeof navigator !== 'undefined' && /mac|iphone|ipad/i.test(navigator.platform)
 
-/** The header's Ask DevDock button (⌘K / Ctrl+K). Renders nothing while the feature is off. */
+/**
+ * The header's Ask DevDock button (⌘K / Ctrl+K). Always shown: there is no build-time switch. To turn
+ * the assistant off, set the function's AI_ENABLED secret to "false"; the panel then says so.
+ */
 export function AskDevDockButton() {
   const { team } = useCurrentTeam()
   const [open, setOpen] = useState(false)
@@ -19,7 +21,6 @@ export function AskDevDockButton() {
   const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
-    if (!aiEnabled) return
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key.toLowerCase() !== 'k' || !(isMac ? event.metaKey : event.ctrlKey) || event.shiftKey || event.altKey) return
       if (event.defaultPrevented) return
@@ -31,7 +32,6 @@ export function AskDevDockButton() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
-  if (!aiEnabled) return null
   return (
     <>
       <Tooltip>

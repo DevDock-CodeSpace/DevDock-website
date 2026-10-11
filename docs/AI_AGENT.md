@@ -108,13 +108,14 @@ Edge Function secrets (`supabase secrets set NAME=value`):
 | `AI_PROVIDER` | optional; `gemini` is the only entry in `providers/index.ts` today |
 | `AI_ENABLED` | `false` switches the function off without removing anything |
 
-Browser: `VITE_AI_ENABLED=true` shows the header button (it is hidden otherwise). It is not a secret.
+Browser: nothing to configure. The header button is always shown; `AI_ENABLED=false` on the function is the off
+switch (the panel then says the assistant is switched off).
 
 Moving from the free tier to a paid key is a change of `GEMINI_API_KEY` only. Moving to another model family is a
 new file in `providers/` and one entry in `providers/index.ts`.
 
 Deploy: `supabase db push` (the `ai_pending_actions` migration), `supabase functions deploy ai-agent`, set the
-secrets, then set `VITE_AI_ENABLED=true` in the hosting environment.
+secrets.
 
 ## Testing
 
@@ -127,7 +128,7 @@ sh supabase/functions/ai-agent/tests/run-local.sh # everything, against the LOCA
   `tests/local.ts` refuses any URL that isn't localhost. Never point them at the hosted project.
 - No test calls a real model: the agent loop uses a scripted provider and the Gemini adapter a fake `fetch`.
 - To try the function by hand locally: `supabase functions serve ai-agent --env-file <file with GEMINI_API_KEY>`,
-  and run the app with `VITE_AI_ENABLED=true npx vite --mode localdb`.
+  and run the app with `npx vite --mode localdb`.
 - Real-model checks are manual and few, with the admin test account in a throwaway project, never messaging real people.
 
 ## Not built yet (the registry is ready for them)
