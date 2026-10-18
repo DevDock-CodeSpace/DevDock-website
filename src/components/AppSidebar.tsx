@@ -3,6 +3,7 @@ import { ChevronRight, Pin, Plus } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { Link, matchPath, useLocation, useParams } from 'react-router'
 import { TruncatedText } from '@/components/TruncatedText'
+import { cn } from '@/lib/utils'
 import {
   Sidebar,
   SidebarContent,
@@ -16,6 +17,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
+  SidebarTrigger,
 } from '@/components/ui/sidebar'
 import { SidebarResizer } from '@/components/SidebarResizer'
 import type { SidebarWidth } from '@/hooks/use-sidebar-width'
@@ -90,8 +92,10 @@ export function AppSidebar({ sidebarWidth }: { sidebarWidth: SidebarWidth }) {
     <Sidebar collapsible="icon">
       {/* Match the app header (h-12 + border-b) so the team switcher lines up with the top bar.
           The same px-2 collapsed or not keeps the logo centered over the icon column below. */}
-      <SidebarHeader className="h-12 justify-center border-b px-2 py-0">
+      <SidebarHeader className="h-12 flex-row items-center gap-1 border-b px-2 py-0">
         <TeamSwitcher />
+        {/* Closes the sidebar from inside it (ChatGPT-style); collapsed, the logo opens it again. */}
+        <SidebarTrigger className="ml-auto shrink-0 text-muted-foreground group-data-[collapsible=icon]:hidden" />
       </SidebarHeader>
 
       <SidebarContent className="gap-0">
@@ -134,7 +138,13 @@ export function AppSidebar({ sidebarWidth }: { sidebarWidth: SidebarWidth }) {
                       <SidebarMenuButton
                         asChild
                         tooltip={workspace.title}
-                        className={activeIcon}
+                        // The pin only shows on hover or focus (unless pinned); keep its room free until then,
+                        // so the name isn't cut short by an invisible button. Touch screens always show it.
+                        className={cn(
+                          activeIcon,
+                          !pinned &&
+                            'md:group-has-data-[sidebar=menu-action]/menu-item:pr-2 md:group-hover/menu-item:group-has-data-[sidebar=menu-action]/menu-item:pr-8 md:group-focus-within/menu-item:group-has-data-[sidebar=menu-action]/menu-item:pr-8',
+                        )}
                         isActive={matchPath({ path: to, end: false }, pathname) !== null}
                       >
                         <Link to={to} onClick={close}>

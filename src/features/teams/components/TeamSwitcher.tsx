@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { Check, ChevronsUpDown, Plus } from 'lucide-react'
+import { Check, ChevronDown, PanelLeft, Plus } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { LogoMark } from '@/components/Logo'
@@ -36,7 +36,7 @@ export function TeamSwitcher() {
   const memberships = useMyTeams()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
-  const { isMobile, setOpenMobile } = useSidebar()
+  const { isMobile, setOpenMobile, state, toggleSidebar } = useSidebar()
 
   const open = (slug: string, teamId: string, collectionId?: string) => {
     if (collectionId) rememberCollectionView(teamId, collectionId)
@@ -44,18 +44,41 @@ export function TeamSwitcher() {
     navigate(teamPath(slug))
   }
 
+  // Collapsed to icons there is no room for the menu and the sidebar button side by side: the logo
+  // becomes the button that opens the sidebar (it shows the panel icon on hover), as in ChatGPT.
+  if (state === 'collapsed' && !isMobile) {
+    return (
+      <SidebarMenu>
+        <SidebarMenuItem>
+          <SidebarMenuButton size="lg" tooltip="Open sidebar" onClick={toggleSidebar} className="group/open">
+            <span className="relative grid size-8 shrink-0 place-items-center">
+              <GroupIcon
+                team={team}
+                className="size-8 transition-opacity group-hover/open:opacity-0 group-focus-visible/open:opacity-0"
+                fallback={<LogoMark className="size-8 object-contain transition-opacity group-hover/open:opacity-0 group-focus-visible/open:opacity-0" />}
+              />
+              <PanelLeft className="absolute opacity-0 transition-opacity group-hover/open:opacity-100 group-focus-visible/open:opacity-100" />
+            </span>
+            <span className="sr-only">Toggle Sidebar</span>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      </SidebarMenu>
+    )
+  }
+
   return (
-    <SidebarMenu>
+    // Hugs the group's name, with the menu's arrow right after it; the sidebar button sits beside (AppSidebar).
+    <SidebarMenu className="min-w-0 flex-1">
       <SidebarMenuItem>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton
               size="lg"
               tooltip={view.collection ? `${team.name} · ${view.collection.name}` : team.name}
-              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+              className="w-auto max-w-full data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <GroupIcon team={team} className="size-8" fallback={<LogoMark className="size-8 object-contain" />} />
-              <div className="grid flex-1 text-left leading-tight">
+              <div className="grid min-w-0 text-left leading-tight">
                 <span className="truncate font-semibold">{team.name}</span>
                 <span className="truncate font-mono text-xs text-muted-foreground">
                   {view.collection
@@ -63,7 +86,7 @@ export function TeamSwitcher() {
                     : `${teamRoleLabel[role].toLowerCase()} · ${teamTypes[team.type].label.toLowerCase()}`}
                 </span>
               </div>
-              <ChevronsUpDown className="ml-auto size-4" />
+              <ChevronDown className="text-muted-foreground" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent side={isMobile ? 'bottom' : 'right'} align="start" sideOffset={4} className="min-w-60">
