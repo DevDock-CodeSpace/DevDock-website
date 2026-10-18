@@ -1,6 +1,6 @@
 // How wide the sidebar may be, and how that is remembered. Pure, so the limits are easy to test.
 
-export const SIDEBAR_MIN = 224 // 14rem: long names still fit, and nothing overlaps
+export const SIDEBAR_MIN = 178 // the group name still shows in full; longer names truncate with a tooltip
 export const SIDEBAR_MAX = 448 // 28rem: wide enough for anything, still leaves room for the page
 export const SIDEBAR_DEFAULT = 256 // 16rem, the shadcn default
 /** The page area never gets squeezed below this by a wide sidebar (a narrow window caps the sidebar instead). */

@@ -56,8 +56,9 @@ function AppShell() {
       {/* min-w-0: wide content (the issue board) scrolls inside the page instead of widening it. */}
       <SidebarInset className="min-w-0">
         <header className="sticky top-0 z-10 flex h-12 shrink-0 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur md:px-6">
-          <SidebarTrigger className="-ml-1" />
-          <Separator orientation="vertical" className="mr-2 h-4 data-vertical:self-center" />
+          {/* On a phone the sidebar is a slide-out panel: this opens it. On wider screens its own button does. */}
+          <SidebarTrigger className="-ml-1 md:hidden" />
+          <Separator orientation="vertical" className="mr-2 h-4 data-vertical:self-center md:hidden" />
           {workspaceId ? <WorkspaceBreadcrumb /> : <TeamBreadcrumb />}
           <div className="ml-auto flex items-center gap-1">
             <AskDevDockButton />
