@@ -25,8 +25,15 @@ export type ShapeKind =
   | 'note'
   | 'text'
 
+/** Text blocks and tables: they grow with their text, and only their width is set by hand. */
+export type BlockKind = 'heading' | 'paragraph' | 'list' | 'table'
+
 export type DiagramNodeData = {
   label: string
+  /** 'block' nodes only: the text under the heading (paragraph, one bullet or table row per line). */
+  body?: string
+  /** 'block' nodes only. */
+  block?: BlockKind
   /** 'shape' nodes only. */
   shape?: ShapeKind
   /** 'icon' nodes only. */
@@ -39,7 +46,7 @@ export type DiagramNodeData = {
   bold: boolean
 }
 
-export type DiagramNodeType = 'shape' | 'icon' | 'container'
+export type DiagramNodeType = 'shape' | 'icon' | 'container' | 'block'
 export type DiagramNode = Node<DiagramNodeData, DiagramNodeType>
 
 export type Routing = 'orthogonal' | 'straight' | 'curved'
@@ -78,7 +85,9 @@ export const defaultConnector: ConnectorData = {
 export type LibraryItem =
   | { type: 'shape'; shape: ShapeKind }
   | { type: 'icon'; icon: IconKey }
-  | { type: 'container'; variant: 'solid' | 'dashed' }
+  /** `label`: a preset's own title (the Data section's "Schema"). */
+  | { type: 'container'; variant: 'solid' | 'dashed'; label?: string }
+  | { type: 'block'; block: BlockKind }
 
 const shapeDefaults: Record<ShapeKind, { label: string; w: number; h: number; data?: Partial<DiagramNodeData> }> = {
   rectangle: { label: 'Rectangle', w: 140, h: 72 },
@@ -100,6 +109,28 @@ export const shapeLabels = Object.fromEntries(
 ) as Record<ShapeKind, string>
 
 export const SHAPE_KINDS = Object.keys(shapeDefaults) as ShapeKind[]
+
+const blockDefaults: Record<BlockKind, { label: string; w: number; title: string; body: string; data?: Partial<DiagramNodeData> }> = {
+  heading: { label: 'Heading', w: 280, title: 'Heading', body: '', data: { text: 'lg', bold: true } },
+  paragraph: { label: 'Paragraph', w: 260, title: 'Sub-heading', body: 'Write a few sentences here.' },
+  list: { label: 'Bullet list', w: 240, title: 'Sub-heading', body: 'First point\nSecond point\nThird point' },
+  table: {
+    label: 'Table',
+    w: 240,
+    title: 'users',
+    body: 'id uuid PK\nemail text\nteam_id uuid FK\ncreated_at timestamptz',
+    data: { fill: 'blue', stroke: 'default', line: 'solid' },
+  },
+}
+
+export const blockLabels = Object.fromEntries(
+  Object.entries(blockDefaults).map(([kind, def]) => [kind, def.label]),
+) as Record<BlockKind, string>
+
+export const BLOCK_KINDS = Object.keys(blockDefaults) as BlockKind[]
+
+/** Longest heading or body a block keeps (a pasted essay shouldn't bloat the saved diagram). */
+const MAX_BODY = 4000
 
 const baseData: Omit<DiagramNodeData, 'label'> = {
   fill: 'default',
@@ -128,6 +159,18 @@ export function createNode(item: LibraryItem, center: XYPosition): DiagramNode {
       data: { ...baseData, label, shape: item.shape, ...def.data },
     }
   }
+  if (item.type === 'block') {
+    const def = blockDefaults[item.block]
+    return {
+      id,
+      type: 'block',
+      // No height: a block is as tall as its text (only the width is resized).
+      position: at(def.w, 80),
+      width: def.w,
+      zIndex: NODE_Z,
+      data: { ...baseData, fill: 'none', line: 'none', label: def.title, body: def.body, block: item.block, ...def.data },
+    }
+  }
   if (item.type === 'icon') {
     const def = ICONS[item.icon]
     return {
@@ -149,7 +192,7 @@ export function createNode(item: LibraryItem, center: XYPosition): DiagramNode {
     zIndex: CONTAINER_Z,
     data: {
       ...baseData,
-      label: item.variant === 'dashed' ? 'Zone' : 'Group',
+      label: item.label ?? (item.variant === 'dashed' ? 'Zone' : 'Group'),
       fill: item.variant === 'dashed' ? 'none' : 'default',
       line: item.variant,
       text: 'sm',
@@ -230,7 +273,8 @@ export function serialize({ nodes, edges }: DiagramContent): Json {
       type: n.type,
       position: { x: Math.round(n.position.x), y: Math.round(n.position.y) },
       width: Math.round(n.width ?? n.measured?.width ?? 0),
-      height: Math.round(n.height ?? n.measured?.height ?? 0),
+      // A block's height follows its text, so it isn't stored.
+      ...(n.type === 'block' ? {} : { height: Math.round(n.height ?? n.measured?.height ?? 0) }),
       ...(n.parentId ? { parentId: n.parentId } : {}),
       data: n.data,
     })),
@@ -260,7 +304,7 @@ export function parse(json: Json): DiagramContent {
   const nodes: DiagramNode[] = []
   for (const raw of rawNodes) {
     if (!isObject(raw) || typeof raw.id !== 'string' || !isObject(raw.position) || !isObject(raw.data)) continue
-    const type = oneOf<DiagramNodeType>(raw.type, ['shape', 'icon', 'container'], 'shape')
+    const type = oneOf<DiagramNodeType>(raw.type, ['shape', 'icon', 'container', 'block'], 'shape')
     const { x, y } = raw.position
     if (typeof x !== 'number' || typeof y !== 'number') continue
     const d = raw.data
@@ -274,12 +318,17 @@ export function parse(json: Json): DiagramContent {
     }
     if (type === 'shape') data.shape = oneOf(d.shape, SHAPE_KINDS, 'rectangle')
     if (type === 'icon') data.icon = oneOf(d.icon, Object.keys(ICONS) as IconKey[], 'server')
+    if (type === 'block') {
+      data.block = oneOf(d.block, BLOCK_KINDS, 'paragraph')
+      data.label = data.label.slice(0, MAX_BODY)
+      data.body = typeof d.body === 'string' ? d.body.slice(0, MAX_BODY) : ''
+    }
     nodes.push({
       id: raw.id,
       type,
       position: { x, y },
       width: typeof raw.width === 'number' && raw.width > 0 ? raw.width : undefined,
-      height: typeof raw.height === 'number' && raw.height > 0 ? raw.height : undefined,
+      height: type !== 'block' && typeof raw.height === 'number' && raw.height > 0 ? raw.height : undefined,
       ...(typeof raw.parentId === 'string' ? { parentId: raw.parentId } : {}),
       data,
     })

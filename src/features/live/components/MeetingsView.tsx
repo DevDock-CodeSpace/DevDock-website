@@ -1,10 +1,11 @@
+import { useQuery } from '@tanstack/react-query'
 import { CalendarDays, List } from 'lucide-react'
 import { lazy, Suspense, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router'
 import { cn } from '@/lib/utils'
 import { useCollectionView } from '@/features/collections/hooks'
-import type { LiveSession } from '../api'
-import { readCursor, type CalendarMode } from '../calendarView'
+import { meetingsRangeQuery, type LiveSession, type MeetingsScope } from '../api'
+import { readCursor, visibleRange, type CalendarMode } from '../calendarView'
 import { useCanWriteLive } from '../hooks'
 import { toDateKey } from '../recurrence'
 import { LiveSessionList } from './LiveSessionList'
@@ -14,7 +15,8 @@ import { ScheduleSessionDialog } from './ScheduleSessionDialog'
 const MeetingCalendar = lazy(() => import('./MeetingCalendar').then((m) => ({ default: m.MeetingCalendar })))
 
 type MeetingsViewProps = {
-  sessions: LiveSession[]
+  /** Whose meetings: the list pages through them, the calendar asks for its visible range. */
+  scope: MeetingsScope
   now: number
   href: (session: LiveSession) => string
   /** Group view: show which workspace (or the whole group) each meeting is for. */
@@ -31,7 +33,7 @@ type MeetingsViewProps = {
  * ?view=calendar&mode=week&date=YYYY-MM-DD) and, for people who may schedule
  * here, a "New meeting" button plus click-to-create on the calendar.
  */
-export function MeetingsView({ sessions, now, href, showScope, workspaceId, empty, lead }: MeetingsViewProps) {
+export function MeetingsView({ scope, now, href, showScope, workspaceId, empty, lead }: MeetingsViewProps) {
   // Only the collection being looked at (everything, in a group without collections).
   const { workspaces } = useCollectionView()
   const canWrite = useCanWriteLive()
@@ -41,6 +43,9 @@ export function MeetingsView({ sessions, now, href, showScope, workspaceId, empt
   const view = params.get('view') === 'calendar' ? 'calendar' : 'list'
   const mode: CalendarMode = params.get('mode') === 'week' ? 'week' : 'month'
   const cursor = readCursor(params.get('date'), now)
+  const range = visibleRange(cursor, mode)
+  // Only while the calendar is showing; the list fetches its own pages.
+  const calendar = useQuery({ ...meetingsRangeQuery(scope, range.from, range.to), enabled: view === 'calendar' })
 
   const canSchedule = workspaceId
     ? canWrite(workspaceId)
@@ -92,7 +97,7 @@ export function MeetingsView({ sessions, now, href, showScope, workspaceId, empt
       {view === 'calendar' ? (
         <Suspense fallback={<div className="h-96 animate-pulse rounded-md bg-muted/40" />}>
         <MeetingCalendar
-          sessions={sessions}
+          sessions={calendar.data ?? []}
           now={now}
           cursor={cursor}
           mode={mode}
@@ -107,7 +112,7 @@ export function MeetingsView({ sessions, now, href, showScope, workspaceId, empt
         />
         </Suspense>
       ) : (
-        <LiveSessionList sessions={sessions} now={now} href={href} showScope={showScope} empty={empty} />
+        <LiveSessionList scope={scope} now={now} href={href} showScope={showScope} empty={empty} />
       )}
 
       {creating && (

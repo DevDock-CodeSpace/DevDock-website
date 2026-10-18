@@ -1,5 +1,6 @@
 import { useReactFlow, useStore } from '@xyflow/react'
 import {
+  Grid3x3,
   Maximize,
   Maximize2,
   Minimize2,
@@ -25,9 +26,11 @@ type ToolbarProps = {
   onFullscreen: (on: boolean) => void
   propertiesOpen: boolean
   onToggleProperties: () => void
+  snapToGrid: boolean
+  onSnapToGrid: (on: boolean) => void
 }
 
-/** Undo/redo, zoom, full screen and the properties-panel toggle, above the canvas. */
+/** Undo/redo, zoom, snap to grid, full screen and the properties-panel toggle, above the canvas. */
 export function Toolbar({
   readOnly,
   canUndo,
@@ -38,6 +41,8 @@ export function Toolbar({
   onFullscreen,
   propertiesOpen,
   onToggleProperties,
+  snapToGrid,
+  onSnapToGrid,
 }: ToolbarProps) {
   const flow = useReactFlow()
   const zoom = useStore((s) => s.transform[2])
@@ -70,6 +75,17 @@ export function Toolbar({
         label="Fit to screen"
         onClick={() => void flow.fitView({ padding: 0.2, maxZoom: 1, duration: 200 })}
       />
+      {!readOnly && (
+        <>
+          <Separator orientation="vertical" className="mx-1.5 h-4 data-vertical:self-center" />
+          <ToolButton
+            icon={Grid3x3}
+            label={snapToGrid ? 'Snap to grid: on' : 'Snap to grid: off'}
+            onClick={() => onSnapToGrid(!snapToGrid)}
+            pressed={snapToGrid}
+          />
+        </>
+      )}
       <div className="ml-auto flex items-center gap-0.5">
         <ToolButton
           icon={fullscreen ? Minimize2 : Maximize2}

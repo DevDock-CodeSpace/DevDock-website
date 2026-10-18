@@ -1,5 +1,5 @@
 import { FunctionsHttpError } from '@supabase/supabase-js'
-import { queryOptions } from '@tanstack/react-query'
+import { infiniteQueryOptions, keepPreviousData, queryOptions } from '@tanstack/react-query'
 import type { PersonProfile } from '@/features/teams/api'
 import type { WorkspaceType } from '@/features/workspaces/api'
 import { DataError, requireAffected, toDataError } from '@/lib/errors'
@@ -61,7 +61,7 @@ const writeErrors = {
 
 // ---------------------------------------------------------------- queries
 
-/** Group → Meetings: group-wide meetings plus meetings of every workspace the caller can see. */
+/** Every meeting in the group the caller can see (the message attachment picker; the Meetings page pages instead). */
 export const teamLiveSessionsQuery = (teamId: string) =>
   queryOptions({
     queryKey: ['live', 'team', teamId],
@@ -76,19 +76,74 @@ export const teamLiveSessionsQuery = (teamId: string) =>
     },
   })
 
-/** Workspace → Meetings: only this workspace's meetings. */
-export const workspaceLiveSessionsQuery = (workspaceId: string) =>
+// ---------------------------------------------------------------- paged lists (the Meetings page)
+
+/** Meetings fetched per request as the list scrolls. */
+export const MEETINGS_PAGE = 10
+
+/**
+ * Whose meetings a list shows. In a group: `workspaceIds` narrows to the collection in
+ * view (group-wide meetings always belong); null shows everything the caller can see.
+ */
+export type MeetingsScope =
+  | { kind: 'team'; teamId: string; workspaceIds: string[] | null }
+  | { kind: 'workspace'; workspaceId: string }
+
+export type MeetingsPage = { rows: LiveSession[]; total: number; next: number | undefined }
+
+const scopeKey = (scope: MeetingsScope) =>
+  scope.kind === 'team' ? ['team', scope.teamId, scope.workspaceIds?.join(',') ?? 'all'] : ['workspace', scope.workspaceId]
+
+function scoped<Q extends { eq: (column: string, value: string) => Q; or: (filters: string) => Q }>(query: Q, scope: MeetingsScope): Q {
+  if (scope.kind === 'workspace') return query.eq('workspace_id', scope.workspaceId)
+  const team = query.eq('team_id', scope.teamId)
+  if (!scope.workspaceIds) return team
+  // Ids come from the cache (uuids), never from what someone typed.
+  return scope.workspaceIds.length === 0
+    ? team.or('workspace_id.is.null')
+    : team.or(`workspace_id.is.null,workspace_id.in.(${scope.workspaceIds.join(',')})`)
+}
+
+/**
+ * One section of the Meetings list, MEETINGS_PAGE at a time: `upcoming` (live and not yet
+ * ended, soonest first) or `past` (ended, latest first). The first page also carries the
+ * section's total. "Now" is read when each page is fetched, so the key doesn't tick.
+ */
+export const meetingsPageQuery = (scope: MeetingsScope, when: 'upcoming' | 'past') =>
+  infiniteQueryOptions({
+    queryKey: ['live', 'list', ...scopeKey(scope), when],
+    initialPageParam: 0,
+    queryFn: async ({ pageParam }): Promise<MeetingsPage> => {
+      const now = new Date().toISOString()
+      const query = scoped(supabase.from('live_sessions').select(COLUMNS, { count: 'exact' }), scope)
+      const { data, error, count } = await (when === 'upcoming'
+        ? query.gt('ends_at', now).order('starts_at', { ascending: true })
+        : query.lte('ends_at', now).order('starts_at', { ascending: false })
+      ).range(pageParam, pageParam + MEETINGS_PAGE - 1)
+      if (error) throw toDataError('load meetings', error)
+      const total = count ?? data.length
+      const after = pageParam + data.length
+      return { rows: data, total, next: data.length === MEETINGS_PAGE && after < total ? after : undefined }
+    },
+    getNextPageParam: (last) => last.next,
+  })
+
+/** The Meetings calendar: only what overlaps the visible month or week. */
+export const meetingsRangeQuery = (scope: MeetingsScope, from: Date, to: Date) =>
   queryOptions({
-    queryKey: ['live', 'workspace', workspaceId],
+    queryKey: ['live', 'range', ...scopeKey(scope), from.toISOString(), to.toISOString()],
     queryFn: async (): Promise<LiveSession[]> => {
-      const { data, error } = await supabase
-        .from('live_sessions')
-        .select(COLUMNS)
-        .eq('workspace_id', workspaceId)
+      const { data, error } = await scoped(supabase.from('live_sessions').select(COLUMNS), scope)
+        .lt('starts_at', to.toISOString())
+        .gt('ends_at', from.toISOString())
         .order('starts_at', { ascending: true })
+        // A month holds a few dozen at most; the cap keeps a runaway series from loading everything.
+        .limit(500)
       if (error) throw toDataError('load meetings', error)
       return data
     },
+    // Moving to the next month shows this one until the new one arrives.
+    placeholderData: keepPreviousData,
   })
 
 /** null when the session doesn't exist or the caller can't see it. */

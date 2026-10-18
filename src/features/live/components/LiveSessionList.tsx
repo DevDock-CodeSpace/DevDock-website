@@ -1,15 +1,16 @@
-import { CalendarCheck, Repeat, Video } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useInfiniteQuery } from '@tanstack/react-query'
+import { CalendarCheck, LoaderCircle, Repeat, Video } from 'lucide-react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { PersonAvatar } from '@/components/PersonRow'
 import { DocScope } from '@/features/docs/components/DocScope'
 import { timeAgo } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import type { LiveSession } from '../api'
-import { formatDay, formatTimeRange, sessionStatus, splitSessions } from '../time'
+import { meetingsPageQuery, type LiveSession, type MeetingsScope } from '../api'
+import { formatDay, formatTimeRange, sessionStatus } from '../time'
 
 type LiveSessionListProps = {
-  sessions: LiveSession[]
+  scope: MeetingsScope
   now: number
   href: (session: LiveSession) => string
   /** Group view: show which workspace (or the whole group) each session is for. */
@@ -17,28 +18,111 @@ type LiveSessionListProps = {
   empty: ReactNode
 }
 
-/** "Upcoming" (live ones on top) and "Past" sections of dense session rows. */
-export function LiveSessionList({ sessions, now, href, showScope = false, empty }: LiveSessionListProps) {
-  const { current, past } = splitSessions(sessions, now)
+/**
+ * "Upcoming" (live ones on top) and "Past" sections of dense session rows, fetched
+ * MEETINGS_PAGE at a time: the next page loads as the end of a section scrolls into
+ * view. The two sections are fetched side by side.
+ */
+export function LiveSessionList({ scope, now, href, showScope = false, empty }: LiveSessionListProps) {
+  const upcoming = useInfiniteQuery(meetingsPageQuery(scope, 'upcoming'))
+  const past = useInfiniteQuery(meetingsPageQuery(scope, 'past'))
 
-  if (sessions.length === 0) {
+  if (upcoming.isPending || past.isPending) {
+    return <div className="h-40 animate-pulse rounded-md bg-muted/40" aria-label="Loading meetings" />
+  }
+  if (upcoming.isError || past.isError) {
+    return <div className="border-y py-10 text-center text-sm text-muted-foreground">Couldn’t load meetings. Reload the page to try again.</div>
+  }
+  const upcomingTotal = upcoming.data.pages[0]?.total ?? 0
+  const pastTotal = past.data.pages[0]?.total ?? 0
+  if (upcomingTotal === 0 && pastTotal === 0) {
     return <div className="border-y py-10 text-center text-sm text-muted-foreground">{empty}</div>
   }
 
   return (
     <div className="space-y-8">
-      <Section title="Upcoming" count={current.length}>
-        {current.length === 0 ? (
+      <Section title="Upcoming" count={upcomingTotal}>
+        {upcomingTotal === 0 ? (
           <div className="border-y py-8 text-center text-sm text-muted-foreground">Nothing scheduled.</div>
         ) : (
-          <Rows sessions={current} now={now} href={href} showScope={showScope} />
+          <>
+            <Rows sessions={rowsOf(upcoming.data.pages)} now={now} href={href} showScope={showScope} />
+            {/* Its end is on screen above Past from the start, so it only loads more when asked. */}
+            <LoadMore query={upcoming} auto={pastTotal === 0} />
+          </>
         )}
       </Section>
-      {past.length > 0 && (
-        <Section title="Past" count={past.length}>
-          <Rows sessions={past.slice(0, 30)} now={now} href={href} showScope={showScope} />
+      {pastTotal > 0 && (
+        <Section title="Past" count={pastTotal}>
+          <Rows sessions={rowsOf(past.data.pages)} now={now} href={href} showScope={showScope} />
+          <LoadMore query={past} auto />
         </Section>
       )}
+    </div>
+  )
+}
+
+/** The pages' rows in order. A meeting that moved between pages (time passed, one was added) shows once. */
+function rowsOf(pages: { rows: LiveSession[] }[]): LiveSession[] {
+  const seen = new Set<string>()
+  return pages.flatMap((page) => page.rows).filter((row) => !seen.has(row.id) && seen.add(row.id))
+}
+
+/**
+ * The section's next page: on click, and with `auto` when the reader scrolls down to it. Only
+ * the page's last section is `auto`: a section above it has its end on screen from the
+ * start, which isn't the reader asking for more.
+ */
+function LoadMore({
+  query,
+  auto,
+}: {
+  query: { hasNextPage: boolean; isFetchingNextPage: boolean; fetchNextPage: () => Promise<unknown> }
+  auto: boolean
+}) {
+  const marker = useRef<HTMLDivElement>(null)
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = query
+  useEffect(() => {
+    const el = marker.current
+    if (!auto || !el || !hasNextPage || isFetchingNextPage) return
+    // Only when the reader scrolls down to it: an end that's on screen without scrolling
+    // (a short list on a tall window) waits for "Show more" instead of loading by itself.
+    let near = false
+    let scrolled = false
+    const load = () => near && scrolled && void fetchNextPage()
+    // Start a little before the end is visible, so scrolling rarely waits.
+    const observer = new IntersectionObserver(
+      (entries) => {
+        near = entries.some((e) => e.isIntersecting)
+        load()
+      },
+      { rootMargin: '200px 0px' },
+    )
+    const onScroll = () => {
+      scrolled = true
+      load()
+    }
+    observer.observe(el)
+    // Capture: the page area may be its own scroll container.
+    window.addEventListener('scroll', onScroll, { capture: true, passive: true })
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('scroll', onScroll, { capture: true })
+    }
+  }, [auto, hasNextPage, isFetchingNextPage, fetchNextPage])
+
+  if (!hasNextPage) return null
+  return (
+    <div ref={marker} className="flex justify-center py-3">
+      <button
+        type="button"
+        onClick={() => void fetchNextPage()}
+        disabled={isFetchingNextPage}
+        className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+      >
+        {isFetchingNextPage && <LoaderCircle className="size-3.5 animate-spin" />}
+        {isFetchingNextPage ? 'Loading…' : 'Show more'}
+      </button>
     </div>
   )
 }

@@ -11,6 +11,8 @@ type DiagramEditorContextValue = {
   /** Change node/edge data as one undoable step. */
   updateNode: (id: string, patch: Partial<DiagramNodeData>) => void
   updateEdge: (id: string, patch: Partial<ConnectorData>) => void
+  /** A resize ended (puts the node's edges on the grid when snapping is on). */
+  resized: (id: string) => void
 }
 
 export const DiagramEditorContext = createContext<DiagramEditorContextValue | null>(null)

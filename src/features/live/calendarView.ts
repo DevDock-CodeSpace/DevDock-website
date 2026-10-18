@@ -30,6 +30,12 @@ export const weekDays = (d: Date): Date[] => {
   return Array.from({ length: 7 }, (_, i) => addDays(start, i))
 }
 
+/** The days the calendar shows: whole weeks around the month, or the week. `to` is exclusive. */
+export function visibleRange(cursor: Date, mode: CalendarMode): { from: Date; to: Date } {
+  const days = mode === 'month' ? monthWeeks(cursor).flat() : weekDays(cursor)
+  return { from: days[0], to: addDays(days[days.length - 1], 1) }
+}
+
 /** Move the visible range by one month or one week. */
 export function shiftCursor(d: Date, mode: CalendarMode, direction: 1 | -1): Date {
   return mode === 'month'

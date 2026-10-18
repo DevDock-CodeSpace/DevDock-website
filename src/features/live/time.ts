@@ -68,10 +68,3 @@ export function nextFullHour(now: number): Date {
   d.setHours(d.getHours() + 1)
   return d
 }
-
-/** Upcoming/live first (soonest first), then ended (most recent first). */
-export function splitSessions<T extends Times>(sessions: T[], now: number) {
-  const current = sessions.filter((s) => sessionStatus(s, now) !== 'ended')
-  const past = sessions.filter((s) => sessionStatus(s, now) === 'ended').reverse()
-  return { current, past }
-}

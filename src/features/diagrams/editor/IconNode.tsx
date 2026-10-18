@@ -10,10 +10,15 @@ import { NodeFrame } from './NodeFrame'
 /** Space kept under the tile for the label. */
 const LABEL_SPACE = { sm: 22, md: 24, lg: 30 }
 
-/** An architecture icon (Lucide) in an optional tile, with its label underneath. */
+/**
+ * An architecture icon in an optional tile, with its label underneath: a Lucide glyph
+ * in the node's color, or a cloud provider's own icon, drawn as it is (the providers
+ * don't allow recoloring or distorting theirs).
+ */
 export function IconNode({ id, data, selected, width = 0, height = 0 }: NodeProps<DiagramNode>) {
   const { editingId, setEditingId, updateNode } = useDiagramEditor()
-  const { icon: Icon } = ICONS[data.icon ?? 'server']
+  const def = ICONS[data.icon ?? 'server'] ?? ICONS.server
+  const Icon = def.icon
   const tile = Math.max(20, Math.min(width, height - LABEL_SPACE[data.text]))
 
   return (
@@ -28,7 +33,17 @@ export function IconNode({ id, data, selected, width = 0, height = 0 }: NodeProp
           )}
           style={{ width: tile, height: tile }}
         >
-          <Icon className={iconClass[data.stroke]} style={{ width: tile * 0.6, height: tile * 0.6 }} strokeWidth={1.5} />
+          {Icon ? (
+            <Icon className={iconClass[data.stroke]} style={{ width: tile * 0.6, height: tile * 0.6 }} strokeWidth={1.5} />
+          ) : (
+            <img
+              src={def.src}
+              alt=""
+              draggable={false}
+              className="pointer-events-none object-contain select-none"
+              style={{ width: tile * 0.78, height: tile * 0.78 }}
+            />
+          )}
         </div>
         <div
           className={cn(
