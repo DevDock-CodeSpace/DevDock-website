@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronRight, CircleUserRound, GitBranch, ImagePlus, IterationCw, LoaderCircle, Tag, X } from 'lucide-react'
+import { ChevronRight, CircleUserRound, ImagePlus, IterationCw, LoaderCircle, Tag, X } from 'lucide-react'
 import { useEffect, useRef, useState, type ComponentProps, type FormEvent, type ReactNode } from 'react'
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
@@ -25,6 +25,7 @@ import { PriorityPicker } from './PriorityPicker'
 import { StatusIcon } from './StatusIcon'
 import { StatusPicker } from './StatusPicker'
 import { ownWrite } from '@/lib/realtime'
+import { GitHubMark } from '@/features/repos/components/GitHubMark'
 
 /**
  * Plain text (one paragraph per line) followed by the attached images → a
@@ -322,7 +323,7 @@ export function CreateIssueDialog({
             {repos.length > 0 && (
               <RepoPicker value={repoId} repos={repos} onChange={setRepoId}>
                 <Chip>
-                  <GitBranch className="size-3.5 text-muted-foreground" />
+                  <GitHubMark className="size-3.5 text-muted-foreground" />
                   {repo ? repo.name : 'Repository'}
                 </Chip>
               </RepoPicker>

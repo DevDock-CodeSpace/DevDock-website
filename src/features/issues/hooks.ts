@@ -18,6 +18,7 @@ import {
   type IssueDetail,
   type IssuePatch,
 } from './api'
+import { announceBranch } from './copyBranch'
 import { readFilters, writeFilters, type IssueFilters } from './filters'
 import { ownSave, ownWrite } from '@/lib/realtime'
 
@@ -52,9 +53,7 @@ export function useCreateIssueBranch() {
       for (const table of ['issue_activity', 'issue_branches']) ownWrite(table, issue.id, 15_000)
       return createIssueBranch(issue.id)
     },
-    onSuccess: ({ branch, created }) => {
-      if (created) toast.success(`Created branch ${branch.name}`)
-    },
+    onSuccess: ({ branch, created }) => void announceBranch(branch.name, created),
     onError: (error) => toast.error(errorMessage(error)),
     onSettled: (_data, _error, issue) => {
       // The project's only repo becomes the issue's repo when it had none; only then do the lists change.

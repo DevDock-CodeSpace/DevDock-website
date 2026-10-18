@@ -1,4 +1,4 @@
-import { CircleUserRound, GitBranch, IterationCw, ListFilter, Tag, X } from 'lucide-react'
+import { CircleUserRound, IterationCw, ListFilter, Tag, X } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { PersonAvatar } from '@/components/PersonRow'
 import { Button } from '@/components/ui/button'
@@ -20,6 +20,7 @@ import { labelDotClass, PRIORITY_ORDER, priorityLabel, STATUS_ORDER, statusLabel
 import { Picker, type PickerOption } from './Picker'
 import { PriorityIcon } from './PriorityIcon'
 import { StatusIcon } from './StatusIcon'
+import { GitHubMark } from '@/features/repos/components/GitHubMark'
 
 const facetIcon: Record<FilterFacet, ReactNode> = {
   status: <StatusIcon status="in_progress" />,
@@ -27,7 +28,7 @@ const facetIcon: Record<FilterFacet, ReactNode> = {
   assignee: <CircleUserRound className="size-3.5" />,
   label: <Tag className="size-3.5" />,
   cycle: <IterationCw className="size-3.5" />,
-  repo: <GitBranch className="size-3.5" />,
+  repo: <GitHubMark className="size-3.5" />,
 }
 
 /** The values a facet can take, with labels and icons (menus and chips share them). */
@@ -70,8 +71,8 @@ function useFacetOptions(): Record<FilterFacet, PickerOption[]> {
       repos.length === 0
         ? []
         : [
-            { value: 'none', label: 'No repository', icon: <GitBranch className="size-3.5 text-muted-foreground" /> },
-            ...repos.map((r) => ({ value: r.id, label: r.name, icon: <GitBranch className="size-3.5 text-muted-foreground" /> })),
+            { value: 'none', label: 'No repository', icon: <GitHubMark className="size-3.5 text-muted-foreground" /> },
+            ...repos.map((r) => ({ value: r.id, label: r.name, icon: <GitHubMark className="size-3.5 text-muted-foreground" /> })),
           ],
   }
 }
