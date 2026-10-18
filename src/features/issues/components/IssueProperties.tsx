@@ -1,5 +1,5 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
-import { CalendarDays, CircleUserRound, Gauge, GitBranch, GitPullRequestArrow, IterationCw, Tag, X } from 'lucide-react'
+import { CalendarDays, CircleUserRound, Gauge, GitPullRequestArrow, IterationCw, Tag, X } from 'lucide-react'
 import { useState, type ComponentProps, type ReactNode } from 'react'
 import { PersonAvatar } from '@/components/PersonRow'
 import { formatDate, localDateISO, timeAgo } from '@/lib/format'
@@ -20,6 +20,7 @@ import { PriorityPicker } from './PriorityPicker'
 import { RepoPicker } from './RepoPicker'
 import { StatusIcon } from './StatusIcon'
 import { StatusPicker } from './StatusPicker'
+import { GitHubMark } from '@/features/repos/components/GitHubMark'
 
 /** Whole-hour estimate buckets. */
 const NONE = 'none'
@@ -151,7 +152,7 @@ export function IssueProperties({
         <Row label="Repo">
           <RepoPicker value={issue.repo_id} repos={repos} onChange={(repo_id) => update.mutate({ issue, patch: { repo_id } })}>
             <Value muted={!repo}>
-              <GitBranch className="size-4" />
+              <GitHubMark className="size-4" />
               <span className="truncate">{repo ? repo.name : 'No repository'}</span>
             </Value>
           </RepoPicker>

@@ -1,6 +1,8 @@
-import { ChevronsUpDown, LogOut, ShieldCheck } from 'lucide-react'
+import { Ellipsis, LogOut, ShieldCheck } from 'lucide-react'
+import { useState } from 'react'
 import { Link } from 'react-router'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,16 +16,17 @@ import { initials } from '@/lib/utils'
 import { useSignOut, useUserIdentity } from '../hooks'
 
 /**
- * Signed-in user in the sidebar footer: avatar + name. Clicking opens the
- * account menu upward, as wide as the sidebar (like ChatGPT's), with the email
- * in its header and Sign out.
+ * Signed-in user in the sidebar footer (Vercel-style): avatar + name, then a round
+ * "…" button. Both open the same account menu upward, as wide as the name, with
+ * the email in its header and Sign out. Collapsed to icons, only the avatar shows.
  */
 export function UserMenu() {
   const { name, email, avatarUrl, profileUnavailable } = useUserIdentity()
   const signOut = useSignOut()
+  const [open, setOpen] = useState(false)
 
   const avatar = (
-    <Avatar className="size-8 rounded-full">
+    <Avatar className="size-7 rounded-full">
       {/* Google avatar URLs can reject requests that send a Referer. */}
       {avatarUrl && <AvatarImage src={avatarUrl} alt="" referrerPolicy="no-referrer" />}
       <AvatarFallback className="rounded-full text-xs">{initials(name)}</AvatarFallback>
@@ -32,17 +35,16 @@ export function UserMenu() {
 
   return (
     <SidebarMenu>
-      <SidebarMenuItem>
-        <DropdownMenu>
+      <SidebarMenuItem className="flex flex-wrap items-center gap-1.5">
+        <DropdownMenu open={open} onOpenChange={setOpen}>
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton
               size="lg"
               tooltip={name}
-              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+              className="min-w-0 flex-1 gap-2.5 data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               {avatar}
               <span className="min-w-0 flex-1 truncate text-left text-sm font-medium">{name}</span>
-              <ChevronsUpDown className="ml-auto size-4 text-muted-foreground" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent
@@ -82,8 +84,18 @@ export function UserMenu() {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        <Button
+          variant="outline"
+          size="icon-sm"
+          className="shrink-0 rounded-full bg-transparent text-muted-foreground hover:text-foreground group-data-[collapsible=icon]:hidden"
+          aria-label="Account menu"
+          aria-expanded={open}
+          onClick={() => setOpen(true)}
+        >
+          <Ellipsis />
+        </Button>
         {signOut.isError && (
-          <p role="alert" className="px-2 pt-1 text-xs text-destructive">
+          <p role="alert" className="basis-full px-2 pt-1 text-xs text-destructive">
             {signOut.error.message}
           </p>
         )}

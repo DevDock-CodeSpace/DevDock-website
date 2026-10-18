@@ -24,6 +24,7 @@ import {
   threadUnreadQuery,
   unreadCountsQuery,
   type Message,
+  type UnreadCount,
 } from '../api'
 import { useSendMessage, useSetNotificationMode } from '../hooks'
 import { displayName, formatDay, GROUP_WINDOW_MS, isPendingMessage, sameDay } from '../names'
@@ -120,7 +121,25 @@ export function ConversationView({ conversationId, kind, description, teamId, te
     // The count can lag a new message by a moment; this runs again when it arrives.
     if (markedId.current !== latest.id && unreadHere !== 0) {
       markedId.current = latest.id
-      markConversationRead(conversationId, latest.id).catch((error: unknown) => console.error('[messaging] Could not mark read', error))
+      // The badges drop at once, not when the receipt's echo arrives: a tab that is just
+      // reconnecting (back after being hidden) can miss that echo and keep the old count.
+      const unreadKey = conversationKeys.unread(teamId)
+      queryClient.setQueryData(unreadKey, (rows: UnreadCount[] | undefined) =>
+        rows?.map((row) => (row.conversation_id === conversationId ? { ...row, unread_count: 0, mention_count: 0 } : row)),
+      )
+      markConversationRead(conversationId, latest.id)
+        .then(() => {
+          // A count fetched before the receipt was saved would bring the old number back.
+          const row = queryClient.getQueryData<UnreadCount[]>(unreadKey)?.find((r) => r.conversation_id === conversationId)
+          if ((row?.unread_count ?? 0) > 0 || queryClient.isFetching({ queryKey: unreadKey }) > 0) {
+            void queryClient.invalidateQueries({ queryKey: unreadKey })
+          }
+        })
+        .catch((error: unknown) => {
+          console.error('[messaging] Could not mark read', error)
+          markedId.current = undefined
+          void queryClient.invalidateQueries({ queryKey: unreadKey })
+        })
     }
     // Reading the conversation also clears its bell notifications: all of them when it
     // opens, afterwards those for new messages (a reply's stays until its thread is read).
@@ -133,7 +152,7 @@ export function ConversationView({ conversationId, kind, description, teamId, te
     if (!batch || batch === clearedNotices.current) return
     clearedNotices.current = batch
     markConversationNotificationsRead(conversationId, user.id).catch((error: unknown) => console.error('[messaging] Could not clear notifications', error))
-  }, [messages, conversationId, user.id, unreadHere, notices])
+  }, [messages, conversationId, teamId, user.id, unreadHere, notices, queryClient])
 
   useLayoutEffect(() => {
     const el = scroller.current
@@ -194,6 +213,12 @@ export function ConversationView({ conversationId, kind, description, teamId, te
     if (el) {
       atBottom.current = false
       el.scrollIntoView({ block: 'center' })
+      // Where that leaves the view decides whether it counts as read. A message already in
+      // view (usually the latest, from a notification) doesn't scroll at all, so no scroll
+      // event would ever say the reader is at the bottom.
+      const box = scroller.current
+      atBottom.current = box !== null && box.scrollHeight - box.scrollTop - box.clientHeight < BOTTOM_SLACK
+      if (atBottom.current) markRead()
       // Plain DOM classes: a short outline that needs no re-render.
       el.classList.add(...HIGHLIGHT_CLASSES)
       window.clearTimeout(highlightTimer.current)
@@ -203,7 +228,7 @@ export function ConversationView({ conversationId, kind, description, teamId, te
       toast.error('That message is no longer available.')
       onTargetHandled()
     }
-  }, [targetMessageId, messages, ready, giveUp, onTargetHandled])
+  }, [targetMessageId, messages, ready, giveUp, onTargetHandled, markRead])
   useEffect(() => () => window.clearTimeout(highlightTimer.current), [])
 
   const subtitle = description || (kind === 'channel' ? `${people.length} members` : kind === 'dm' ? 'Direct message' : `${members.length} participant${members.length === 1 ? '' : 's'}`)

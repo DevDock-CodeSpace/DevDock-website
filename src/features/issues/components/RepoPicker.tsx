@@ -1,6 +1,6 @@
-import { GitBranch } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { repoFullName, type Repo } from '@/features/repos/api'
+import { GitHubMark } from '@/features/repos/components/GitHubMark'
 import { Picker } from './Picker'
 
 const NONE = 'none'
@@ -29,11 +29,11 @@ export function RepoPicker({
         if (next !== value) onChange(next)
       }}
       options={[
-        { value: NONE, label: 'No repository', icon: <GitBranch className="size-3.5 text-muted-foreground" /> },
+        { value: NONE, label: 'No repository', icon: <GitHubMark className="size-3.5 text-muted-foreground" /> },
         ...repos.map((r) => ({
           value: r.id,
           label: repoFullName(r),
-          icon: <GitBranch className="size-3.5 text-muted-foreground" />,
+          icon: <GitHubMark className="size-3.5 text-muted-foreground" />,
         })),
       ]}
     >
