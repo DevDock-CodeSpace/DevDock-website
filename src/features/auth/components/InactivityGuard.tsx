@@ -10,13 +10,15 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { useInactivityLogout } from '@/hooks/use-inactivity-logout'
-import { INACTIVE_REASON, INACTIVITY_LIMIT_MS, WARNING_MS } from '@/lib/inactivity-config'
+import { sessionExpired } from '@/lib/auth-storage'
+import { EXPIRED_REASON, INACTIVE_REASON, INACTIVITY_CHECK_MS, INACTIVITY_LIMIT_MS, WARNING_MS } from '@/lib/inactivity-config'
 import { queryClient } from '@/lib/query-client'
-import { signOutForInactivity } from '../api'
+import { signOutForInactivity, signOutForSessionLimit } from '../api'
 import { safeNextPath } from '../redirect'
 
 /**
- * Signs out a person who has been away for INACTIVITY_LIMIT_MS, asking first.
+ * Signs out a person who has been away for INACTIVITY_LIMIT_MS, asking first,
+ * and a session that has reached its time limit (lib/auth-storage), without asking.
  * Rendered once on the `app` route, so only where there is a session.
  */
 export function InactivityGuard() {
@@ -37,6 +39,40 @@ export function InactivityGuard() {
   }, [navigate, here])
 
   const { staySignedIn } = useInactivityLogout({ limitMs: INACTIVITY_LIMIT_MS, warningMs: WARNING_MS, onWarn: setDeadline, onLogout })
+
+  // The session's own time limit, asked on the same rhythm as the inactivity clock.
+  // requireUser asks on every navigation; this covers a page that stays open.
+  useEffect(() => {
+    let ending = false
+    const check = () => {
+      if (ending || !sessionExpired()) return
+      ending = true
+      void signOutForSessionLimit()
+        .then(() => {
+          queryClient.clear()
+          const search = new URLSearchParams({ reason: EXPIRED_REASON })
+          const next = safeNextPath(here)
+          if (next !== '/app') search.set('next', next)
+          navigate(`/login?${search}`, { replace: true })
+        })
+        // Offline: the next check tries again.
+        .catch(() => {
+          ending = false
+        })
+    }
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') check()
+    }
+    const interval = window.setInterval(check, INACTIVITY_CHECK_MS)
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', check)
+    check()
+    return () => {
+      window.clearInterval(interval)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', check)
+    }
+  }, [navigate, here])
 
   if (deadline === null) return null
   return (

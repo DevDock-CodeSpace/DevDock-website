@@ -11,7 +11,10 @@ type Options = {
   onLogout: () => Promise<void>
 }
 
-const INPUT_EVENTS = ['pointerdown', 'pointermove', 'keydown', 'scroll', 'touchstart', 'wheel'] as const
+// Only what a person does. Not `scroll`: the page scrolls itself (a chat list
+// following new messages), and a person's own scrolling arrives as wheel, touch,
+// keys or a press on the scrollbar.
+const INPUT_EVENTS = ['pointerdown', 'pointermove', 'keydown', 'touchstart', 'wheel'] as const
 
 /**
  * Signs the person out after `limitMs` without input in any of their tabs (see
@@ -44,7 +47,19 @@ export function useInactivityLogout({ limitMs, warningMs, onWarn, onLogout }: Op
     })
     watch.current = running
 
-    const onInput = () => running.activity()
+    // Browsers also send pointermove when the page changes under a pointer that hasn't
+    // moved; those, and events the page dispatches itself, aren't anyone's input.
+    let pointerAt = ''
+    const onInput = (event: Event) => {
+      if (!event.isTrusted) return
+      if (event.type === 'pointermove') {
+        const { screenX, screenY } = event as PointerEvent
+        const at = `${screenX},${screenY}`
+        if (at === pointerAt) return
+        pointerAt = at
+      }
+      running.activity()
+    }
     const check = () => void running.check()
     const onVisible = () => {
       if (document.visibilityState === 'visible') check()

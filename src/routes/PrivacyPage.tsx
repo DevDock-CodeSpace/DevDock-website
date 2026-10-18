@@ -99,7 +99,9 @@ export function PrivacyPage() {
         <Section title="In your browser">
           <p>
             DevDock keeps your sign-in session and a few preferences in your browser: light or dark theme, the last
-            group you opened, and whether some panels are open. There are no ads, no analytics and no tracking.
+            group you opened, and whether some panels are open. The session stays in the tab you signed in with and
+            ends after 4 hours; if you tick “Remember me”, this browser keeps it for up to 12 hours. Either way you are
+            signed out after 15 minutes without use. There are no ads, no analytics and no tracking.
           </p>
         </Section>
 
