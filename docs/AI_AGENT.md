@@ -114,8 +114,8 @@ switch (the panel then says the assistant is switched off).
 Moving from the free tier to a paid key is a change of `GEMINI_API_KEY` only. Moving to another model family is a
 new file in `providers/` and one entry in `providers/index.ts`.
 
-Deploy: `supabase db push` (the `ai_pending_actions` migration), `supabase functions deploy ai-agent`, set the
-secrets.
+Deploy: a push to `prod` applies the migration and deploys the function (`.github/workflows/deploy-supabase.yml`;
+by hand: `supabase db push`, `supabase functions deploy ai-agent`). Set the secrets by hand, once.
 
 ## Testing
 
