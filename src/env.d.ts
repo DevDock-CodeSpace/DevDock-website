@@ -5,6 +5,8 @@ interface ImportMetaEnv {
   readonly VITE_SUPABASE_PUBLISHABLE_KEY?: string
   /** The DevDock GitHub App's public slug (github.com/apps/<slug>). Optional. */
   readonly VITE_GITHUB_APP_SLUG?: string
+  /** Minutes without input before a person is signed out. Optional; 15 when unset. */
+  readonly VITE_INACTIVITY_LIMIT_MINUTES?: string
 }
 
 interface ImportMeta {
