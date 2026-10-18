@@ -3,7 +3,7 @@
 
 import { Constants } from '../../../../src/types/database.types.ts'
 import { buildSystemPrompt, readHistory } from '../agent/prompt.ts'
-import { rangeOf, safeTimeZone } from '../agent/time.ts'
+import { localTimeOfDay, rangeOf, safeTimeZone, zonedInstant } from '../agent/time.ts'
 import { AiProviderError, type AiMessage } from '../agent/types.ts'
 import { createGeminiProvider } from '../providers/gemini.ts'
 import { createProvider } from '../providers/index.ts'
@@ -115,7 +115,7 @@ Deno.test('provider: chosen from the environment, absent without a key', () => {
   assertEquals([provider?.name, provider?.model], ['gemini', 'my-model'])
 })
 
-Deno.test('catalogue: the nine tools, their domains and risks', () => {
+Deno.test('catalogue: the fourteen tools, their domains and risks', () => {
   const registry = createToolRegistry()
   assertEquals(
     registry.list().map((t) => `${t.domain}/${t.capability} ${t.definition.name} ${t.executor.risk}`),
@@ -129,6 +129,11 @@ Deno.test('catalogue: the nine tools, their domains and risks', () => {
       'messaging/send send_message external',
       'meetings/search get_upcoming_meetings read',
       'meetings/get get_meeting read',
+      'reminders/create create_reminder write',
+      'reminders/search list_reminders read',
+      'reminders/update update_reminder write',
+      'reminders/complete complete_reminder write',
+      'reminders/cancel cancel_reminder write',
     ],
   )
   // Only the message send asks first, and every confirmed tool can be prepared.
@@ -183,6 +188,20 @@ Deno.test('time: named ranges follow the person’s time zone', () => {
   const dst = rangeOf('today', new Date('2026-11-01T12:00:00Z'), 'America/New_York')
   assertEquals((dst.to.getTime() - dst.from.getTime()) / 3_600_000, 25)
   assertEquals([safeTimeZone('Not/AZone'), safeTimeZone(42), safeTimeZone('Europe/Paris')], ['UTC', 'UTC', 'Europe/Paris'])
+})
+
+Deno.test('time: a local date and time becomes the right instant in the zone', () => {
+  assertEquals(zonedInstant('2026-10-19', '09:00', 'UTC'), new Date('2026-10-19T09:00:00Z'))
+  assertEquals(zonedInstant('2026-10-19', '09:00', 'Asia/Kolkata'), new Date('2026-10-19T03:30:00Z'))
+  // New York: EDT (-4) before Nov 1, 2026, EST (-5) after; the wall-clock time is kept on both sides.
+  assertEquals(zonedInstant('2026-10-31', '09:00', 'America/New_York'), new Date('2026-10-31T13:00:00Z'))
+  assertEquals(zonedInstant('2026-11-02', '09:00', 'America/New_York'), new Date('2026-11-02T14:00:00Z'))
+  // 02:30 doesn't exist on Mar 14, 2027 in Chicago; it lands just after the gap, an hour on.
+  assertEquals(zonedInstant('2027-03-14', '02:30', 'America/Chicago'), new Date('2027-03-14T08:30:00Z'))
+  // 01:30 happens twice on Nov 7, 2027 in Chicago; the first one (CDT) is meant.
+  assertEquals(zonedInstant('2027-11-07', '01:30', 'America/Chicago'), new Date('2027-11-07T06:30:00Z'))
+  assertEquals(localTimeOfDay(new Date('2026-10-19T03:30:00Z'), 'Asia/Kolkata'), '09:00')
+  assertEquals(localTimeOfDay(new Date('2026-10-19T23:05:00Z'), 'UTC'), '23:05')
 })
 
 Deno.test('text: plain text and TipTap documents convert both ways, whatever is stored', () => {

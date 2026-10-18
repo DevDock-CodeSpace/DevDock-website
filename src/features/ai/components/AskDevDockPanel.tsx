@@ -38,7 +38,7 @@ function toHistory(turns: Turn[]): AiHistoryTurn[] {
     .slice(-HISTORY_TURNS)
 }
 
-const EXAMPLES = ['Show me my open issues', 'What meetings do I have today?', 'Create an issue called Fix login redirect']
+const EXAMPLES = ['Show me my open issues', 'What meetings do I have today?', 'Remind me tomorrow at 9 to review my PRs']
 
 /** The Ask DevDock side panel. Lazy-loaded by AskDevDockButton; default export for `lazy()`. */
 export default function AskDevDockPanel({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
