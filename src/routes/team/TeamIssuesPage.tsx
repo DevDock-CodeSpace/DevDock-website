@@ -9,20 +9,26 @@ import { useAuth } from '@/features/auth/hooks'
 import { useCollectionView } from '@/features/collections/hooks'
 import { teamIssuesQuery, type TeamIssue } from '@/features/issues/api'
 import { PriorityIcon } from '@/features/issues/components/PriorityIcon'
+import { PriorityPicker } from '@/features/issues/components/PriorityPicker'
 import { StatusIcon } from '@/features/issues/components/StatusIcon'
+import { StatusPicker } from '@/features/issues/components/StatusPicker'
 import { applyFilters, ISSUE_TABS, NO_FILTERS, readTab } from '@/features/issues/filters'
-import { compareIssues, isClosed, issueIdentifier, STATUS_ORDER, statusLabel } from '@/features/issues/meta'
+import { useUpdateTeamIssue } from '@/features/issues/hooks'
+import { compareIssues, isClosed, issueIdentifier, priorityLabel, STATUS_ORDER, statusLabel } from '@/features/issues/meta'
 import { useCurrentTeam } from '@/features/teams/hooks'
 import { hasTeamIssues, issuePath, teamIssuesPath } from '@/features/teams/nav'
 import { timeAgo } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 const ALL = 'all'
+const iconButton =
+  'relative z-10 flex size-6 shrink-0 items-center justify-center rounded-sm hover:bg-muted focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none'
 
 /**
  * Group → Issues (groups with a project): issues from every project you can see,
  * grouped by status. Tabs (All / Active / Backlog / My issues) and a project
- * filter live in the URL. Rows open the issue inside its project, where it's edited.
+ * filter live in the URL. Rows open the issue inside its project; status and
+ * priority are menus here too (`useUpdateTeamIssue`).
  */
 export function TeamIssuesPage() {
   const { user } = useAuth()
@@ -33,6 +39,7 @@ export function TeamIssuesPage() {
   const where = collection ? collection.name : team.name
   const [params, setParams] = useSearchParams()
   const [now] = useState(Date.now)
+  const update = useUpdateTeamIssue(team.id)
 
   if (!hasTeamIssues(collection?.type ?? team.type, workspaces)) {
     return (
@@ -136,11 +143,20 @@ export function TeamIssuesPage() {
                 <ul className="divide-y border-b last:border-b-0">
                   {items.map((issue) => (
                     <li key={issue.id} className="relative flex h-10 items-center gap-3 px-3 text-sm hover:bg-muted/50">
-                      <PriorityIcon priority={issue.priority} />
+                      {/* Menus sit above the row's stretched link, as in the project's list. */}
+                      <PriorityPicker value={issue.priority} onChange={(priority) => update.mutate({ issue, patch: { priority } })}>
+                        <button type="button" className={iconButton} aria-label={`Priority: ${priorityLabel[issue.priority]}`}>
+                          <PriorityIcon priority={issue.priority} />
+                        </button>
+                      </PriorityPicker>
                       <span className="w-16 shrink-0 font-mono text-xs text-muted-foreground">
                         {issueIdentifier(issue.workspace.issue_key, issue.number)}
                       </span>
-                      <StatusIcon status={issue.status} />
+                      <StatusPicker value={issue.status} onChange={(status) => update.mutate({ issue, patch: { status } })}>
+                        <button type="button" className={iconButton} aria-label={`Status: ${statusLabel[issue.status]}`}>
+                          <StatusIcon status={issue.status} />
+                        </button>
+                      </StatusPicker>
                       <Link
                         to={issuePath(team.slug, issue.workspace.id, issue.number)}
                         className={cn(

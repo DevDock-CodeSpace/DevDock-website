@@ -159,6 +159,70 @@ export function useUpdateIssue() {
   })
 }
 
+type TeamUpdateVars = { issue: Pick<Issue, 'id' | 'number' | 'status'> & { workspace: { id: string } }; patch: IssuePatch }
+
+/**
+ * `useUpdateIssue` for the group-wide Issues page, which isn't inside a project:
+ * the same optimistic edit (rolled back with a toast), on the group's list. Moving
+ * an issue into In Progress creates its branch, as in the project, when the project
+ * has repos; they're looked up only then (cached after), so the page loads nothing extra.
+ */
+export function useUpdateTeamIssue(teamId: string) {
+  const queryClient = useQueryClient()
+  const listKey = ['issues', 'team', teamId]
+
+  const startBranch = async (issue: TeamUpdateVars['issue']) => {
+    const repos = await queryClient.fetchQuery(workspaceReposQuery(issue.workspace.id))
+    if (repos.length === 0) return
+    for (const table of ['issue_activity', 'issue_branches']) ownWrite(table, issue.id, 15_000)
+    try {
+      const { branch, created } = await createIssueBranch(issue.id)
+      if (created) toast.success(`Created branch ${branch.name}`)
+    } catch (error) {
+      toast.error(errorMessage(error))
+    } finally {
+      // It may also have set the issue's repo.
+      void queryClient.invalidateQueries({ queryKey: issueKeys.branches(issue.id) })
+      void queryClient.invalidateQueries({ queryKey: listKey })
+    }
+  }
+
+  return useMutation({
+    scope: { id: `issues:team:${teamId}` },
+    mutationFn: async ({ issue, patch }: TeamUpdateVars) => {
+      ownWrite('issue_activity', issue.id)
+      const done = ownSave('issues', issue.id)
+      try {
+        done(await updateIssue(issue.id, patch))
+      } catch (error) {
+        done()
+        throw error
+      }
+    },
+    onMutate: async ({ issue, patch }) => {
+      await queryClient.cancelQueries({ queryKey: listKey })
+      const previous = queryClient.getQueryData<Issue[]>(listKey)
+      queryClient.setQueryData<Issue[]>(listKey, (old) => old?.map((i) => (i.id === issue.id ? { ...i, ...patch } : i)))
+      return { previous }
+    },
+    onError: (error, _vars, context) => {
+      if (context) queryClient.setQueryData(listKey, context.previous)
+      toast.error(errorMessage(error))
+    },
+    onSuccess: (_data, { issue, patch }) => {
+      if (patch.status === 'in_progress' && issue.status !== 'in_progress') void startBranch(issue)
+    },
+    onSettled: (_data, error, { issue, patch }) => {
+      // The server adds `completed_at` on a status change; after a failure, ask for everything.
+      if (error !== null || patch.status !== undefined) void queryClient.invalidateQueries({ queryKey: listKey })
+      // The project's own list and the issue page, if they were opened earlier (refetched when shown).
+      void queryClient.invalidateQueries({ queryKey: issueKeys.workspace(issue.workspace.id), refetchType: 'none' })
+      void queryClient.invalidateQueries({ queryKey: issueKeys.detail(issue.workspace.id, issue.number), refetchType: 'none' })
+      void queryClient.invalidateQueries({ queryKey: issueKeys.activity(issue.id), refetchType: 'none' })
+    },
+  })
+}
+
 /** List ↔ Board, kept in the URL (?view=board) so it survives reloads and links. */
 export function useIssueView() {
   const [params, setParams] = useSearchParams()
