@@ -50,17 +50,21 @@ import {
   Zap,
   type LucideIcon,
 } from 'lucide-react'
+import { CLOUD_ICONS, CLOUD_PROVIDERS } from './cloud'
 import type { ColorKey } from './model'
 
 // Architecture icons for the shape panel. The key is what gets saved, so
 // never rename one; the label and icon can change freely.
 
-export const ICON_GROUPS = ['Clients', 'Compute', 'Data', 'Network', 'Messaging', 'Security', 'Dev & ops'] as const
-type IconGroup = (typeof ICON_GROUPS)[number]
+const GENERIC_GROUPS = ['Clients', 'Compute', 'Data', 'Network', 'Messaging', 'Security', 'Dev & ops'] as const
+/** Generic icons first, then each cloud provider's official icons. */
+export const ICON_GROUPS = [...GENERIC_GROUPS, ...CLOUD_PROVIDERS] as const
+type IconGroup = (typeof GENERIC_GROUPS)[number] | (typeof CLOUD_PROVIDERS)[number]
 
-type IconDef = { label: string; icon: LucideIcon; group: IconGroup; color: ColorKey }
+/** A generic icon is a Lucide glyph (`icon`) tinted by the node's color; a cloud icon is the provider's own image (`src`), never recolored. */
+type IconDef = { label: string; group: IconGroup; color: ColorKey } & ({ icon: LucideIcon; src?: undefined } | { icon?: undefined; src: string })
 
-const groupColor: Record<IconGroup, ColorKey> = {
+const groupColor: Record<(typeof GENERIC_GROUPS)[number], ColorKey> = {
   Clients: 'default',
   Compute: 'blue',
   Data: 'green',
@@ -128,10 +132,16 @@ const defs = {
   docs: ['Docs', FileText, 'Dev & ops'],
 } as const satisfies Record<string, readonly [string, LucideIcon, IconGroup]>
 
-export type IconKey = keyof typeof defs
+/** A generic icon's key, or a cloud icon's (`aws-lambda`, `azure-functions`, `gcp-cloud-run`). */
+export type IconKey = keyof typeof defs | (string & {})
 
-export const ICONS = Object.fromEntries(
-  Object.entries(defs).map(([key, [label, icon, group]]) => [key, { label, icon, group, color: groupColor[group] }]),
-) as Record<IconKey, IconDef>
+export const ICONS: Record<IconKey, IconDef> = {
+  ...(Object.fromEntries(
+    Object.entries(defs).map(([key, [label, icon, group]]) => [key, { label, icon, group, color: groupColor[group] }]),
+  ) as Record<keyof typeof defs, IconDef>),
+  ...Object.fromEntries(
+    Object.entries(CLOUD_ICONS).map(([key, { label, provider, src }]) => [key, { label, src, group: provider, color: 'default' as ColorKey }]),
+  ),
+}
 
-export const ICON_KEYS = Object.keys(defs) as IconKey[]
+export const ICON_KEYS = Object.keys(ICONS) as IconKey[]

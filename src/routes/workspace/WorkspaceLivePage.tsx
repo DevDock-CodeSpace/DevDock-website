@@ -1,7 +1,7 @@
-import { useSuspenseQuery } from '@tanstack/react-query'
 import { ArrowRight } from 'lucide-react'
+import { useMemo } from 'react'
 import { Link } from 'react-router'
-import { workspaceLiveSessionsQuery } from '@/features/live/api'
+import type { MeetingsScope } from '@/features/live/api'
 import { MeetingsView } from '@/features/live/components/MeetingsView'
 import { useCalendarQueue, useNow } from '@/features/live/hooks'
 import { useCurrentTeam, useCurrentWorkspace } from '@/features/teams/hooks'
@@ -12,12 +12,12 @@ export function WorkspaceLivePage() {
   useCalendarQueue()
   const { team } = useCurrentTeam()
   const { workspace, can } = useCurrentWorkspace()
-  const sessions = useSuspenseQuery(workspaceLiveSessionsQuery(workspace.id)).data
+  const scope = useMemo<MeetingsScope>(() => ({ kind: 'workspace', workspaceId: workspace.id }), [workspace.id])
   const now = useNow()
 
   return (
     <MeetingsView
-      sessions={sessions}
+      scope={scope}
       now={now}
       workspaceId={workspace.id}
       href={(session) => liveSessionPath(team.slug, session.id, workspace.id)}

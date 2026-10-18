@@ -5,13 +5,16 @@ type EditableTextProps = {
   value: string
   onDone: (value: string | null) => void
   className?: string
+  /** Enter starts a new line (paragraphs, lists, table rows); Ctrl/⌘+Enter or clicking away saves. */
+  multiline?: boolean
 }
 
 /**
  * In-place text editing for shapes and connectors. Enter saves (Shift+Enter
- * for a new line), Escape cancels, clicking away saves. `onDone(null)` = cancelled.
+ * for a new line; with `multiline`, Enter is a new line and Ctrl/⌘+Enter saves),
+ * Escape cancels, clicking away saves. `onDone(null)` = cancelled.
  */
-export function EditableText({ value, onDone, className }: EditableTextProps) {
+export function EditableText({ value, onDone, className, multiline }: EditableTextProps) {
   const ref = useRef<HTMLDivElement>(null)
   const done = useRef(false)
   // The element owns the text while editing; it starts from the value at mount.
@@ -48,7 +51,7 @@ export function EditableText({ value, onDone, className }: EditableTextProps) {
       )}
       onKeyDown={(e) => {
         e.stopPropagation()
-        if (e.key === 'Enter' && !e.shiftKey) {
+        if (e.key === 'Enter' && (multiline ? e.metaKey || e.ctrlKey : !e.shiftKey)) {
           e.preventDefault()
           finish(ref.current?.innerText.replace(/\n$/, '') ?? value)
         } else if (e.key === 'Escape') {
