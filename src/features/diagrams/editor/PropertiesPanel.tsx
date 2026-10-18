@@ -20,7 +20,7 @@ import { Input } from '@/components/ui/input'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { bgClass, borderClass, COLOR_KEYS, colorNames, FILL_KEYS, swatchClass } from './colors'
-import type { ColorKey, ConnectorData, DiagramEdge, DiagramNode, DiagramNodeData, FillKey } from './model'
+import { blockLabels, type ColorKey, type ConnectorData, type DiagramEdge, type DiagramNode, type DiagramNodeData, type FillKey } from './model'
 
 export type Alignment = 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom'
 
@@ -83,8 +83,18 @@ function NodeOptions({ nodes, onNodes, onAlign, onDistribute }: PropertiesPanelP
           <TextField
             key={single.id}
             value={single.data.label}
-            placeholder="Text"
+            placeholder={single.type === 'block' ? (single.data.block === 'table' ? 'Table name' : 'Heading') : 'Text'}
             onCommit={(label) => onNodes({ label })}
+          />
+        )}
+        {single?.type === 'block' && single.data.block !== 'heading' && (
+          <TextAreaField
+            key={`${single.id}:body`}
+            value={single.data.body ?? ''}
+            placeholder={
+              single.data.block === 'table' ? 'One column per line: name type PK/FK' : single.data.block === 'list' ? 'One point per line' : 'Paragraph'
+            }
+            onCommit={(body) => onNodes({ body })}
           />
         )}
       </Group>
@@ -219,8 +229,10 @@ const shortcuts: [string, string][] = [
   ['⌘ + scroll / pinch', 'Zoom'],
   ['⌘Z / ⇧⌘Z', 'Undo / redo'],
   ['⌘C ⌘V ⌘D', 'Copy, paste, duplicate'],
+  ['⌘C here, ⌘V there', 'Copy to another diagram'],
   ['⌘A', 'Select all'],
-  ['Arrows', 'Nudge (⇧ = 10px)'],
+  ['Arrows', 'Nudge (⇧ = 10px; a grid step when snapping)'],
+  ['⌘Enter', 'Finish a paragraph, list or table'],
   ['⌫', 'Delete'],
 ]
 
@@ -257,6 +269,7 @@ function CanvasOptions({ snapToGrid, onSnapToGrid }: PropertiesPanelProps) {
 function kindTitle(node: DiagramNode) {
   if (node.type === 'container') return 'Container'
   if (node.type === 'icon') return 'Icon'
+  if (node.type === 'block') return blockLabels[node.data.block ?? 'paragraph']
   return node.data.shape === 'text' ? 'Text' : 'Shape'
 }
 
@@ -286,6 +299,26 @@ function TextField({ value, placeholder, onCommit }: { value: string; placeholde
       onKeyDown={(e) => {
         e.stopPropagation()
         if (e.key === 'Enter') commit()
+        if (e.key === 'Escape') setDraft(value)
+      }}
+    />
+  )
+}
+
+/** Several lines (a block's body): Enter is a new line; leaving the box saves, Escape undoes the edit. */
+function TextAreaField({ value, placeholder, onCommit }: { value: string; placeholder: string; onCommit: (v: string) => void }) {
+  const [draft, setDraft] = useState(value)
+  return (
+    <textarea
+      value={draft}
+      placeholder={placeholder}
+      aria-label={placeholder}
+      rows={4}
+      className="w-full resize-y rounded-md border bg-transparent px-2.5 py-1.5 font-mono text-xs leading-relaxed outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-brand"
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => draft !== value && onCommit(draft)}
+      onKeyDown={(e) => {
+        e.stopPropagation()
         if (e.key === 'Escape') setDraft(value)
       }}
     />

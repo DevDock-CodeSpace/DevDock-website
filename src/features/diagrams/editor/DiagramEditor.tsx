@@ -16,8 +16,10 @@ import {
   type XYPosition,
 } from '@xyflow/react'
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from 'react'
+import { toast } from 'sonner'
 import type { Json } from '@/types/database.types'
 import { cn } from '@/lib/utils'
+import { BlockNode } from './BlockNode'
 import { ConnectorEdge } from './ConnectorEdge'
 import { ContainerNode } from './ContainerNode'
 import { DiagramEditorContext } from './context'
@@ -28,6 +30,7 @@ import {
   createEdge,
   createNode,
   normalizeOrder,
+  parse,
   serialize,
   withDescendants,
   type ConnectorData,
@@ -39,16 +42,24 @@ import {
 } from './model'
 import { PropertiesPanel, type Alignment } from './PropertiesPanel'
 import { LIBRARY_DRAG_TYPE, ShapePanel } from './ShapePanel'
+import { readRecent, toLibraryItem, withoutRecent, withRecent } from './recent'
 import { ShapeNode } from './ShapeNode'
 import { Toolbar } from './Toolbar'
 import { useHistory } from './useHistory'
 
-const nodeTypes = { shape: ShapeNode, icon: IconNode, container: ContainerNode }
+const nodeTypes = { shape: ShapeNode, icon: IconNode, container: ContainerNode, block: BlockNode }
 const edgeTypes = { connector: ConnectorEdge }
 
 const GRID = 16
 const PROPERTIES_KEY = 'devdock-diagram-properties'
+const SNAP_KEY = 'devdock-diagram-snap'
 const PASTE_OFFSET = 24
+/** Starts what the editor puts on the clipboard, so a paste can tell its own content from any other text. */
+const CLIP_MARKER = 'devdock-diagram/v1\n'
+/** A larger paste is refused: nobody copies this much from one diagram. */
+const MAX_CLIP_CHARS = 2_000_000
+
+const snapValue = (v: number) => Math.round(v / GRID) * GRID
 
 // React Flow's own colors, pointed at DevDock's theme tokens.
 const flowStyle = {
@@ -61,6 +72,21 @@ const flowStyle = {
 
 type Rect = { x: number; y: number; w: number; h: number }
 type Clip = { nodes: DiagramNode[]; edges: DiagramEdge[] }
+
+const readStored = (key: string) => {
+  try {
+    return localStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+const store = (key: string, value: string) => {
+  try {
+    localStorage.setItem(key, value)
+  } catch {
+    // Storage unavailable (private mode): the choice lasts for this visit only.
+  }
+}
 
 type DiagramEditorProps = {
   initial: DiagramContent
@@ -86,7 +112,19 @@ function Editor({ initial, readOnly, onChange, fullscreen, onFullscreen }: Diagr
   const [edges, setEdges] = useState(initial.edges)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [guides, setGuides] = useState<Guides | null>(null)
-  const [snapToGrid, setSnapToGrid] = useState(false)
+  // Remembered in this browser, like the properties panel.
+  const [snapToGrid, setSnapToGridState] = useState(() => readStored(SNAP_KEY) === 'on')
+  const setSnapToGrid = (on: boolean) => {
+    setSnapToGridState(on)
+    store(SNAP_KEY, on ? 'on' : 'off')
+    // Nothing on the canvas moves when it's switched: say what changed.
+    toast(on ? 'Snap to grid on' : 'Snap to grid off', {
+      id: 'diagram-snap',
+      description: on
+        ? `Shapes now move, resize and nudge in ${GRID} px steps, so they line up on the grid.`
+        : 'Shapes move freely again, with alignment guides to other shapes.',
+    })
+  }
   // Collapsing the properties panel is a per-viewer preference, remembered in this browser.
   const [propertiesOpen, setPropertiesOpen] = useState(() => {
     try {
@@ -105,6 +143,8 @@ function Editor({ initial, readOnly, onChange, fullscreen, onFullscreen }: Diagr
     }
   }
   const canvas = useRef<HTMLDivElement>(null)
+  // The panel's "Recently used" (this browser only).
+  const [recent, setRecent] = useState(readRecent)
 
   const history = useHistory(
     useCallback(() => ({ nodes: flow.getNodes(), edges: flow.getEdges() }), [flow]),
@@ -257,6 +297,35 @@ function Editor({ initial, readOnly, onChange, fullscreen, onFullscreen }: Diagr
     [snapshot],
   )
 
+  /** After a resize with snapping on: the node's edges move to the nearest grid lines. */
+  const resized = useCallback(
+    (id: string) => {
+      if (!snapToGrid) return
+      const node = flow.getNode(id)
+      const rect = rectOf(id)
+      if (!node || !rect) return
+      const parent = node.parentId ? rectOf(node.parentId) : null
+      const x = snapValue(rect.x)
+      const y = snapValue(rect.y)
+      const width = Math.max(GRID, snapValue(rect.x + rect.w) - x)
+      const height = Math.max(GRID, snapValue(rect.y + rect.h) - y)
+      setNodes((ns) =>
+        ns.map((n) =>
+          n.id === id
+            ? {
+                ...n,
+                position: { x: x - (parent?.x ?? 0), y: y - (parent?.y ?? 0) },
+                width,
+                // A block's height follows its text.
+                ...(n.type === 'block' ? {} : { height }),
+              }
+            : n,
+        ),
+      )
+    },
+    [flow, rectOf, snapToGrid],
+  )
+
   // ------------------------------------------------------------ editing actions
   const updateNode = useCallback(
     (id: string, patch: Partial<DiagramNodeData>) => {
@@ -312,8 +381,13 @@ function Editor({ initial, readOnly, onChange, fullscreen, onFullscreen }: Diagr
           y: (box ? box.top + box.height / 2 : window.innerHeight / 2) + step,
         })
       }
-      if (snapToGrid) center = { x: Math.round(center.x / GRID) * GRID, y: Math.round(center.y / GRID) * GRID }
       const node = createNode(item, center)
+      if (snapToGrid) {
+        // Its edges on the grid, not just its center: the default sizes aren't multiples of it.
+        node.position = { x: snapValue(node.position.x), y: snapValue(node.position.y) }
+        if (node.width) node.width = Math.max(GRID, snapValue(node.width))
+        if (node.height) node.height = Math.max(GRID, snapValue(node.height))
+      }
       const rect = { ...node.position, w: node.width ?? 0, h: node.height ?? 0 }
       const parent = findContainer(rect, new Set())
       if (parent) {
@@ -321,6 +395,7 @@ function Editor({ initial, readOnly, onChange, fullscreen, onFullscreen }: Diagr
         node.position = { x: rect.x - parent.rect.x, y: rect.y - parent.rect.y }
       }
       insert([node])
+      setRecent((list) => withRecent(list, item))
     },
     [flow, findContainer, insert, snapToGrid],
   )
@@ -330,13 +405,19 @@ function Editor({ initial, readOnly, onChange, fullscreen, onFullscreen }: Diagr
       const raw = event.dataTransfer.getData(LIBRARY_DRAG_TYPE)
       if (!raw) return
       event.preventDefault()
-      addItem(JSON.parse(raw) as LibraryItem, flow.screenToFlowPosition({ x: event.clientX, y: event.clientY }))
+      // Checked like anything stored: a drop can come from another page.
+      let item: LibraryItem | null = null
+      try {
+        item = toLibraryItem(JSON.parse(raw))
+      } catch {
+        item = null
+      }
+      if (item) addItem(item, flow.screenToFlowPosition({ x: event.clientX, y: event.clientY }))
     },
     [addItem, flow],
   )
 
   // Copy/paste keeps a container's contents and the connectors between copied shapes.
-  const clipboard = useRef<Clip | null>(null)
   const pasteCount = useRef(0)
 
   const collectSelection = useCallback((): Clip | null => {
@@ -358,7 +439,7 @@ function Editor({ initial, readOnly, onChange, fullscreen, onFullscreen }: Diagr
   }, [flow, rectOf])
 
   const paste = useCallback(
-    (clip: Clip, offset: number) => {
+    (clip: Clip, offset: XYPosition) => {
       const map = new Map(clip.nodes.map((n) => [n.id, crypto.randomUUID()]))
       const newNodes = clip.nodes.map((n) => {
         const parentId = n.parentId ? map.get(n.parentId) : undefined
@@ -367,7 +448,7 @@ function Editor({ initial, readOnly, onChange, fullscreen, onFullscreen }: Diagr
           id: map.get(n.id) ?? crypto.randomUUID(),
           parentId,
           // Only top-level pasted nodes move; children stay put inside their pasted parent.
-          position: parentId ? n.position : { x: n.position.x + offset, y: n.position.y + offset },
+          position: parentId ? n.position : { x: n.position.x + offset.x, y: n.position.y + offset.y },
           data: { ...n.data },
         }
       })
@@ -383,23 +464,56 @@ function Editor({ initial, readOnly, onChange, fullscreen, onFullscreen }: Diagr
     [insert],
   )
 
-  const copy = useCallback(() => {
-    const clip = collectSelection()
-    if (!clip) return false
-    clipboard.current = clip
-    pasteCount.current = 0
-    return true
-  }, [collectSelection])
+  // The clipboard is the system's, so a copy can be pasted into another diagram (or
+  // another tab). What goes on it is the saved format; a paste goes through parse(),
+  // like anything loaded, and never trusts the text it finds.
+  const editorId = useRef(crypto.randomUUID())
 
-  const pasteClipboard = useCallback(() => {
-    if (!clipboard.current) return
-    pasteCount.current += 1
-    paste(clipboard.current, PASTE_OFFSET * pasteCount.current)
-  }, [paste])
+  /** Content copied in this editor is pasted a step down and right each time; content from elsewhere lands in the middle of the view. */
+  const pasteFromClipboard = useCallback(
+    (text: string) => {
+      if (!text.startsWith(CLIP_MARKER) || text.length > MAX_CLIP_CHARS) return false
+      let payload: unknown
+      try {
+        payload = JSON.parse(text.slice(CLIP_MARKER.length))
+      } catch {
+        return false
+      }
+      if (typeof payload !== 'object' || payload === null) return false
+      const clip = parse(payload as Json)
+      if (clip.nodes.length === 0) return false
+      const from = (payload as { from?: unknown }).from
+      if (from === editorId.current) {
+        pasteCount.current += 1
+        paste(clip, { x: PASTE_OFFSET * pasteCount.current, y: PASTE_OFFSET * pasteCount.current })
+        return true
+      }
+      const top = clip.nodes.filter((n) => !n.parentId)
+      const minX = Math.min(...top.map((n) => n.position.x))
+      const minY = Math.min(...top.map((n) => n.position.y))
+      const maxX = Math.max(...top.map((n) => n.position.x + (n.width ?? 0)))
+      const maxY = Math.max(...top.map((n) => n.position.y + (n.height ?? 0)))
+      const box = canvas.current?.getBoundingClientRect()
+      const center = flow.screenToFlowPosition({
+        x: box ? box.left + box.width / 2 : window.innerWidth / 2,
+        y: box ? box.top + box.height / 2 : window.innerHeight / 2,
+      })
+      let dx = center.x - (minX + maxX) / 2
+      let dy = center.y - (minY + maxY) / 2
+      // Keep things on the grid they came from.
+      if (snapToGrid) {
+        dx = snapValue(dx)
+        dy = snapValue(dy)
+      }
+      paste(clip, { x: Math.round(dx), y: Math.round(dy) })
+      return true
+    },
+    [flow, paste, snapToGrid],
+  )
 
   const duplicate = useCallback(() => {
     const clip = collectSelection()
-    if (clip) paste(clip, PASTE_OFFSET)
+    if (clip) paste(clip, { x: PASTE_OFFSET, y: PASTE_OFFSET })
   }, [collectSelection, paste])
 
   const deleteSelection = useCallback(() => {
@@ -499,18 +613,6 @@ function Editor({ initial, readOnly, onChange, fullscreen, onFullscreen }: Diagr
       } else if (mod && key === 'y') {
         event.preventDefault()
         history.redo()
-      } else if (mod && key === 'c') {
-        if (copy()) event.preventDefault()
-      } else if (mod && key === 'x') {
-        if (copy()) {
-          event.preventDefault()
-          deleteSelection()
-        }
-      } else if (mod && key === 'v') {
-        if (clipboard.current) {
-          event.preventDefault()
-          pasteClipboard()
-        }
       } else if (mod && key === 'd') {
         event.preventDefault()
         duplicate()
@@ -535,7 +637,8 @@ function Editor({ initial, readOnly, onChange, fullscreen, onFullscreen }: Diagr
         // One undo step per burst of nudges.
         if (event.timeStamp - lastNudge.current > 600) snapshot()
         lastNudge.current = event.timeStamp
-        const step = event.shiftKey ? 10 : 1
+        // With snapping on, a nudge is one grid step.
+        const step = snapToGrid ? GRID : event.shiftKey ? 10 : 1
         const dx = key === 'arrowleft' ? -step : key === 'arrowright' ? step : 0
         const dy = key === 'arrowup' ? -step : key === 'arrowdown' ? step : 0
         const ids = new Set(selected.map((n) => n.id))
@@ -551,10 +654,44 @@ function Editor({ initial, readOnly, onChange, fullscreen, onFullscreen }: Diagr
     return () => window.removeEventListener('keydown', onKeyDown)
   })
 
+  // ------------------------------------------------------------ clipboard (copy, cut, paste events)
+  useEffect(() => {
+    if (readOnly) return
+    // Text being typed (a label, the title, a search box) keeps the normal clipboard.
+    const typing = (event: Event) =>
+      Boolean((event.target as HTMLElement | null)?.closest?.('input, textarea, select, [contenteditable], [role="dialog"]'))
+    const write = (event: ClipboardEvent) => {
+      if (typing(event) || !event.clipboardData) return false
+      const clip = collectSelection()
+      if (!clip) return false
+      const payload = { from: editorId.current, ...(serialize(clip) as object) }
+      event.clipboardData.setData('text/plain', CLIP_MARKER + JSON.stringify(payload))
+      event.preventDefault()
+      pasteCount.current = 0
+      return true
+    }
+    const onCopy = (event: ClipboardEvent) => void write(event)
+    const onCut = (event: ClipboardEvent) => {
+      if (write(event)) deleteSelection()
+    }
+    const onPaste = (event: ClipboardEvent) => {
+      if (typing(event) || !event.clipboardData) return
+      if (pasteFromClipboard(event.clipboardData.getData('text/plain'))) event.preventDefault()
+    }
+    document.addEventListener('copy', onCopy)
+    document.addEventListener('cut', onCut)
+    document.addEventListener('paste', onPaste)
+    return () => {
+      document.removeEventListener('copy', onCopy)
+      document.removeEventListener('cut', onCut)
+      document.removeEventListener('paste', onPaste)
+    }
+  }, [readOnly, collectSelection, deleteSelection, pasteFromClipboard])
+
   // ------------------------------------------------------------ render
   const context = useMemo(
-    () => ({ readOnly, editingId, setEditingId, snapshot, updateNode, updateEdge }),
-    [readOnly, editingId, snapshot, updateNode, updateEdge],
+    () => ({ readOnly, editingId, setEditingId, snapshot, updateNode, updateEdge, resized }),
+    [readOnly, editingId, snapshot, updateNode, updateEdge, resized],
   )
   const selectedNodes = nodes.filter((n) => n.selected)
   const selectedEdges = edges.filter((e) => e.selected)
@@ -572,9 +709,17 @@ function Editor({ initial, readOnly, onChange, fullscreen, onFullscreen }: Diagr
           onFullscreen={onFullscreen}
           propertiesOpen={propertiesOpen}
           onToggleProperties={toggleProperties}
+          snapToGrid={snapToGrid}
+          onSnapToGrid={setSnapToGrid}
         />
         <div className="flex min-h-0 flex-1">
-          {!readOnly && <ShapePanel onAdd={(item) => addItem(item)} />}
+          {!readOnly && (
+            <ShapePanel
+              onAdd={(item) => addItem(item)}
+              recent={recent}
+              onForget={(item) => setRecent((list) => withoutRecent(list, item))}
+            />
+          )}
           <div ref={canvas} className="relative min-w-0 flex-1" onDragOver={(e) => e.preventDefault()} onDrop={onDrop}>
             <ReactFlow<DiagramNode, DiagramEdge>
               nodes={nodes}
@@ -627,7 +772,30 @@ function Editor({ initial, readOnly, onChange, fullscreen, onFullscreen }: Diagr
               style={flowStyle}
               className={cn(readOnly && '[&_.react-flow__node]:cursor-default')}
             >
-              <Background variant={BackgroundVariant.Dots} gap={GRID} size={1.2} color="var(--border)" />
+              {snapToGrid ? (
+                // Snapping on: the grid it snaps to is drawn as lines, every 16 px faintly and
+                // every 64 px more strongly, so it reads at any zoom.
+                <>
+                  <Background
+                    id="snap-minor"
+                    variant={BackgroundVariant.Lines}
+                    gap={GRID}
+                    lineWidth={0.6}
+                    color="color-mix(in oklab, var(--muted-foreground) 30%, transparent)"
+                  />
+                  <Background
+                    id="snap-major"
+                    // Drawn over the fine grid: without this its fill would hide it.
+                    bgColor="transparent"
+                    variant={BackgroundVariant.Lines}
+                    gap={GRID * 4}
+                    lineWidth={0.75}
+                    color="color-mix(in oklab, var(--muted-foreground) 40%, transparent)"
+                  />
+                </>
+              ) : (
+                <Background variant={BackgroundVariant.Dots} gap={GRID} size={1.2} color="var(--border)" />
+              )}
               <GuideLines guides={guides} />
             </ReactFlow>
             {nodes.length === 0 && (
