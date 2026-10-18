@@ -67,13 +67,23 @@ export async function buildContext(input: ContextInput): Promise<ContextResult> 
   if (!isUuid(teamId)) return bad
   if (workspaceId !== undefined && workspaceId !== null && !isUuid(workspaceId)) return bad
 
-  const [membership, profile, workspace, entity] = await Promise.all([
-    db.from('team_members').select('team:teams(id, name)').eq('team_id', teamId).eq('user_id', userId).maybeSingle(),
-    db.from('profiles').select('display_name').eq('id', userId).maybeSingle(),
+  // The membership row brings the group's name and the person's own name with it: one request, not two.
+  // An embed RLS hides comes back null rather than as an error, so a missing name never refuses the request.
+  const [membership, workspace, entity] = await Promise.all([
+    db
+      .from('team_members')
+      .select('team:teams(id, name), profile:profiles(display_name)')
+      .eq('team_id', teamId)
+      .eq('user_id', userId)
+      .maybeSingle(),
     isUuid(workspaceId) ? db.from('workspaces').select('id, title, team_id').eq('id', workspaceId).maybeSingle() : null,
     resolveEntity(db, teamId, body.currentEntity),
   ])
-  const team = (membership.data as unknown as { team: { id: string; name: string } | null } | null)?.team
+  const member = membership.data as unknown as {
+    team: { id: string; name: string } | null
+    profile: { display_name: string | null } | null
+  } | null
+  const team = member?.team
   if (membership.error || !team) return notFound
 
   const open = workspace?.data as { id: string; title: string; team_id: string } | null | undefined
@@ -85,7 +95,7 @@ export async function buildContext(input: ContextInput): Promise<ContextResult> 
     context: {
       requestId: input.requestId,
       userId,
-      userName: (profile.data as { display_name: string | null } | null)?.display_name?.trim() || 'the user',
+      userName: member?.profile?.display_name?.trim() || 'the user',
       teamId,
       teamName: team.name,
       workspaceId: open?.id,

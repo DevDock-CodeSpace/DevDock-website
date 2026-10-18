@@ -491,10 +491,14 @@ export const issueTools = [
       const changed = Object.keys(patch)
       if (changed.length === 0 && !labelIds) return fail('INVALID_ARGUMENTS', 'Say what to change on the issue.')
 
+      // The update returns the row as saved (after the database's triggers), so the answer
+      // describes what the database now holds, not what was asked for, without reading it again.
+      let saved: IssueRow | undefined
       if (changed.length > 0) {
-        const { data, error } = await context.db.from('issues').update(patch).eq('id', issue.id).select('id')
+        const { data, error } = await context.db.from('issues').update(patch).eq('id', issue.id).select(ISSUE_COLUMNS)
         if (error) return dbFailure('save the issue', error, WRITE_ERRORS)
         if (!data || data.length === 0) return DENIED
+        saved = (data as unknown as IssueRow[])[0]
       }
       if (labelIds) {
         const { error } = await context.db.rpc('set_issue_labels', { p_issue_id: issue.id, p_label_ids: labelIds })
@@ -502,8 +506,8 @@ export const issueTools = [
       }
       const branch = patch.status === 'in_progress' && issue.status !== 'in_progress' ? await startBranch(context, issue) : undefined
 
-      // Read it back: the answer describes what the database now holds, not what was asked for.
-      const after = await loadIssue(context, args.issue)
+      // Only labels changed (nothing returned a row): read it back, as before.
+      const after = saved ? ok(saved) : await loadIssue(context, args.issue)
       return ok({ ...(after.success ? summary(after.data) : { identifier: args.issue.toUpperCase() }), updated: true, ...branch })
     },
   }),
