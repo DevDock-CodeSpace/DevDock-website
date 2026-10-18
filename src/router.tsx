@@ -1,5 +1,6 @@
 import { createBrowserRouter, Outlet, redirect } from 'react-router'
 import { AuthLoading } from '@/features/auth/components/AuthLoading'
+import { InactivityGuard } from '@/features/auth/components/InactivityGuard'
 import { authCallbackLoader, loginLoader } from '@/features/auth/loaders'
 import { watchAuthIdentity } from '@/features/auth/session'
 import { diagramLoader } from '@/features/diagrams/loaders'
@@ -77,7 +78,13 @@ export const router = createBrowserRouter([
     // Everything under here requires a session (appLoader → requireUser).
     id: APP_ROUTE_ID,
     loader: appLoader,
-    element: <Outlet />,
+    element: (
+      <>
+        {/* Signs out a person who has been away too long (features/auth, lib/inactivity). */}
+        <InactivityGuard />
+        <Outlet />
+      </>
+    ),
     errorElement: <RouteErrorPage />,
     hydrateFallbackElement: <AuthLoading />,
     children: [

@@ -37,6 +37,10 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  // The browser may reuse this preflight answer for 2 hours (Chrome's ceiling), so a
+  // question costs one request instead of two. It caches permission only, never answers.
+  // If the allowed headers ever change, browsers can hold the old answer that long.
+  'Access-Control-Max-Age': '7200',
 }
 
 const MAX_MESSAGE_CHARS = 2000

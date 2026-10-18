@@ -1,14 +1,17 @@
 import type { User } from '@supabase/supabase-js'
 import { redirect, type LoaderFunctionArgs } from 'react-router'
-import { getCurrentSession } from './api'
+import { activityExpired, startActivityClock, wasIdleSignOut } from '@/lib/inactivity'
+import { INACTIVE_REASON, INACTIVITY_LIMIT_MS } from '@/lib/inactivity-config'
+import { getCurrentSession, signOutForInactivity } from './api'
 import { captureCalendarToken, clearCalendarToken } from './google-calendar'
 import { isLoginErrorCode, type LoginErrorCode } from './errors'
 import { DEFAULT_AFTER_LOGIN, safeNextPath, takeNextPath } from './redirect'
 
-function loginUrl(params: { next?: string; error?: LoginErrorCode }) {
+function loginUrl(params: { next?: string; error?: LoginErrorCode; inactive?: boolean }) {
   const search = new URLSearchParams()
   if (params.next && params.next !== DEFAULT_AFTER_LOGIN) search.set('next', params.next)
   if (params.error) search.set('error', params.error)
+  if (params.inactive) search.set('reason', INACTIVE_REASON)
   const query = search.toString()
   return query ? `/login?${query}` : '/login'
 }
@@ -26,7 +29,15 @@ export async function requireUser(request: Request): Promise<User> {
   } catch {
     throw redirect(loginUrl({ next, error: 'session' }))
   }
-  if (!session) throw redirect(loginUrl({ next }))
+  // Signed out for inactivity by another tab: say so on the login page.
+  if (!session) throw redirect(loginUrl({ next, inactive: wasIdleSignOut() }))
+  // Away for longer than the limit (a tab opened the next morning): sign out before
+  // any page data is requested. InactivityGuard does the same for a page that is open.
+  if (activityExpired(INACTIVITY_LIMIT_MS)) {
+    // If it fails (offline), the login page still shows and the next visit tries again.
+    await signOutForInactivity().catch(() => undefined)
+    throw redirect(loginUrl({ next, inactive: true }))
+  }
   return session.user
 }
 
@@ -38,7 +49,7 @@ export async function loginLoader({ request }: LoaderFunctionArgs) {
   if (session) throw redirect(next)
 
   const error = url.searchParams.get('error')
-  return { next, error: isLoginErrorCode(error) ? error : null }
+  return { next, error: isLoginErrorCode(error) ? error : null, inactive: url.searchParams.get('reason') === INACTIVE_REASON }
 }
 
 /**
@@ -70,5 +81,7 @@ export async function authCallbackLoader({ request }: LoaderFunctionArgs) {
     throw redirect(loginUrl({ next, error: 'callback' }))
   }
   captureCalendarToken(session)
+  // Signing in is activity: an old timestamp must not sign them straight back out.
+  startActivityClock()
   throw redirect(next)
 }

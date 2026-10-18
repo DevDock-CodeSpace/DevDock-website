@@ -1,6 +1,7 @@
 import type { Session, User } from '@supabase/supabase-js'
 import { queryOptions } from '@tanstack/react-query'
 import { SETTLED_STALE_MS } from '@/lib/query-client'
+import { clearActivityClock, markIdleSignOut, startActivityClock } from '@/lib/inactivity'
 import { supabase, supabasePublishableKey, supabaseUrl } from '@/lib/supabase'
 import type { Tables } from '@/types/database.types'
 import { AuthFlowError } from './errors'
@@ -85,6 +86,7 @@ export async function signInWithPassword(email: string, password: string): Promi
     // A wrong password, an unknown email and a disabled provider all answer 400; network trouble has no status.
     throw new AuthFlowError(error.status === undefined || error.status >= 500 ? 'unavailable' : 'credentials', { cause: error })
   }
+  startActivityClock()
 }
 
 /** Signs out this browser only. Other devices keep their sessions. */
@@ -95,7 +97,26 @@ export async function signOut(): Promise<void> {
     console.error('[auth] signOut failed', error)
     throw new Error('Couldn’t sign out. Check your connection and try again.', { cause: error })
   }
+  clearActivityClock()
 }
+
+/**
+ * The same sign-out, started by the inactivity clock (lib/inactivity) instead of
+ * the person. It leaves a note for this browser's other tabs, which follow through
+ * the auth change and tell the login page why.
+ */
+export function signOutForInactivity(): Promise<void> {
+  // Loaders that run side by side each notice the expired clock: they share one request.
+  idleSignOut ??= (async () => {
+    markIdleSignOut()
+    await signOut()
+  })().finally(() => {
+    idleSignOut = null
+  })
+  return idleSignOut
+}
+
+let idleSignOut: Promise<void> | null = null
 
 /**
  * The signed-in user's profile row, or null if the sign-up trigger hasn't
