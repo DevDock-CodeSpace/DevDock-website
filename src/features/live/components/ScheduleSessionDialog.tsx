@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { CalendarPlus, Globe, LoaderCircle, Repeat } from 'lucide-react'
-import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { lazy, Suspense, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -47,7 +47,14 @@ import {
 } from '../time'
 import { DatesPicker } from './DatesPicker'
 
+// The date and time fields load with the open dialog; this file is in the first load (Meetings pages).
+const DateField = lazy(() => import('./DateField').then((m) => ({ default: m.DateField })))
+const TimeSelect = lazy(() => import('./TimeSelect').then((m) => ({ default: m.TimeSelect })))
+
 const GROUP_WIDE = 'group'
+
+/** Holds a field's place while its code loads (the first time the dialog opens). */
+const FieldPlaceholder = () => <div className="h-9 rounded-md border" />
 const DURATIONS = [30, 45, 60, 90, 120, 180]
 
 type ScheduleSessionDialogProps = {
@@ -292,27 +299,23 @@ export function ScheduleSessionDialog({
               </div>
             )}
 
-            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,0.8fr)] gap-3">
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,0.7fr)] gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="live-date">{rule.kind === 'dates' ? 'First date' : 'Date'}</Label>
-                <Input
-                  id="live-date"
-                  type="date"
-                  value={form.date}
-                  disabled={rule.kind === 'dates'}
-                  onChange={(e) => set('date', e.target.value)}
-                  required
-                />
+                <Suspense fallback={<FieldPlaceholder />}>
+                  <DateField
+                    id="live-date"
+                    value={form.date}
+                    disabled={rule.kind === 'dates'}
+                    onChange={(value) => set('date', value)}
+                  />
+                </Suspense>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="live-time">Start</Label>
-                <Input
-                  id="live-time"
-                  type="time"
-                  value={form.time}
-                  onChange={(e) => set('time', e.target.value)}
-                  required
-                />
+                <Suspense fallback={<FieldPlaceholder />}>
+                  <TimeSelect id="live-time" value={form.time} onChange={(value) => set('time', value)} />
+                </Suspense>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="live-duration">Length</Label>
@@ -518,18 +521,19 @@ function RepeatSection({ rule, setRule, setKind, date, starts, problem }: Repeat
             ) : (
               <>
                 <Label htmlFor="live-until">Last day</Label>
-                <Input
-                  id="live-until"
-                  type="date"
-                  min={date}
-                  value={rule.end.until}
-                  onChange={(e) =>
-                    setRule((r) => ({
-                      ...r,
-                      end: { mode: 'until', until: e.target.value },
-                    }))
-                  }
-                />
+                <Suspense fallback={<FieldPlaceholder />}>
+                  <DateField
+                    id="live-until"
+                    min={date}
+                    value={rule.end.until}
+                    onChange={(until) =>
+                      setRule((r) => ({
+                        ...r,
+                        end: { mode: 'until', until },
+                      }))
+                    }
+                  />
+                </Suspense>
               </>
             )}
           </div>

@@ -4,6 +4,7 @@
 // agent loop is exercised, the provider is scripted.
 
 import { buildContext } from '../agent/context.ts'
+import { localDate, zonedInstant } from '../agent/time.ts'
 import { runAgent } from '../agent/runner.ts'
 import type { AiExecutionContext, AiToolResult } from '../agent/types.ts'
 import { confirmPendingAction, supabasePendingStore } from '../safety/confirmation.ts'
@@ -21,6 +22,8 @@ function run(name: string, args: unknown, context: AiExecutionContext): Promise<
 
 type Issues = { total: number; issues: { identifier: string; title: string; assignee: string | null; status: string }[] }
 type Meetings = { meetings: { id: string; title: string }[] }
+type Reminder = { id: string; title: string; when: string; remindAt: string; status: string; issue: string | null; project: string | null; notes?: string }
+type Reminders = { reminders: Reminder[]; total: number; note?: string }
 type Conversations = { conversations: { id: string; kind: string; title: string }[]; note?: string }
 
 Deno.test({
@@ -357,6 +360,115 @@ Deno.test({
         assertEquals(code(await run('get_meeting', { meetingId: f.meetings.group }, f.context(outsider))), 'NOT_FOUND')
       })
 
+      // ---------------------------------------------------------- reminders
+
+      await t.step('create_reminder: the time is worked out on the server, and an issue brings its project', async () => {
+        const before = Date.now()
+        const soon = data<{ created: Reminder }>(await run('create_reminder', { title: 'Review the redirect fix', inMinutes: 45, issue: `${alpha.key}-1` }, f.context(kumar))).created
+        assertEquals([soon.issue, soon.project, soon.status], [`${alpha.key}-1`, 'Alpha Rocket', 'upcoming'])
+        const minutes = (Date.parse(soon.remindAt) - before) / 60_000
+        assert(minutes > 44 && minutes < 46, `45 minutes from now, got ${minutes}`)
+        // The owner is the caller, whatever else is sent.
+        const { data: row } = await f.admin.from('reminders').select('user_id, team_id, workspace_id').eq('id', soon.id).single()
+        assertEquals(row, { user_id: kumar.id, team_id: f.teamId, workspace_id: alpha.id })
+        assert(!JSON.stringify(soon).includes(kumar.id), 'no user ids in the result')
+
+        // A local date and time, in the person's zone.
+        const zone = 'Asia/Kolkata'
+        const tomorrow = localDate(new Date(Date.now() + 86_400_000), zone)
+        const nine = data<{ created: Reminder }>(await run('create_reminder', { title: 'Deploy staging', date: tomorrow, time: '09:00', notes: 'Check the migrations first' }, f.context(kumar, { timeZone: zone }))).created
+        assertEquals(nine.remindAt, zonedInstant(tomorrow, '09:00', zone).toISOString())
+        assertEquals([nine.issue, nine.project, nine.notes], [null, null, 'Check the migrations first'])
+        // A time alone is the next time it comes round.
+        const later = data<{ created: Reminder }>(await run('create_reminder', { title: 'Stand-up notes', time: '23:59' }, f.context(kumar))).created
+        assert(Date.parse(later.remindAt) > Date.now() && Date.parse(later.remindAt) - Date.now() <= 86_400_000)
+        // A project without an issue.
+        const garden = data<{ created: Reminder }>(await run('create_reminder', { title: 'Plan the garden', inMinutes: 90, project: 'beta' }, f.context(owner))).created
+        assertEquals([garden.project, garden.issue], ['Beta Garden', null])
+      })
+
+      await t.step('create_reminder: unclear or impossible times are asked about, never guessed', async () => {
+        const ctx = f.context(kumar)
+        assertEquals(code(await run('create_reminder', { title: 'x' }, ctx)), 'NEEDS_CLARIFICATION')
+        assertEquals(code(await run('create_reminder', { title: 'x', date: localDate(new Date(Date.now() + 86_400_000), 'UTC') }, ctx)), 'NEEDS_CLARIFICATION')
+        assertEquals(code(await run('create_reminder', { title: 'x', inMinutes: 5, time: '10:00' }, ctx)), 'INVALID_ARGUMENTS')
+        assertEquals(code(await run('create_reminder', { title: 'x', time: '9am' }, ctx)), 'INVALID_ARGUMENTS')
+        assertEquals(code(await run('create_reminder', { title: 'x', remindAt: new Date(Date.now() - 3_600_000).toISOString() }, ctx)), 'INVALID_ARGUMENTS')
+        assertEquals(code(await run('create_reminder', { title: 'x', inMinutes: 5, issue: 'the login one' }, ctx)), 'INVALID_ARGUMENTS')
+      })
+
+      await t.step('create_reminder: only issues and projects the person can open', async () => {
+        // Reddy is in the group but in no project.
+        assertEquals(code(await run('create_reminder', { title: 'Peek', inMinutes: 5, issue: `${alpha.key}-1` }, f.context(reddy))), 'NOT_FOUND')
+        assertEquals(code(await run('create_reminder', { title: 'Peek', inMinutes: 5, project: 'Alpha Rocket' }, f.context(reddy))), 'NOT_FOUND')
+        assertEquals(code(await run('create_reminder', { title: 'Elsewhere', inMinutes: 5 }, f.context(outsider))), 'PERMISSION_DENIED')
+        const { count } = await f.admin.from('reminders').select('id', { count: 'exact', head: true }).eq('title', 'Peek')
+        assertEquals(count, 0)
+      })
+
+      await t.step('list_reminders: your own, by status and day', async () => {
+        // One whose time has passed (written as the table owner; the tools refuse past times).
+        await f.admin.from('reminders').insert({ user_id: kumar.id, team_id: f.teamId, title: 'Send the invoice', remind_at: new Date(Date.now() - 600_000).toISOString() })
+        const open = data<Reminders>(await run('list_reminders', {}, f.context(kumar)))
+        assertEquals(open.reminders[0].title, 'Send the invoice')
+        assertEquals(open.reminders[0].status, 'overdue')
+        assertEquals(open.total, 4)
+        assertEquals(data<Reminders>(await run('list_reminders', { status: 'overdue' }, f.context(kumar))).reminders.map((r) => r.title), ['Send the invoice'])
+        assertEquals(data<Reminders>(await run('list_reminders', { query: 'staging' }, f.context(kumar))).reminders.map((r) => r.title), ['Deploy staging'])
+        const tomorrow = data<Reminders>(await run('list_reminders', { range: 'tomorrow' }, f.context(kumar, { timeZone: 'Asia/Kolkata' })))
+        assert(tomorrow.reminders.some((r) => r.title === 'Deploy staging'))
+        // Nobody else sees them, not even the group's owner.
+        assertEquals(data<Reminders>(await run('list_reminders', {}, f.context(owner))).reminders.map((r) => r.title), ['Plan the garden'])
+        assertEquals(data<Reminders>(await run('list_reminders', {}, f.context(reddy))).total, 0)
+      })
+
+      await t.step('update_reminder: by words, snooze, keep the time of day, and drop the issue', async () => {
+        const snoozed = data<{ updated: Reminder }>(await run('update_reminder', { reminder: 'invoice', inMinutes: 60 }, f.context(kumar))).updated
+        assertEquals(snoozed.status, 'upcoming')
+        const { data: row } = await f.admin.from('reminders').select('notified_at').eq('id', snoozed.id).single()
+        assertEquals(row, { notified_at: null })
+
+        // A date alone keeps 09:00 in the person's zone.
+        const zone = 'Asia/Kolkata'
+        const inThreeDays = localDate(new Date(Date.now() + 3 * 86_400_000), zone)
+        const moved = data<{ updated: Reminder }>(await run('update_reminder', { reminder: 'staging', date: inThreeDays }, f.context(kumar, { timeZone: zone }))).updated
+        assertEquals(moved.remindAt, zonedInstant(inThreeDays, '09:00', zone).toISOString())
+
+        const unlinked = data<{ updated: Reminder }>(await run('update_reminder', { reminder: 'redirect', issue: 'none', title: 'Review the redirect' }, f.context(kumar))).updated
+        assertEquals([unlinked.title, unlinked.issue, unlinked.project], ['Review the redirect', null, 'Alpha Rocket'])
+
+        assertEquals(code(await run('update_reminder', { reminder: 'invoice' }, f.context(kumar))), 'INVALID_ARGUMENTS')
+        assertEquals(code(await run('update_reminder', { reminder: 'nothing like this', inMinutes: 5 }, f.context(kumar))), 'NOT_FOUND')
+      })
+
+      await t.step('reminders: several matches are listed, never picked', async () => {
+        await run('create_reminder', { title: 'Review the slides', inMinutes: 30 }, f.context(kumar))
+        const both = await run('complete_reminder', { reminder: 'review' }, f.context(kumar))
+        assertEquals(code(both), 'AMBIGUOUS')
+        const candidates = (both as { details?: { reminders: Reminder[] } }).details?.reminders ?? []
+        assertEquals(candidates.map((r) => r.title).sort(), ['Review the redirect', 'Review the slides'])
+      })
+
+      await t.step('complete, cancel and reopen: as the page does, and only your own', async () => {
+        const done = data<{ completed: Reminder }>(await run('complete_reminder', { reminder: 'slides' }, f.context(kumar))).completed
+        assertEquals(done.status, 'completed')
+        const { data: row } = await f.admin.from('reminders').select('status, completed_at').eq('id', done.id).single()
+        assert(row?.status === 'completed' && row.completed_at !== null)
+        assertEquals(data<{ note?: string }>(await run('complete_reminder', { reminderId: done.id }, f.context(kumar))).note, 'It was already completed.')
+
+        const cancelled = data<{ cancelled: Reminder }>(await run('cancel_reminder', { reminder: 'staging' }, f.context(kumar))).cancelled
+        assertEquals(cancelled.status, 'cancelled')
+        assertEquals(data<Reminders>(await run('list_reminders', { status: 'cancelled' }, f.context(kumar))).reminders.map((r) => r.title), ['Deploy staging'])
+        const reopened = data<{ updated: Reminder }>(await run('update_reminder', { reminder: 'staging', reopen: true }, f.context(kumar))).updated
+        assertEquals(reopened.status, 'upcoming')
+
+        // Someone else can't touch it, even with its id.
+        assertEquals(code(await run('cancel_reminder', { reminderId: done.id }, f.context(owner))), 'NOT_FOUND')
+        assertEquals(code(await run('update_reminder', { reminderId: reopened.id, title: 'Mine now' }, f.context(reddy))), 'NOT_FOUND')
+        const { data: still } = await f.admin.from('reminders').select('title, user_id').eq('id', reopened.id).single()
+        assertEquals(still, { title: 'Deploy staging', user_id: kumar.id })
+      })
+
       // --------------------------------------------------------- agent loop
 
       await t.step('agent loop: several real tools in one request', async () => {
@@ -375,6 +487,19 @@ Deno.test({
         assert(last?.role === 'tool')
         // Kumar isn't in Beta: the database refused, and the model was told so.
         assertEquals(code(last.results[0].result), 'NOT_ALLOWED')
+      })
+
+      await t.step('agent loop: "remind me" runs at once, with no confirmation card', async () => {
+        const provider = scriptedProvider([
+          call('create_reminder', { title: 'Check the deploy', inMinutes: 30, issue: `${alpha.key}-2` }),
+          { text: 'Done: I’ll remind you in 30 minutes.', toolCalls: [] },
+        ])
+        const response = await runAgent({ provider, registry, context: f.context(kumar), store: supabasePendingStore(f.admin), system: 'test', history: [], message: 'remind me in 30 minutes to check the deploy for the styling issue' })
+        assertEquals(response.type, 'message')
+        const { data: rows } = await f.admin.from('reminders').select('title, user_id, status').eq('title', 'Check the deploy')
+        assertEquals(rows, [{ title: 'Check the deploy', user_id: kumar.id, status: 'pending' }])
+        const { count } = await f.admin.from('ai_pending_actions').select('id', { count: 'exact', head: true }).eq('user_id', kumar.id)
+        assertEquals(count, 0)
       })
     } finally {
       await f.cleanup()
