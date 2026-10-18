@@ -53,6 +53,7 @@ const edgeTypes = { connector: ConnectorEdge }
 const GRID = 16
 const PROPERTIES_KEY = 'devdock-diagram-properties'
 const SNAP_KEY = 'devdock-diagram-snap'
+const FINE_GRID_KEY = 'devdock-diagram-fine-grid'
 const PASTE_OFFSET = 24
 /** Starts what the editor puts on the clipboard, so a paste can tell its own content from any other text. */
 const CLIP_MARKER = 'devdock-diagram/v1\n'
@@ -124,6 +125,12 @@ function Editor({ initial, readOnly, onChange, fullscreen, onFullscreen }: Diagr
         ? `Shapes now move, resize and nudge in ${GRID} px steps, so they line up on the grid.`
         : 'Shapes move freely again, with alignment guides to other shapes.',
     })
+  }
+  // The 16 px lines are dense, so they're opt-in (the 64 px ones always show while snapping).
+  const [fineGrid, setFineGridState] = useState(() => readStored(FINE_GRID_KEY) === 'on')
+  const setFineGrid = (on: boolean) => {
+    setFineGridState(on)
+    store(FINE_GRID_KEY, on ? 'on' : 'off')
   }
   // Collapsing the properties panel is a per-viewer preference, remembered in this browser.
   const [propertiesOpen, setPropertiesOpen] = useState(() => {
@@ -773,24 +780,27 @@ function Editor({ initial, readOnly, onChange, fullscreen, onFullscreen }: Diagr
               className={cn(readOnly && '[&_.react-flow__node]:cursor-default')}
             >
               {snapToGrid ? (
-                // Snapping on: the grid it snaps to is drawn as lines, every 16 px faintly and
-                // every 64 px more strongly, so it reads at any zoom.
+                // Snapping on: the grid is drawn as lines every 64 px, in the theme's hairline
+                // color so it stays quiet in light and dark. The 16 px steps it snaps to are an
+                // opt-in ("Fine grid lines"), fainter still.
                 <>
-                  <Background
-                    id="snap-minor"
-                    variant={BackgroundVariant.Lines}
-                    gap={GRID}
-                    lineWidth={0.6}
-                    color="color-mix(in oklab, var(--muted-foreground) 30%, transparent)"
-                  />
+                  {fineGrid && (
+                    <Background
+                      id="snap-minor"
+                      variant={BackgroundVariant.Lines}
+                      gap={GRID}
+                      lineWidth={0.5}
+                      color="color-mix(in oklab, var(--border) 60%, transparent)"
+                    />
+                  )}
                   <Background
                     id="snap-major"
-                    // Drawn over the fine grid: without this its fill would hide it.
-                    bgColor="transparent"
+                    // Over the fine grid, its fill would hide it.
+                    bgColor={fineGrid ? 'transparent' : undefined}
                     variant={BackgroundVariant.Lines}
                     gap={GRID * 4}
                     lineWidth={0.75}
-                    color="color-mix(in oklab, var(--muted-foreground) 40%, transparent)"
+                    color="color-mix(in oklab, var(--border), var(--foreground) 6%)"
                   />
                 </>
               ) : (
@@ -817,6 +827,8 @@ function Editor({ initial, readOnly, onChange, fullscreen, onFullscreen }: Diagr
               onDelete={deleteSelection}
               snapToGrid={snapToGrid}
               onSnapToGrid={setSnapToGrid}
+              fineGrid={fineGrid}
+              onFineGrid={setFineGrid}
             />
           )}
         </div>

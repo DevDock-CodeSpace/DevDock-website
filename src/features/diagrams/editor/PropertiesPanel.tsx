@@ -36,6 +36,8 @@ type PropertiesPanelProps = {
   onDelete: () => void
   snapToGrid: boolean
   onSnapToGrid: (on: boolean) => void
+  fineGrid: boolean
+  onFineGrid: (on: boolean) => void
 }
 
 /** Right panel: style for the selection (Lucid's "shape/line options"), or canvas settings when nothing is selected. */
@@ -236,7 +238,7 @@ const shortcuts: [string, string][] = [
   ['⌫', 'Delete'],
 ]
 
-function CanvasOptions({ snapToGrid, onSnapToGrid }: PropertiesPanelProps) {
+function CanvasOptions({ snapToGrid, onSnapToGrid, fineGrid, onFineGrid }: PropertiesPanelProps) {
   return (
     <>
       <Group title="Canvas">
@@ -247,6 +249,25 @@ function CanvasOptions({ snapToGrid, onSnapToGrid }: PropertiesPanelProps) {
             className="size-4 accent-(--brand) dark:scheme-dark"
             checked={snapToGrid}
             onChange={(e) => onSnapToGrid(e.target.checked)}
+          />
+        </label>
+        {/* The grid lines only show while snapping. */}
+        <label
+          className={cn(
+            'mt-2 flex items-center justify-between gap-2 text-sm',
+            snapToGrid ? 'cursor-pointer' : 'cursor-not-allowed opacity-50',
+          )}
+        >
+          <span className="text-muted-foreground">
+            Fine grid lines
+            <span className="block text-xs">Every 16 px, not just every 64</span>
+          </span>
+          <input
+            type="checkbox"
+            className="size-4 accent-(--brand) dark:scheme-dark"
+            checked={fineGrid}
+            disabled={!snapToGrid}
+            onChange={(e) => onFineGrid(e.target.checked)}
           />
         </label>
       </Group>
