@@ -144,4 +144,4 @@ one query. Revisit (server-side filtering and paging) before a workspace passes 
 
 ## Accepted trade-offs
 
-(None yet. Add a line with the date and the owner's decision whenever something slower is approved.)
+- **2026-10-18, Meetings list pages from the server** (owner's choice over rendering more of a single request): 10 meetings per request as the reader scrolls (`meetingsPageQuery`). First visit is 2 requests (upcoming and past, in parallel), each further page 1; a write refetches every loaded page (`live_sessions` has no realtime, so only the writer's tab). The calendar asks for its visible range (1 request per month or week). Diagrams and Docs stay one request per scope: their lists are small, and paging them would also need `listsAlreadyShow` (realtime) to understand paged caches.

@@ -1,6 +1,6 @@
-import { useSuspenseQuery } from '@tanstack/react-query'
+import { useMemo } from 'react'
 import { PageHeader } from '@/components/PageHeader'
-import { teamLiveSessionsQuery } from '@/features/live/api'
+import type { MeetingsScope } from '@/features/live/api'
 import { MeetingsView } from '@/features/live/components/MeetingsView'
 import { useCalendarQueue, useNow } from '@/features/live/hooks'
 import { useCollectionView } from '@/features/collections/hooks'
@@ -11,8 +11,13 @@ import { liveSessionPath } from '@/features/teams/nav'
 export function TeamLivePage() {
   useCalendarQueue()
   const { team, can } = useCurrentTeam()
-  const { collection, inView } = useCollectionView()
-  const sessions = useSuspenseQuery(teamLiveSessionsQuery(team.id)).data.filter((s) => inView(s.workspace_id))
+  const { collection, workspaces } = useCollectionView()
+  // A collection in view narrows the list on the server (group-wide meetings always show).
+  const workspaceIds = collection ? workspaces.map((w) => w.id).sort().join(',') : null
+  const scope = useMemo<MeetingsScope>(
+    () => ({ kind: 'team', teamId: team.id, workspaceIds: workspaceIds === null ? null : workspaceIds ? workspaceIds.split(',') : [] }),
+    [team.id, workspaceIds],
+  )
   const now = useNow()
 
   return (
@@ -22,7 +27,7 @@ export function TeamLivePage() {
         description={`Video meetings in ${team.name}: for the whole group, and for the workspaces you can access${collection ? ` in ${collection.name}` : ''}.`}
       />
       <MeetingsView
-        sessions={sessions}
+        scope={scope}
         now={now}
         showScope
         href={(session) => liveSessionPath(team.slug, session.id)}
