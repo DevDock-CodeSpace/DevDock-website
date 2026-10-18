@@ -1,5 +1,5 @@
 import { queryOptions } from '@tanstack/react-query'
-import { callGitHub } from '@/features/repos/api'
+import { callGitHub, type Repo } from '@/features/repos/api'
 import type { PersonProfile } from '@/features/teams/api'
 import type { CycleEvent, HistoryIssue } from './cycleStats'
 import { requireAffected, toDataError } from '@/lib/errors'
@@ -145,11 +145,20 @@ export const workspaceIssuesQuery = (workspaceId: string) =>
     },
   })
 
-/** An issue with its project and assignee, for the group-wide Issues page. */
+/**
+ * An issue for the group-wide Issues page, with what its row shows from its project
+ * (sprint, labels, the project's repos), so the page draws project-style rows from one request.
+ */
 export type TeamIssue = Issue & {
-  workspace: { id: string; title: string; issue_key: string }
+  workspace: { id: string; title: string; issue_key: string; repos: Repo[] }
   assignee: PersonProfile
+  cycle: IssueCycle | null
+  labels: IssueLabel[]
 }
+
+// Written out (not built from ISSUE_COLUMNS) so the typed client can read it.
+const TEAM_ISSUE_COLUMNS =
+  'id, workspace_id, number, title, status, priority, assignee_id, parent_id, cycle_id, repo_id, estimate, due_date, completed_at, created_by, created_at, updated_at, issue_label_links(label_id, label:issue_labels!issue_label_links_label_fkey(id, workspace_id, name, color)), workspace:workspaces!issues_workspace_team_fkey(id, title, issue_key, workspace_repos(repo:repos!workspace_repos_repo_fkey(id, team_id, owner, name, created_at, github_repo_id, installation_id))), assignee:profiles!issues_assignee_id_fkey(display_name, avatar_url), cycle:issue_cycles!issues_cycle_id_fkey(id, workspace_id, number, name, starts_on, ends_on)'
 
 /** Issues from every workspace in the group the caller can see (RLS). */
 export const teamIssuesQuery = (teamId: string) =>
@@ -158,13 +167,24 @@ export const teamIssuesQuery = (teamId: string) =>
     queryFn: async (): Promise<TeamIssue[]> => {
       const { data, error } = await supabase
         .from('issues')
-        .select(
-          `${ISSUE_COLUMNS}, workspace:workspaces!issues_workspace_team_fkey(id, title, issue_key), assignee:profiles!issues_assignee_id_fkey(display_name, avatar_url)`,
-        )
+        .select(TEAM_ISSUE_COLUMNS)
         .eq('team_id', teamId)
         .order('updated_at', { ascending: false })
       if (error) throw toDataError('load issues', error)
-      return data.map(({ workspace, assignee, ...row }) => ({ ...toIssue(row), workspace, assignee }))
+      return data.map(({ workspace, assignee, cycle, ...row }) => ({
+        ...toIssue(row),
+        workspace: {
+          id: workspace.id,
+          title: workspace.title,
+          issue_key: workspace.issue_key,
+          repos: workspace.workspace_repos
+            .map((link) => link.repo)
+            .sort((a, b) => `${a.owner}/${a.name}`.localeCompare(`${b.owner}/${b.name}`, undefined, { sensitivity: 'base' })),
+        },
+        assignee,
+        cycle,
+        labels: row.issue_label_links.map((link) => link.label as IssueLabel),
+      }))
     },
   })
 
