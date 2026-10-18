@@ -1,0 +1,87 @@
+name: Deploy Supabase
+
+# Vercel deploys only the website (the built SPA). The database migrations and the
+# Edge Functions live on Supabase, so this deploys them after every push to prod
+# that changes them: migrations first (a function may need a new column), then
+# every function (config.toml's verify_jwt settings come along).
+#
+# There is one Supabase project (ejqrrxxiatvvdiyxtvid): local, dev and prod all use it,
+# so a migration usually went live while its feature was being built and the push
+# here has nothing left to apply. It is the safety net for one that was forgotten.
+#
+# Secrets (repo → Settings → Secrets and variables → Actions):
+#   SUPABASE_ACCESS_TOKEN  a personal access token (supabase.com/dashboard/account/tokens)
+#   SUPABASE_DB_PASSWORD   the database password (Project settings → Database)
+on:
+  push:
+    branches: [prod]
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase/functions/**'
+      - 'supabase/config.toml'
+  # By hand (Actions → Deploy Supabase → Run workflow): deploys both.
+  workflow_dispatch:
+
+# One deploy at a time, and never cut one off halfway through a migration.
+concurrency:
+  group: deploy-supabase
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Migrations and Edge Functions
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      PROJECT_REF: ejqrrxxiatvvdiyxtvid
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check the secrets are set
+        run: |
+          missing=""
+          [ -n "$SUPABASE_ACCESS_TOKEN" ] || missing="$missing SUPABASE_ACCESS_TOKEN"
+          [ -n "$SUPABASE_DB_PASSWORD" ] || missing="$missing SUPABASE_DB_PASSWORD"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secrets:$missing (see the top of this workflow)."
+            exit 1
+          fi
+
+      - name: What changed
+        id: changed
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          # By hand, or when the previous commit is unknown (a new branch, a force push): deploy both.
+          if [ "$GITHUB_EVENT_NAME" != "push" ] || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            echo "migrations=true" >> "$GITHUB_OUTPUT"
+            echo "functions=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          files="$(git diff --name-only "$BEFORE" "$GITHUB_SHA")"
+          echo "$files" | grep -q '^supabase/migrations/' && echo "migrations=true" >> "$GITHUB_OUTPUT" || echo "migrations=false" >> "$GITHUB_OUTPUT"
+          echo "$files" | grep -qE '^supabase/(functions/|config\.toml$)' && echo "functions=true" >> "$GITHUB_OUTPUT" || echo "functions=false" >> "$GITHUB_OUTPUT"
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.117.0
+
+      - name: Apply new migrations
+        if: steps.changed.outputs.migrations == 'true'
+        run: |
+          supabase link --project-ref "$PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+          echo "Migrations to apply (none means the database already has them all):"
+          supabase db push --linked --password "$SUPABASE_DB_PASSWORD" --skip-vault --dry-run
+          supabase db push --linked --password "$SUPABASE_DB_PASSWORD" --skip-vault --yes
+
+      - name: Deploy Edge Functions
+        if: steps.changed.outputs.functions == 'true'
+        # Every function: cheap (four), and nothing is missed when a shared file changes.
+        run: supabase functions deploy --project-ref "$PROJECT_REF" --use-api --yes
