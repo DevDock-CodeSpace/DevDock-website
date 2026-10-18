@@ -1,4 +1,5 @@
 import {
+  AlarmClock,
   BookOpen,
   CircleDot,
   FileText,
@@ -71,6 +72,9 @@ export function isTeamTool(tool: string): tool is TeamToolId {
   return (TEAM_TOOLS as string[]).includes(tool)
 }
 
+/** Your own reminders in the group (private, so not a team tool: there is no workspace view). */
+export const remindersPath = (slug: string) => `${teamPath(slug)}/reminders`
+
 /** Group-wide issues: every project's issues in one list. */
 export const teamIssuesPath = (slug: string) => `${teamPath(slug)}/issues`
 
@@ -84,8 +88,8 @@ export function hasTeamIssues(type: TeamType, workspaces: readonly { type: Works
 
 /**
  * Sidebar team links: Home + team tools on top (plus Issues below Meetings
- * when `issues` is set, see hasTeamIssues), then the workspaces, then
- * Members/Settings.
+ * when `issues` is set, see hasTeamIssues, then your Reminders), then the
+ * workspaces, then Members/Settings.
  */
 export function getTeamNav(
   slug: string,
@@ -96,6 +100,7 @@ export function getTeamNav(
   members: NavItem
   settings: NavItem
   messages: NavItem
+  reminders: NavItem
 } {
   const base = teamPath(slug)
   return {
@@ -112,6 +117,7 @@ export function getTeamNav(
         ? [{ id: 'issues' as const, title: 'Issues', icon: workspaceTabDefs.issues.icon, to: teamIssuesPath(slug) }]
         : []),
     ],
+    reminders: { title: 'Reminders', to: remindersPath(slug), icon: AlarmClock },
     members: { title: 'Members', to: `${base}/members`, icon: Users },
     settings: { title: 'Settings', to: `${base}/settings`, icon: Settings },
   }
