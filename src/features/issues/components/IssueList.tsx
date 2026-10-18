@@ -1,5 +1,5 @@
 import { ChevronDown, Plus } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 import type { Issue, IssueStatus } from '../api'
 import { compareIssues, STATUS_ORDER, statusLabel } from '../meta'
@@ -10,8 +10,22 @@ import { StatusIcon } from './StatusIcon'
 /** Rows drawn per status before "Show more", and how many each click adds. */
 const PAGE_SIZE = 10
 
-/** Linear's default list: one collapsible group per status (empty groups hidden), priority order inside. */
-export function IssueList({ issues, onCreate }: { issues: Issue[]; onCreate: (status: IssueStatus) => void }) {
+type SubIssueCount = { done: number; total: number }
+type RenderRow<T extends Issue> = (issue: T, subIssues: SubIssueCount | undefined) => ReactNode
+
+/**
+ * Linear's default list: one collapsible group per status (empty groups hidden), priority order inside.
+ * `row` draws each row (default: the project's `IssueRow`); without `onCreate` groups have no "+".
+ */
+export function IssueList<T extends Issue>({
+  issues,
+  onCreate,
+  row,
+}: {
+  issues: T[]
+  onCreate?: (status: IssueStatus) => void
+  row?: RenderRow<T>
+}) {
   const stats = subIssueStats(issues)
   const groups = STATUS_ORDER.map((status) => ({
     status,
@@ -21,17 +35,18 @@ export function IssueList({ issues, onCreate }: { issues: Issue[]; onCreate: (st
   return (
     <div className="border-y">
       {groups.map(({ status, items }) => (
-        <IssueGroup key={status} status={status} items={items} stats={stats} onCreate={onCreate} />
+        <IssueGroup key={status} status={status} items={items} stats={stats} onCreate={onCreate} row={row} />
       ))}
     </div>
   )
 }
 
-type IssueGroupProps = {
+type IssueGroupProps<T extends Issue> = {
   status: IssueStatus
-  items: Issue[]
+  items: T[]
   stats: ReturnType<typeof subIssueStats>
-  onCreate: (status: IssueStatus) => void
+  onCreate?: (status: IssueStatus) => void
+  row?: RenderRow<T>
 }
 
 /**
@@ -39,7 +54,7 @@ type IssueGroupProps = {
  * button; after the first click the rest load as that button scrolls into view,
  * so a long list stays cheap to render without hiding anything behind paging.
  */
-function IssueGroup({ status, items, stats, onCreate }: IssueGroupProps) {
+function IssueGroup<T extends Issue>({ status, items, stats, onCreate, row }: IssueGroupProps<T>) {
   const [collapsed, setCollapsed] = useState(false)
   const [shown, setShown] = useState(PAGE_SIZE)
   // Only after the reader asks for more once; otherwise a group already on
@@ -69,6 +84,7 @@ function IssueGroup({ status, items, stats, onCreate }: IssueGroupProps) {
           <span className="font-medium">{statusLabel[status]}</span>
           <span className="font-mono text-xs text-muted-foreground">{items.length}</span>
         </button>
+        {onCreate && (
         <button
           type="button"
           onClick={() => onCreate(status)}
@@ -77,12 +93,15 @@ function IssueGroup({ status, items, stats, onCreate }: IssueGroupProps) {
         >
           <Plus className="size-3.5" />
         </button>
+        )}
       </div>
       {!collapsed && (
         <>
           <ul className="divide-y border-b last:border-b-0">
             {items.slice(0, shown).map((issue) => (
-              <IssueRow key={issue.id} issue={issue} subIssues={stats.get(issue.id)} />
+              <Fragment key={issue.id}>
+                {row ? row(issue, stats.get(issue.id)) : <IssueRow issue={issue} subIssues={stats.get(issue.id)} />}
+              </Fragment>
             ))}
           </ul>
           {remaining > 0 && (

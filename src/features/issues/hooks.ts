@@ -158,7 +158,11 @@ export function useUpdateIssue() {
   })
 }
 
-type TeamUpdateVars = { issue: Pick<Issue, 'id' | 'number' | 'status'> & { workspace: { id: string } }; patch: IssuePatch }
+type TeamUpdateVars = {
+  /** `workspace.repos` (the group list has them) saves looking the project's repos up. */
+  issue: Pick<Issue, 'id' | 'number' | 'status'> & { workspace: { id: string; repos?: unknown[] } }
+  patch: IssuePatch
+}
 
 /**
  * `useUpdateIssue` for the group-wide Issues page, which isn't inside a project:
@@ -171,7 +175,7 @@ export function useUpdateTeamIssue(teamId: string) {
   const listKey = ['issues', 'team', teamId]
 
   const startBranch = async (issue: TeamUpdateVars['issue']) => {
-    const repos = await queryClient.fetchQuery(workspaceReposQuery(issue.workspace.id))
+    const repos = issue.workspace.repos ?? (await queryClient.fetchQuery(workspaceReposQuery(issue.workspace.id)))
     if (repos.length === 0) return
     for (const table of ['issue_activity', 'issue_branches']) ownWrite(table, issue.id, 15_000)
     try {
