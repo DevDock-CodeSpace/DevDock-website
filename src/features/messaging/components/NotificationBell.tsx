@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AtSign, Bell, MessageCircle } from 'lucide-react'
+import { AlarmClock, AtSign, Bell, MessageCircle } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
@@ -7,13 +7,13 @@ import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useAuth } from '@/features/auth/hooks'
 import { useCurrentTeam } from '@/features/teams/hooks'
-import { teamPath } from '@/features/teams/nav'
+import { issuePath, remindersPath, teamPath } from '@/features/teams/nav'
 import { errorMessage } from '@/lib/errors'
 import { conversationKeys, markAllNotificationsRead, markNotificationRead, notificationsQuery, type Notification } from '../api'
 import { useConversationTitles } from '../hooks'
 import { displayName, formatWhen } from '../names'
 
-/** The bell in the header: unread message and mention notifications, and where each one leads. */
+/** The bell in the header: unread message, mention and reminder notifications, and where each one leads. */
 export function NotificationBell() {
   const { team } = useCurrentTeam()
   const { user } = useAuth()
@@ -31,13 +31,24 @@ export function NotificationBell() {
   })
 
   const go = async (notification: Notification) => {
-    if (!notification.conversation_id) return
+    const reminder = notification.reminder
+    if (!notification.conversation_id && !reminder) return
     try {
       await markNotificationRead(notification.id)
     } catch (error) {
       toast.error(errorMessage(error))
     }
     setOpen(false)
+    if (reminder) {
+      // Its issue when it has one (and it can still be opened), else the reminder in its list.
+      navigate(
+        reminder.issue && reminder.workspace_id
+          ? issuePath(team.slug, reminder.workspace_id, reminder.issue.number)
+          : `${remindersPath(team.slug)}?r=${notification.reminder_id}`,
+      )
+      void refresh()
+      return
+    }
     // A reply notification points at its thread's first message, which is the one in the timeline.
     const target = notification.message?.parent_id ?? notification.message_id
     navigate(`${teamPath(team.slug)}/messages?c=${notification.conversation_id}${target ? `&m=${target}` : ''}`)
@@ -68,22 +79,29 @@ export function NotificationBell() {
           <div className="flex flex-col items-center gap-1 px-6 py-10 text-center">
             <Bell className="size-5 text-muted-foreground" />
             <p className="text-sm font-medium">You’re all caught up</p>
-            <p className="text-xs text-muted-foreground">New messages and mentions show up here.</p>
+            <p className="text-xs text-muted-foreground">New messages, mentions and reminders show up here.</p>
           </div>
         ) : (
           <ul className="max-h-96 overflow-y-auto py-1">
             {notifications.map((notification) => {
               const mention = notification.kind === 'mention'
+              const reminder = notification.kind === 'reminder'
               const where = displayName(titleOf(notification.conversation_id))
+              const Icon = reminder ? AlarmClock : mention ? AtSign : MessageCircle
               return (
                 <li key={notification.id}>
                   <button type="button" onClick={() => void go(notification)} className="flex w-full items-start gap-2.5 px-3 py-2 text-left transition-colors hover:bg-muted">
-                    <span className={`mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full ${mention ? 'bg-brand/10 text-brand' : 'bg-muted text-muted-foreground'}`}>
-                      {mention ? <AtSign className="size-3.5" /> : <MessageCircle className="size-3.5" />}
+                    <span className={`mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full ${mention || reminder ? 'bg-brand/10 text-brand' : 'bg-muted text-muted-foreground'}`}>
+                      <Icon className="size-3.5" />
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium">{mention ? `Mentioned you in ${where}` : `New message in ${where}`}</span>
-                      <span className="block text-xs text-muted-foreground">{formatWhen(notification.created_at)}</span>
+                      <span className="block truncate text-sm font-medium">
+                        {reminder ? (notification.reminder?.title ?? 'Reminder') : mention ? `Mentioned you in ${where}` : `New message in ${where}`}
+                      </span>
+                      <span className="block text-xs text-muted-foreground">
+                        {reminder && 'Reminder · '}
+                        {formatWhen(notification.created_at)}
+                      </span>
                     </span>
                     <span className="mt-2 size-2 shrink-0 rounded-full bg-brand" aria-hidden />
                   </button>

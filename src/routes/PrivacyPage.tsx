@@ -3,7 +3,7 @@ import { Link } from 'react-router'
 import { LogoMark, LogoWordmark } from '@/components/Logo'
 import { ThemeToggle } from '@/components/ThemeToggle'
 
-const UPDATED = 'October 11, 2026'
+const UPDATED = 'October 18, 2026'
 
 /**
  * Public privacy policy at /privacy (no sign-in needed; linked from the login
@@ -49,11 +49,13 @@ export function PrivacyPage() {
             <li>groups, workspaces and who belongs to them, with their roles;</li>
             <li>docs (including images you add to them) and diagrams;</li>
             <li>issues (including images you add to their descriptions), comments, labels and sprints, and a history of changes made to issues;</li>
-            <li>the GitHub repositories your group uses (their names and GitHub ids) and which projects use them.</li>
+            <li>the GitHub repositories your group uses (their names and GitHub ids) and which projects use them;</li>
+            <li>reminders you set for yourself: their title, notes, time and the workspace or issue they are about.</li>
           </ul>
           <p>
             This content is only visible to people in your group or workspace, according to their role (for example,
-            workspace content is visible to that workspace’s members and the group’s owners and admins).
+            workspace content is visible to that workspace’s members and the group’s owners and admins). Reminders are
+            the exception: only you can see yours, not even the group’s owners and admins.
           </p>
         </Section>
 
@@ -130,7 +132,7 @@ export function PrivacyPage() {
         <Section title="Keeping and deleting data">
           <p>
             Your data is kept while you use DevDock. Group owners and workspace leads can delete content, and leaving a
-            group removes your access to it. To have your account and data deleted, ask the instructor who runs your
+            group removes your access to it and deletes your reminders in it. To have your account and data deleted, ask the instructor who runs your
             DevDock group.
           </p>
         </Section>

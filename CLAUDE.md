@@ -53,6 +53,8 @@ DevDock is a private software-engineering teaching workspace for **one instructo
 
 **Messaging (team-wide chat) done, part 1:** channels (`#general` is automatic), DMs and ad-hoc groups; threads, reactions, pins, mentions, attachments, search, unread badges, mute. Design record: `docs/MESSAGING_ARCHITECTURE.md`.
 
+**Reminders done (V1):** private, time-based reminders to self in a group, optionally about a workspace and an issue. A pg_cron job fires due ones into the bell once a minute, whether or not a browser is open. Not connected to Ask DevDock yet. Design record: `docs/REMINDERS.md`.
+
 Next: 9e deleting an issue can delete its branch (opt-in). Branches are never deleted when an issue moves back.
 
 Exercises is still a placeholder page. Current status and next steps: `docs/STATUS.md`.
@@ -88,6 +90,7 @@ npm run check       # everything below in one go: lint, typecheck + build, perf 
 npm run preview     # serve dist/
 npm run test:ai     # Deno tests for the ai-agent Edge Function (needs Deno; database tests: see docs/AI_AGENT.md)
 npm run test:idle   # Deno tests for the inactivity sign-out clock (src/lib/inactivity.ts)
+npm run test:reminders  # Deno tests for reminder time labels and the time field's parsing (reminders/when.ts, live/timeOfDay.ts)
 npm run db:types    # regenerate src/types/database.types.ts from the linked project (Supabase CLI)
 ```
 
@@ -263,6 +266,14 @@ supabase/
   - Access: a team member who is removed loses DMs and groups too (`can_read_conversation`/`can_read_message` require team membership). `send_message` has one overload (with `p_mention_ids`); `add_group_member` uses `v_`-prefixed variables because a variable named like a column made it fail.
   - Bodies are only checked to be JSON objects on the server, so `MessageBody` must tolerate anything (null children, odd marks, deep nesting).
   - Not built yet: instant calls from a conversation (the `jaas-token` function only mints tokens for `live_sessions`; a conversation-scoped room needs its own audience rule and an Edge Function change). `public.messages` still has a column UPDATE grant from the first migration; revoke it (`revoke update on public.messages from authenticated` and drop the "Authors can edit messages" policy) in a later migration once every open client uses `edit_message`/`delete_message`.
+- **Reminders** (`features/reminders/`, route `/t/:teamSlug/reminders`, lazy loader + page; full record in `docs/REMINDERS.md`):
+  - Private to their owner: RLS is `user_id = auth.uid()` for every operation, and group admins can't read them. Group-scoped, but **not narrowed by the collection view** (personal, like Messages). A sidebar item below the group tools, not a team tool and not a workspace tab.
+  - The rules are in the database, so the app now and the AI agent later go through the same ones: `private.check_reminder` (the workspace and issue must pass `can_view_workspace`; an issue sets the workspace; changing the workspace drops the issue; a status change stamps `completed_at`/`cancelled_at`; moving `remind_at` later clears `notified_at`, which is a snooze), plus column grants (no `user_id`, `notified_at` or delete). Cancel instead of deleting. Leaving the group deletes them (FK to `team_members`).
+  - Delivery: the pg_cron job `fire-due-reminders` runs `private.fire_due_reminders()` every minute. It claims (`skip locked`), marks `notified_at` and inserts a `notifications` row (kind `reminder`, dedupe key `reminder:<id>:<epoch>`) in one statement, so a failure retries and nothing fires twice. There is no Edge Function. `purge-cron-history` trims `cron.job_run_details` daily.
+  - The bell embeds `reminder:reminders(title, workspace_id, issue:issues(number))` and opens the issue, or `…/reminders?r=<id>`. Completing or cancelling marks its notification read (trigger).
+  - Status changes are optimistic, and `useSetReminderStatus` returns a promise: the row unmounts as it changes section, and TanStack skips `mutate()` callbacks for an unmounted component. Keep toasts on the promise.
+  - The issue page's alarm-clock button mounts `ReminderDialog` only while it's open (no requests). The dialog's issue picker loads `['reminders', 'issue-options', ws]` only when opened (in `NOT_LIVE`).
+  - Tests: `supabase/tests/reminders.sql` (local only, rolls back) and `npm run test:reminders`.
 - **Ask DevDock (AI)** (`features/ai/`, the `ai-agent` Edge Function; full record in `docs/AI_AGENT.md`, read it before touching either):
   - The model is an interface, not the backend. It picks **tools**; each tool calls the same table, RPC or Edge Function the UI calls, **with the caller's token**, so RLS, grants and triggers decide. No tool uses the service role, and the prompt holds no permission rules.
   - Function layout: `agent/` (context, runner, prompt, validation; knows no provider and no feature), `providers/` (`AiProvider`; `gemini.ts`), `tools/` (`registry.ts` + one file per feature, registered in `tools/index.ts`), `safety/confirmation.ts`. **A new feature adds a `tools/<feature>.ts` and one line in `tools/index.ts`; the runner never changes.**

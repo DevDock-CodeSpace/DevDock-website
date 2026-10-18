@@ -1,11 +1,12 @@
 import { useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
-import { ArrowLeft, ChevronRight, GitBranch, Trash2 } from 'lucide-react'
+import { AlarmClock, ArrowLeft, ChevronRight, GitBranch, Trash2 } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { ReminderDialog } from '@/features/reminders/components/ReminderDialog'
 import { useCurrentTeam } from '@/features/teams/hooks'
 import { issuePath, issuesPath } from '@/features/teams/nav'
 import { AUTOSAVE_MS, useSaveOnExit } from '@/hooks/use-save-on-exit'
@@ -48,6 +49,7 @@ export default function IssueView({ issue }: { issue: IssueDetail }) {
   // S/P/A/L/⇧C open the property menus, I assigns to me, Esc goes back, ? shows help.
   const [menu, setMenu] = useState<MenuKind | null>(null)
   const [help, setHelp] = useState(false)
+  const [reminding, setReminding] = useState(false)
   useShortcuts({
     s: () => setMenu('status'),
     p: () => setMenu('priority'),
@@ -166,6 +168,20 @@ export default function IssueView({ issue }: { issue: IssueDetail }) {
                 <TooltipContent>Copy branch name</TooltipContent>
               </Tooltip>
             )}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Add reminder"
+                  className="text-muted-foreground hover:text-foreground"
+                  onClick={() => setReminding(true)}
+                >
+                  <AlarmClock />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Add reminder</TooltipContent>
+            </Tooltip>
             {canManage && (
               <Button
                 variant="ghost"
@@ -233,6 +249,14 @@ export default function IssueView({ issue }: { issue: IssueDetail }) {
       </div>
 
       <ShortcutsDialog open={help} onOpenChange={setHelp} />
+      {/* Mounted only while open: the issue page loads nothing for reminders. */}
+      {reminding && (
+        <ReminderDialog
+          open
+          onOpenChange={setReminding}
+          defaults={{ workspaceId: workspace.id, issueId: issue.id, issueLabel: `${id} ${issue.title}` }}
+        />
+      )}
       <ConfirmDialog
         open={confirmDelete}
         onOpenChange={setConfirmDelete}

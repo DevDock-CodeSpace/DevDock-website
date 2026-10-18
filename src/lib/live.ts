@@ -11,7 +11,7 @@ export function setLiveConnected(value: boolean) {
 }
 
 /** Roots whose tables are all in the `supabase_realtime` publication (see AFFECTS in realtime.ts). */
-const LIVE_ROOTS = new Set(['teams', 'workspaces', 'documents', 'diagrams', 'issues', 'repos', 'learning', 'messaging'])
+const LIVE_ROOTS = new Set(['teams', 'workspaces', 'documents', 'diagrams', 'issues', 'repos', 'learning', 'messaging', 'reminders'])
 
 /** Queries under those roots that no event refreshes: tables left out of the publication, GitHub, signed URLs, search. */
 const NOT_LIVE: ((key: readonly unknown[]) => boolean)[] = [
@@ -19,6 +19,8 @@ const NOT_LIVE: ((key: readonly unknown[]) => boolean)[] = [
   (key) => key[0] === 'repos' && (key[1] === 'installations' || key[1] === 'github' || key[1] === 'branches'),
   (key) => key[0] === 'documents' && key[1] === 'image',
   (key) => key[0] === 'messaging' && key[1] === 'search',
+  // Reads issues, whose events don't reach this key.
+  (key) => key[0] === 'reminders' && key[1] === 'issue-options',
 ]
 
 export function keptLive(key: readonly unknown[]): boolean {

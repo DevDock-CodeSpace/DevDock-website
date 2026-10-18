@@ -13,6 +13,7 @@
     "check": "npm run lint && npm run build && npm run perf",
     "test:ai": "deno test --allow-env --allow-net --allow-read supabase/functions/ai-agent/tests/",
     "test:idle": "deno test tests/inactivity.test.ts tests/auth-storage.test.ts",
+    "test:reminders": "TZ=America/Chicago deno test tests/reminders-when.test.ts tests/time-of-day.test.ts",
     "db:types": "supabase gen types typescript --linked --schema public > src/types/database.types.ts"
   },
   "dependencies": {

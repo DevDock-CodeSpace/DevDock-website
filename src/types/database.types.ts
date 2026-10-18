@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.17"
   }
   public: {
     Tables: {
@@ -1698,6 +1698,7 @@ export type Database = {
           message_id: string | null
           read_at: string | null
           recipient_id: string
+          reminder_id: string | null
           team_id: string
         }
         Insert: {
@@ -1709,6 +1710,7 @@ export type Database = {
           message_id?: string | null
           read_at?: string | null
           recipient_id?: string
+          reminder_id?: string | null
           team_id: string
         }
         Update: {
@@ -1720,6 +1722,7 @@ export type Database = {
           message_id?: string | null
           read_at?: string | null
           recipient_id?: string
+          reminder_id?: string | null
           team_id?: string
         }
         Relationships: [
@@ -1742,6 +1745,13 @@ export type Database = {
             columns: ["recipient_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_reminder_id_fkey"
+            columns: ["reminder_id"]
+            isOneToOne: false
+            referencedRelation: "reminders"
             referencedColumns: ["id"]
           },
           {
@@ -1776,6 +1786,86 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      reminders: {
+        Row: {
+          cancelled_at: string | null
+          completed_at: string | null
+          created_at: string
+          id: string
+          issue_id: string | null
+          notes: string | null
+          notified_at: string | null
+          remind_at: string
+          status: Database["public"]["Enums"]["reminder_status"]
+          team_id: string
+          title: string
+          updated_at: string
+          user_id: string
+          workspace_id: string | null
+        }
+        Insert: {
+          cancelled_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          issue_id?: string | null
+          notes?: string | null
+          notified_at?: string | null
+          remind_at: string
+          status?: Database["public"]["Enums"]["reminder_status"]
+          team_id: string
+          title: string
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string | null
+        }
+        Update: {
+          cancelled_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          issue_id?: string | null
+          notes?: string | null
+          notified_at?: string | null
+          remind_at?: string
+          status?: Database["public"]["Enums"]["reminder_status"]
+          team_id?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reminders_issue_fkey"
+            columns: ["issue_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "issues"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "reminders_member_fkey"
+            columns: ["team_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["team_id", "user_id"]
+          },
+          {
+            foreignKeyName: "reminders_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reminders_workspace_fkey"
+            columns: ["workspace_id", "team_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id", "team_id"]
+          },
+        ]
       }
       repos: {
         Row: {
@@ -2519,6 +2609,7 @@ export type Database = {
         | "in_review"
         | "done"
         | "canceled"
+      reminder_status: "pending" | "completed" | "cancelled"
       team_role: "owner" | "admin" | "member"
       team_type: "development" | "learning" | "general"
       workspace_access: "members" | "collection" | "group"
@@ -2668,6 +2759,7 @@ export const Constants = {
         "done",
         "canceled",
       ],
+      reminder_status: ["pending", "completed", "cancelled"],
       team_role: ["owner", "admin", "member"],
       team_type: ["development", "learning", "general"],
       workspace_access: ["members", "collection", "group"],
