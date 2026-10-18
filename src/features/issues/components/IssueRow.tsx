@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { CircleUserRound, GitBranch, Gauge, IterationCw } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
@@ -6,10 +7,11 @@ import { useCurrentTeam } from '@/features/teams/hooks'
 import { issuePath } from '@/features/teams/nav'
 import { formatShortDate, localDateISO } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import type { Issue } from '../api'
+import { issueBranchesQuery, type Issue } from '../api'
+import { copyBranchName } from '../copyBranch'
 import { cycleTitle } from '../cycles'
 import { useIssueContext, useUpdateIssue } from '../hooks'
-import { ESTIMATE_HOURS, hoursLabel, isClosed, issueIdentifier, priorityLabel, statusLabel } from '../meta'
+import { ESTIMATE_HOURS, hoursLabel, isClosed, issueBranchName, issueIdentifier, priorityLabel, statusLabel } from '../meta'
 import { useRowNav } from '../nav-context'
 import { AssigneePicker } from './AssigneePicker'
 import { CyclePicker } from './CyclePicker'
@@ -22,6 +24,7 @@ import { PriorityPicker } from './PriorityPicker'
 import { RepoPicker } from './RepoPicker'
 import { StatusIcon } from './StatusIcon'
 import { StatusPicker } from './StatusPicker'
+import { GitHubMark } from '@/features/repos/components/GitHubMark'
 
 const iconButton =
   'relative z-10 flex size-6 shrink-0 items-center justify-center rounded-sm hover:bg-muted focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none'
@@ -34,13 +37,15 @@ const NONE = 'none'
 /**
  * One list row, like Linear's: priority · ID · status · title · sub-issue
  * progress … cycle · repo · labels · due date · assignee · created. The whole row opens the
- * issue (a stretched title link); priority, status and assignee are menus.
+ * issue (a stretched title link); priority, status and assignee are menus, and in
+ * projects with repos a hover button copies the branch name.
  * Hover or j/k focuses it for keyboard shortcuts.
  */
 export function IssueRow({ issue, subIssues }: { issue: Issue; subIssues?: { done: number; total: number } }) {
   const { team } = useCurrentTeam()
   const { workspace, members, labels, cycles, repos, userId } = useIssueContext()
   const update = useUpdateIssue()
+  const queryClient = useQueryClient()
   const nav = useRowNav(issue.id)
   const cycle = cycles.find((c) => c.id === issue.cycle_id)
   const repo = repos.find((r) => r.id === issue.repo_id)
@@ -94,6 +99,28 @@ export function IssueRow({ issue, subIssues }: { issue: Issue; subIssues?: { don
           {subIssues.done}/{subIssues.total}
         </span>
       )}
+      {repos.length > 0 && (
+        <button
+          type="button"
+          className={cn(
+            iconButton,
+            'text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100',
+            nav.active && 'opacity-100',
+          )}
+          aria-label="Copy branch name"
+          title="Copy branch name"
+          // The branch it has (one request, on click), else the name it would get.
+          onClick={() =>
+            void copyBranchName(
+              queryClient
+                .fetchQuery({ ...issueBranchesQuery(issue.id), staleTime: 0 })
+                .then((branches) => branches[0]?.name ?? issueBranchName(workspace.issue_key, issue.number, issue.title)),
+            )
+          }
+        >
+          <GitBranch className="size-3.5" />
+        </button>
+      )}
       <span className="flex-1" />
       {cycle && (
         <CyclePicker
@@ -121,7 +148,7 @@ export function IssueRow({ issue, subIssues }: { issue: Issue; subIssues?: { don
             title={`Repository: ${repo.owner}/${repo.name}`}
             aria-label={`Repository: ${repo.name}`}
           >
-            <GitBranch className="size-3 shrink-0" />
+            <GitHubMark className="size-3 shrink-0" />
             <span className="truncate">{repo.name}</span>
           </button>
         </RepoPicker>

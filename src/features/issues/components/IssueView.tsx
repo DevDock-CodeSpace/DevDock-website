@@ -1,17 +1,19 @@
-import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
-import { ArrowLeft, ChevronRight, Trash2 } from 'lucide-react'
+import { useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
+import { ArrowLeft, ChevronRight, GitBranch, Trash2 } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useCurrentTeam } from '@/features/teams/hooks'
 import { issuePath, issuesPath } from '@/features/teams/nav'
 import { AUTOSAVE_MS, useSaveOnExit } from '@/hooks/use-save-on-exit'
 import { errorMessage } from '@/lib/errors'
-import { deleteIssue, issueKeys, workspaceIssuesQuery, type IssueDetail } from '../api'
+import { deleteIssue, issueBranchesQuery, issueKeys, workspaceIssuesQuery, type IssueDetail } from '../api'
+import { copyBranchName } from '../copyBranch'
 import { useIssueContext, useUpdateIssue } from '../hooks'
-import { issueIdentifier } from '../meta'
+import { issueBranchName, issueIdentifier } from '../meta'
 import type { MenuKind } from '../nav-context'
 import { useShortcuts } from '../shortcuts'
 import { IssueActivity } from './IssueActivity'
@@ -28,13 +30,19 @@ import { ownWrite } from '@/lib/realtime'
  */
 export default function IssueView({ issue }: { issue: IssueDetail }) {
   const { team } = useCurrentTeam()
-  const { workspace, canManage, userId } = useIssueContext()
+  const { workspace, canManage, userId, repos } = useIssueContext()
   const issues = useSuspenseQuery(workspaceIssuesQuery(workspace.id)).data
   const update = useUpdateIssue()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const parent = issues.find((i) => i.id === issue.parent_id)
   const id = issueIdentifier(workspace.issue_key, issue.number)
+  // The branch it has (the Development block already loads these), else the name it would get.
+  const branches = useQuery(issueBranchesQuery(issue.id)).data
+  const branchName =
+    repos.length > 0 || (branches?.length ?? 0) > 0
+      ? (branches?.[0]?.name ?? issueBranchName(workspace.issue_key, issue.number, issue.title))
+      : null
 
   // ------------------------------------------------------------ shortcuts
   // S/P/A/L/⇧C open the property menus, I assigns to me, Esc goes back, ? shows help.
@@ -141,17 +149,35 @@ export default function IssueView({ issue }: { issue: IssueDetail }) {
             <ChevronRight className="size-3 shrink-0" />
             <span className="shrink-0 font-mono text-foreground">{id}</span>
           </nav>
-          {canManage && (
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Delete issue"
-              className="text-muted-foreground hover:text-destructive"
-              onClick={() => setConfirmDelete(true)}
-            >
-              <Trash2 />
-            </Button>
-          )}
+          <div className="flex shrink-0 items-center gap-0.5">
+            {branchName && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="Copy branch name"
+                    className="text-muted-foreground hover:text-foreground"
+                    onClick={() => void copyBranchName(branchName)}
+                  >
+                    <GitBranch />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Copy branch name</TooltipContent>
+              </Tooltip>
+            )}
+            {canManage && (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Delete issue"
+                className="text-muted-foreground hover:text-destructive"
+                onClick={() => setConfirmDelete(true)}
+              >
+                <Trash2 />
+              </Button>
+            )}
+          </div>
         </div>
 
         <textarea
