@@ -133,7 +133,7 @@ sh supabase/functions/ai-agent/tests/run-local.sh # everything, against the LOCA
 
 ## Not built yet (the registry is ready for them)
 
-Reminders, saved questions, knowledge search (pgvector), meeting transcripts, GitHub tools, Exercises, and choosing
+Saved questions, knowledge search (pgvector), meeting transcripts, GitHub tools, Exercises, and choosing
 a subset of tools per request (`registry.list({ domain, capability, risk })` already exists; the runner takes a
 `tools` filter). No embeddings or vector search exist.
 
@@ -153,6 +153,11 @@ service role.
 | `find_conversation` | read | `conversations` + `conversation_members` (as `teamConversationsQuery`, `teamConversationMembersQuery`) | RLS: channels for the group, DMs and groups for their members | none (it never calls `ensure_general_channel`) | `id`, kind, title, people's names |
 | `send_message` | external (confirmed) | `rpc('create_direct_conversation')` when sending to a person (get-or-create), then `rpc('send_message')` | both RPCs check group and conversation membership | notifications, unread counts, realtime echo | conversation title |
 | `get_upcoming_meetings` | read | `live_sessions` by group (as `teamLiveSessionsQuery`); `rpc('workspace_people')` for "with a person" | RLS: the meeting's audience | none | `id`, title, start and end (ISO and in the person's time zone), project, status |
+| `create_reminder` | write | `insert into reminders` (as `createReminder`) | RLS (owner only, group member), column grants, `check_reminder` (issue/project must be openable; an issue sets its project) | realtime echo to the owner's tabs; pg_cron fires it into the bell later | the reminder: title, time in the person's zone, issue, project, `id` |
+| `list_reminders` | read | `reminders` by group, user and status (as `remindersPageQuery`) | RLS: only your own | none | the above per reminder, `total`; ≤ 20 |
+| `update_reminder` | write | `update reminders` (as `updateReminder`; `status = 'pending'` to reopen) | same; moving the time later re-arms it (trigger) | realtime echo | the reminder and what changed |
+| `complete_reminder` | write | `update reminders set status = 'completed'` (as `completeReminder`) | same | the trigger marks its bell notification read | the reminder |
+| `cancel_reminder` | write | `update reminders set status = 'cancelled'` (as `cancelReminder`) | same | same | the reminder |
 | `get_meeting` | read | `live_sessions` by id (as `liveSessionQuery`), audience from `team_members` or `rpc('workspace_people')` | same | none | the above plus organizer, description excerpt, people's names (≤ 30). **Never `room_name`** |
 
 ### Behaviour the UI adds outside the database (kept on purpose)
@@ -164,6 +169,12 @@ service role.
   a repeated confirmation cannot send twice even if the one-time claim were bypassed.
 - **Message body.** Plain text becomes the same one-paragraph-per-line TipTap JSON the browser sends by default.
 - **Issue description.** Plain text becomes a TipTap doc of paragraphs (no images).
+- **Reminder times.** The model never does date arithmetic for a reminder: it passes `inMinutes`, a local `date` and/or
+  `time`, or an exact `remindAt`, and the tool turns that into an instant in the person's zone (`zonedInstant`, DST-safe:
+  a skipped time lands after the gap, a repeated one is the first). A date alone keeps a reminder's time of day and a
+  time alone keeps its date; a new reminder with a day but no time is a question, not 9 AM. Past times are refused.
+- **Cancelling a reminder is a `write`, not `destructive`:** it is kept and can be reopened (`update_reminder`,
+  `reopen: true`), so it runs without a confirmation card (the owner's choice, 2026-10-18).
 
 ### Things the tools deliberately do not do
 

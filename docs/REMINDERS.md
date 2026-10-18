@@ -2,7 +2,7 @@
 
 Private, time-based reminders to self: "Review CAP-12, tomorrow at 9". Each one belongs to one person in one group, can be about a workspace and an issue in it, and puts a notification in that person's bell when it's due, whether or not a browser is open.
 
-Built 2026-10-18. Not connected to Ask DevDock yet (see [Future: Ask DevDock](#future-ask-devdock)).
+Built 2026-10-18, with Ask DevDock tools (see [Ask DevDock](#ask-devdock)).
 
 ## Decisions
 
@@ -140,24 +140,23 @@ src/routes/team/RemindersPage.tsx
   - complete, Undo, complete again, cancel, and Show cancelled;
   - the issue page's dialog comes prefilled and makes no request.
 
-## Future: Ask DevDock
+## Ask DevDock
 
-The AI tools will be thin wrappers over the same table, called with the user's token, so RLS, grants and `check_reminder` decide, as for every other tool (`docs/AI_AGENT.md`). No tool needs SQL or the service role.
+Built 2026-10-18 in `supabase/functions/ai-agent/tools/reminders.ts` (one line in `tools/index.ts`). The tools call the same table as the page, with the user's token, so RLS, the column grants and `check_reminder` decide; no tool has SQL of its own or the service role. Mapping and risks: `docs/AI_AGENT.md`.
 
-| Tool | Does | Risk |
+| Tool | Same as | Risk |
 |---|---|---|
-| `create_reminder` | `insert into reminders (team_id, title, notes, remind_at, workspace_id?, issue_id?)`, the same as `createReminder()` | write |
-| `list_reminders` | `select … where team_id and status = …`, ordered as `remindersPageQuery` | read |
-| `update_reminder` | `update … set title/notes/remind_at/workspace_id/issue_id` (`updateReminder()`) | write |
-| `complete_reminder` | `update … set status = 'completed'` (`completeReminder()`) | write |
-| `cancel_reminder` | `update … set status = 'cancelled'` (`cancelReminder()`) | write |
+| `create_reminder` | `createReminder()` | write |
+| `list_reminders` | `remindersPageQuery` (plus `overdue`, a day or week, words from the title) | read |
+| `update_reminder` | `updateReminder()`, and reopen | write |
+| `complete_reminder` | `completeReminder()` | write |
+| `cancel_reminder` | `cancelReminder()` | write: reversible, so no confirmation card (owner's choice) |
 
-Notes for whoever builds them:
-
-- Take human references (`CAP-12`, a project name) and resolve them to ids, like the issue tools. Return candidates instead of guessing.
-- The model turns "tomorrow at 9", "in 45 minutes" or "Friday afternoon" into an ISO `remind_at` using the time zone the request already carries. The database only ever sees an instant.
-- Never take a user id: the owner is always `auth.uid()`.
-- Reminder text then goes to the model, so update `/privacy` ("If you use Ask DevDock") when these tools ship.
+- **Times** come as minutes from now, a local date and/or time, or an exact ISO time (e.g. 15 minutes before a meeting from `get_upcoming_meetings`), and are turned into an instant on the server in the person's zone. A day without a time is asked about; past times are refused.
+- **References:** an issue as `CAP-12` (the open issue for "this"), a project by name, a reminder by its id or by words from its title. Several matches come back as candidates to ask about.
+- **Only the user's own:** there is no way to set or see someone else's reminders.
+- Tests: `tests/provider.test.ts` (catalogue, `zonedInstant` across DST) and `tests/tools.test.ts` against the local stack (times, references, privacy, ambiguity, complete/cancel/reopen, and the agent loop with no confirmation card).
+- Not done: `/privacy` doesn't yet say that reminder titles and notes reach the model when the user asks Ask DevDock about them (the owner deferred it, 2026-10-18).
 
 ## Known limitations (V1)
 

@@ -112,8 +112,8 @@ const summary = (row: IssueRow) => ({
   project: row.workspace.title,
 })
 
-/** The issue behind "CAP-12", if the caller can see it. */
-async function loadIssue(context: AiExecutionContext, identifier: string): Promise<AiToolResult<IssueRow>> {
+/** The issue behind "CAP-12", if the caller can see it. Reminders resolve issues with it too. */
+export async function loadIssue(context: AiExecutionContext, identifier: string): Promise<AiToolResult<IssueRow>> {
   const match = IDENTIFIER.exec(identifier.trim())
   if (!match) return fail('INVALID_ARGUMENTS', 'An issue is identified like CAP-12. Use search_issues to find it by title.')
   const projects = await loadProjects(context)

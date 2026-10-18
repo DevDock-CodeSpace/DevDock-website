@@ -6,6 +6,7 @@ import { issueTools } from './issues.ts'
 import { meetingTools } from './meetings.ts'
 import { messagingTools } from './messaging.ts'
 import { peopleTools } from './people.ts'
+import { reminderTools } from './reminders.ts'
 import { ToolRegistry } from './registry.ts'
 
-export const createToolRegistry = () => new ToolRegistry().register(peopleTools, issueTools, messagingTools, meetingTools)
+export const createToolRegistry = () => new ToolRegistry().register(peopleTools, issueTools, messagingTools, meetingTools, reminderTools)

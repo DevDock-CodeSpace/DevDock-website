@@ -44,6 +44,29 @@ function startOfDay(year: number, month: number, day: number, timeZone: string):
   return new Date(guess - offsetMinutes(new Date(first), timeZone) * 60_000)
 }
 
+/**
+ * The instant a local date and time ("2026-10-19", "09:00") happens in the zone. A time that a
+ * DST change skips lands just after the gap.
+ */
+export function zonedInstant(date: string, time: string, timeZone: string): Date {
+  const [year, month, day] = date.split('-').map(Number)
+  const [hour, minute] = time.split(':').map(Number)
+  const wall = Date.UTC(year, month - 1, day, hour, minute)
+  // Read with the offset in force half a day either side: on an ordinary day both agree. Around a
+  // DST change, keep the one that really shows this wall-clock time (the earlier, if both do);
+  // if neither does, the time was skipped, and the later one is just after the gap.
+  const candidates = [-12, 12].map((hours) => new Date(wall - offsetMinutes(new Date(wall + hours * 3_600_000), timeZone) * 60_000))
+  const exact = candidates.filter((at) => localTimeOfDay(at, timeZone) === time && localDate(at, timeZone) === date)
+  if (exact.length > 0) return exact.reduce((a, b) => (a <= b ? a : b))
+  return candidates.reduce((a, b) => (a >= b ? a : b))
+}
+
+/** "09:30" (24-hour) in the zone. */
+export function localTimeOfDay(at: Date, timeZone: string): string {
+  const p = partsIn(at, timeZone)
+  return `${String(p.hour).padStart(2, '0')}:${String(p.minute).padStart(2, '0')}`
+}
+
 /** "2026-10-12" in the zone. */
 export function localDate(now: Date, timeZone: string): string {
   const p = partsIn(now, timeZone)
