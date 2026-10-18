@@ -22,3 +22,5 @@ export const REALTIME_PAUSE_AFTER_HIDDEN_MS = 5 * 60 * 1000
 
 /** On the login page after an inactivity sign-out: /login?reason=inactive. */
 export const INACTIVE_REASON = 'inactive'
+/** On the login page after a session reached its time limit (lib/auth-storage): /login?reason=expired. */
+export const EXPIRED_REASON = 'expired'

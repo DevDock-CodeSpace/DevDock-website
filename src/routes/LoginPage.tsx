@@ -1,16 +1,20 @@
 import { CircleAlert, Clock, LoaderCircle } from 'lucide-react'
+import { useState } from 'react'
 import { Link, useLoaderData } from 'react-router'
 import { LogoMark, LogoWordmark } from '@/components/Logo'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { Button } from '@/components/ui/button'
+import { rememberedChoice } from '@/features/auth/api'
 import { GoogleIcon } from '@/features/auth/components/GoogleIcon'
+import { RememberMe } from '@/features/auth/components/RememberMe'
 import { AuthFlowError, loginErrorMessages } from '@/features/auth/errors'
 import { useSignInWithGoogle } from '@/features/auth/hooks'
 import type { loginLoader } from '@/features/auth/loaders'
 
 export function LoginPage() {
-  const { next, error, inactive } = useLoaderData<typeof loginLoader>()
+  const { next, error, inactive, expired } = useLoaderData<typeof loginLoader>()
   const signIn = useSignInWithGoogle(next)
+  const [remember, setRemember] = useState(rememberedChoice)
   // After success the browser is navigating to Google; keep the button busy.
   const redirecting = signIn.isPending || signIn.isSuccess
 
@@ -46,6 +50,13 @@ export function LoginPage() {
           </div>
         )}
 
+        {expired && !inactive && !message && !redirecting && (
+          <div role="status" className="mt-6 flex gap-2 rounded-lg border px-3 py-2.5 text-sm text-muted-foreground">
+            <Clock className="mt-0.5 size-4 shrink-0" />
+            <span>Your sign-in reached its time limit. Sign in again to pick up where you left off.</span>
+          </div>
+        )}
+
         {message && (
           <div
             role="alert"
@@ -61,11 +72,12 @@ export function LoginPage() {
           variant="outline"
           className="mt-6 h-10 w-full"
           disabled={redirecting}
-          onClick={() => signIn.mutate()}
+          onClick={() => signIn.mutate(remember)}
         >
           {redirecting ? <LoaderCircle className="animate-spin" /> : <GoogleIcon className="size-4" />}
           {redirecting ? 'Redirecting to Google…' : 'Continue with Google'}
         </Button>
+        <RememberMe checked={remember} onChange={setRemember} disabled={redirecting} className="mt-4" />
         <p className="mt-6 text-xs text-muted-foreground">
           By continuing you agree to how DevDock handles your data; see the{' '}
           <Link to="/privacy" className="underline underline-offset-4 hover:text-foreground">

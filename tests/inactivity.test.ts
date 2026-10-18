@@ -221,6 +221,36 @@ Deno.test('a clock cleared by another tab signing out is not treated as inactivi
   watch.stop()
 })
 
+Deno.test('after another tab signs out by hand, this tab still signs out once idle for the full limit', async () => {
+  // Sessions can belong to one tab (lib/auth-storage): the other tab's sign-out doesn't end this one.
+  const storage = fakeStorage()
+  const clock = { now: START }
+  const { watch, events } = tab(storage, clock)
+  clock.now += 20 * MIN
+  storage.removeItem(ACTIVITY_KEY)
+  assertEquals(watch.check(), 'active', 'the countdown starts again from now')
+  clock.now += LIMIT
+  assertEquals(watch.check(), 'expired')
+  await settle()
+  assertEquals(events, ['signOut'])
+  watch.stop()
+})
+
+Deno.test('another tab signing out for inactivity takes this tab with it at once', async () => {
+  const storage = fakeStorage()
+  const clock = { now: START }
+  const other = tab(storage, clock)
+  other.watch.stop()
+  const { watch, events } = tab(storage, clock)
+  clock.now += 3 * MIN // this tab's own reading is recent; the person has gone from every tab
+  markIdleSignOut(other.store)
+  storage.removeItem(ACTIVITY_KEY)
+  assertEquals(watch.check(), 'expired')
+  await settle()
+  assertEquals(events, ['signOut'])
+  watch.stop()
+})
+
 Deno.test('a stored timestamp put back by hand (rehearsing sleep in devtools) is believed', async () => {
   const storage = fakeStorage()
   const clock = { now: START }

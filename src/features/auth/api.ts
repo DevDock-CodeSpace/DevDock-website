@@ -1,6 +1,7 @@
 import type { Session, User } from '@supabase/supabase-js'
 import { queryOptions } from '@tanstack/react-query'
 import { SETTLED_STALE_MS } from '@/lib/query-client'
+import { authStorage, clearSessionClock, startSessionClock } from '@/lib/auth-storage'
 import { clearActivityClock, markIdleSignOut, startActivityClock } from '@/lib/inactivity'
 import { supabase, supabasePublishableKey, supabaseUrl } from '@/lib/supabase'
 import type { Tables } from '@/types/database.types'
@@ -13,7 +14,7 @@ export type Profile = Tables<'profiles'>
 export const AUTH_CALLBACK_PATH = '/auth/callback'
 
 /**
- * The session from local storage, refreshed if expired. Good for deciding what
+ * The session from this tab (or, when remembered, the browser), refreshed if expired. Good for deciding what
  * UI to show; it is not an authorization check. Postgres RLS is.
  */
 export async function getCurrentSession(): Promise<Session | null> {
@@ -29,10 +30,20 @@ export async function getCurrentUser(): Promise<User | null> {
   return (await getCurrentSession())?.user ?? null
 }
 
-/** Starts the Google OAuth redirect. Resolves just before the browser leaves the page. */
-export async function signInWithGoogle(next: string): Promise<void> {
+/** Whether "Remember me" was ticked last time, to start the box that way. */
+export function rememberedChoice(): boolean {
+  return authStorage().remembered()
+}
+
+/**
+ * Starts the Google OAuth redirect. Resolves just before the browser leaves the page.
+ * `remember` decides where the session will be kept (lib/auth-storage); it is set
+ * before the redirect because the PKCE verifier is stored the same way.
+ */
+export async function signInWithGoogle(next: string, remember: boolean): Promise<void> {
   await assertGoogleProviderEnabled()
   rememberNextPath(next)
+  authStorage().setRemembered(remember)
 
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
@@ -79,7 +90,8 @@ export async function connectGoogleCalendar(next: string, email: string | undefi
  * is no sign-up or password reset in the app. What it can see is decided by its
  * group and workspace roles under RLS, like any other user.
  */
-export async function signInWithPassword(email: string, password: string): Promise<void> {
+export async function signInWithPassword(email: string, password: string, remember: boolean): Promise<void> {
+  authStorage().setRemembered(remember)
   const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
   if (error) {
     console.error('[auth] signInWithPassword failed', error)
@@ -87,6 +99,7 @@ export async function signInWithPassword(email: string, password: string): Promi
     throw new AuthFlowError(error.status === undefined || error.status >= 500 ? 'unavailable' : 'credentials', { cause: error })
   }
   startActivityClock()
+  startSessionClock()
 }
 
 /** Signs out this browser only. Other devices keep their sessions. */
@@ -98,7 +111,18 @@ export async function signOut(): Promise<void> {
     throw new Error('Couldn’t sign out. Check your connection and try again.', { cause: error })
   }
   clearActivityClock()
+  clearSessionClock()
 }
+
+/** The session has passed its time limit (lib/auth-storage): sign out as usual. */
+export function signOutForSessionLimit(): Promise<void> {
+  limitSignOut ??= signOut().finally(() => {
+    limitSignOut = null
+  })
+  return limitSignOut
+}
+
+let limitSignOut: Promise<void> | null = null
 
 /**
  * The same sign-out, started by the inactivity clock (lib/inactivity) instead of

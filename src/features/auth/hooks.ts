@@ -36,7 +36,7 @@ export function useUserIdentity() {
 }
 
 export function useSignInWithGoogle(next: string) {
-  return useMutation({ mutationFn: () => signInWithGoogle(next) })
+  return useMutation({ mutationFn: (remember: boolean) => signInWithGoogle(next, remember) })
 }
 
 /** The admin account's sign-in (see signInWithPassword); goes to `next` once signed in. */
@@ -44,7 +44,7 @@ export function useSignInWithPassword(next: string) {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   return useMutation({
-    mutationFn: (input: { email: string; password: string }) => signInWithPassword(input.email, input.password),
+    mutationFn: (input: { email: string; password: string; remember: boolean }) => signInWithPassword(input.email, input.password, input.remember),
     onSuccess: () => {
       queryClient.clear()
       navigate(next, { replace: true })
