@@ -215,9 +215,17 @@ export function createInactivityWatch(options: InactivityOptions): InactivityWat
       expire()
       return phase
     }
-    // The clock was cleared: another tab signed out, and this one is about to follow
-    // (the auth change re-runs the loaders). That wasn't inactivity here.
-    if (readLastActivity(store) === null) return phase
+    // The clock was cleared: another tab signed out. Sessions can belong to one tab
+    // (lib/auth-storage), so that sign-out doesn't necessarily reach this one.
+    if (readLastActivity(store) === null) {
+      // For inactivity: the person has been away from every tab, this one included. Follow.
+      if (wasIdleSignOut(store)) {
+        expire()
+        return phase
+      }
+      // By hand: that wasn't inactivity here. This tab's countdown starts again from now.
+      record(now())
+    }
     const at = now()
     if (holds > 0) record(at)
     const elapsed = at - latest()

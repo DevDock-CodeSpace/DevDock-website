@@ -53,15 +53,20 @@ export function markCalendarConnecting() {
 /**
  * On the OAuth callback: keep the Google token only when this sign-in asked
  * for the calendar scope (a plain sign-in's token can't use the Calendar API).
+ * Returns true when it did: a calendar connection, not a new sign-in.
  */
-export function captureCalendarToken(session: Session) {
+export function captureCalendarToken(session: Session): boolean {
   try {
     const connecting = sessionStorage.getItem(CONNECTING_KEY) === '1'
     sessionStorage.removeItem(CONNECTING_KEY)
-    if (!connecting || !session.provider_token) return
-    const stored: StoredToken = { token: session.provider_token, expiresAt: Date.now() + TOKEN_LIFETIME_MS }
-    sessionStorage.setItem(TOKEN_KEY, JSON.stringify(stored))
+    if (!connecting) return false
+    if (session.provider_token) {
+      const stored: StoredToken = { token: session.provider_token, expiresAt: Date.now() + TOKEN_LIFETIME_MS }
+      sessionStorage.setItem(TOKEN_KEY, JSON.stringify(stored))
+    }
+    return true
   } catch {
     // Storage blocked: calendar sync asks to connect again.
+    return false
   }
 }

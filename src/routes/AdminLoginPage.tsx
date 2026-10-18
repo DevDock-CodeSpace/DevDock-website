@@ -6,6 +6,8 @@ import { ThemeToggle } from '@/components/ThemeToggle'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { rememberedChoice } from '@/features/auth/api'
+import { RememberMe } from '@/features/auth/components/RememberMe'
 import { AuthFlowError, loginErrorMessages } from '@/features/auth/errors'
 import { useSignInWithPassword } from '@/features/auth/hooks'
 import type { loginLoader } from '@/features/auth/loaders'
@@ -20,11 +22,12 @@ export function AdminLoginPage() {
   const signIn = useSignInWithPassword(next)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [remember, setRemember] = useState(rememberedChoice)
   const busy = signIn.isPending || signIn.isSuccess
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
-    if (email.trim() && password) signIn.mutate({ email, password })
+    if (email.trim() && password) signIn.mutate({ email, password, remember })
   }
   const message = signIn.isError ? (signIn.error instanceof AuthFlowError ? signIn.error.message : loginErrorMessages.unavailable) : null
 
@@ -69,6 +72,7 @@ export function AdminLoginPage() {
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
+          <RememberMe checked={remember} onChange={setRemember} disabled={busy} />
           <Button type="submit" size="lg" className="h-10 w-full" disabled={busy || !email.trim() || !password}>
             {busy && <LoaderCircle className="animate-spin" />}
             {busy ? 'Signing in…' : 'Sign in'}

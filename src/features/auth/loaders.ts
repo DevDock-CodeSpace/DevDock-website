@@ -1,17 +1,19 @@
 import type { User } from '@supabase/supabase-js'
 import { redirect, type LoaderFunctionArgs } from 'react-router'
+import { ensureSessionClock, sessionExpired, startSessionClock } from '@/lib/auth-storage'
 import { activityExpired, startActivityClock, wasIdleSignOut } from '@/lib/inactivity'
-import { INACTIVE_REASON, INACTIVITY_LIMIT_MS } from '@/lib/inactivity-config'
-import { getCurrentSession, signOutForInactivity } from './api'
+import { EXPIRED_REASON, INACTIVE_REASON, INACTIVITY_LIMIT_MS } from '@/lib/inactivity-config'
+import { getCurrentSession, signOutForInactivity, signOutForSessionLimit } from './api'
 import { captureCalendarToken, clearCalendarToken } from './google-calendar'
 import { isLoginErrorCode, type LoginErrorCode } from './errors'
 import { DEFAULT_AFTER_LOGIN, safeNextPath, takeNextPath } from './redirect'
 
-function loginUrl(params: { next?: string; error?: LoginErrorCode; inactive?: boolean }) {
+function loginUrl(params: { next?: string; error?: LoginErrorCode; inactive?: boolean; expired?: boolean }) {
   const search = new URLSearchParams()
   if (params.next && params.next !== DEFAULT_AFTER_LOGIN) search.set('next', params.next)
   if (params.error) search.set('error', params.error)
   if (params.inactive) search.set('reason', INACTIVE_REASON)
+  else if (params.expired) search.set('reason', EXPIRED_REASON)
   const query = search.toString()
   return query ? `/login?${query}` : '/login'
 }
@@ -38,6 +40,12 @@ export async function requireUser(request: Request): Promise<User> {
     await signOutForInactivity().catch(() => undefined)
     throw redirect(loginUrl({ next, inactive: true }))
   }
+  // Older than its limit (4 h, or 12 h when remembered; lib/auth-storage).
+  ensureSessionClock()
+  if (sessionExpired()) {
+    await signOutForSessionLimit().catch(() => undefined)
+    throw redirect(loginUrl({ next, expired: true }))
+  }
   return session.user
 }
 
@@ -49,7 +57,8 @@ export async function loginLoader({ request }: LoaderFunctionArgs) {
   if (session) throw redirect(next)
 
   const error = url.searchParams.get('error')
-  return { next, error: isLoginErrorCode(error) ? error : null, inactive: url.searchParams.get('reason') === INACTIVE_REASON }
+  const reason = url.searchParams.get('reason')
+  return { next, error: isLoginErrorCode(error) ? error : null, inactive: reason === INACTIVE_REASON, expired: reason === EXPIRED_REASON }
 }
 
 /**
@@ -80,8 +89,10 @@ export async function authCallbackLoader({ request }: LoaderFunctionArgs) {
     console.error('[auth] Callback reached without a session (code missing, expired, or already used)')
     throw redirect(loginUrl({ next, error: 'callback' }))
   }
-  captureCalendarToken(session)
+  const calendarOnly = captureCalendarToken(session)
   // Signing in is activity: an old timestamp must not sign them straight back out.
   startActivityClock()
+  // A new sign-in starts the session's time limit; connecting Google Calendar doesn't extend it.
+  if (!calendarOnly) startSessionClock()
   throw redirect(next)
 }

@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database.types'
+import { authStorage } from './auth-storage'
 
 // Browser client. Uses the *publishable* key only; access control is enforced
 // by Postgres Row Level Security, not by keeping this key secret.
@@ -30,6 +31,13 @@ export const supabase = createClient<Database>(supabaseUrl, supabasePublishableK
     // PKCE: the OAuth redirect carries a one-time code instead of tokens in the
     // URL. detectSessionInUrl (on by default) exchanges it automatically.
     flowType: 'pkce',
+    // This tab only (sessionStorage), or every tab and across restarts when
+    // "Remember me" was ticked (localStorage). See lib/auth-storage.
+    storage: {
+      getItem: (key) => authStorage().getItem(key),
+      setItem: (key, value) => authStorage().setItem(key, value),
+      removeItem: (key) => authStorage().removeItem(key),
+    },
   },
 })
 
