@@ -1,4 +1,4 @@
-import { CircleAlert, LoaderCircle } from 'lucide-react'
+import { CircleAlert, Clock, LoaderCircle } from 'lucide-react'
 import { Link, useLoaderData } from 'react-router'
 import { LogoMark, LogoWordmark } from '@/components/Logo'
 import { ThemeToggle } from '@/components/ThemeToggle'
@@ -9,7 +9,7 @@ import { useSignInWithGoogle } from '@/features/auth/hooks'
 import type { loginLoader } from '@/features/auth/loaders'
 
 export function LoginPage() {
-  const { next, error } = useLoaderData<typeof loginLoader>()
+  const { next, error, inactive } = useLoaderData<typeof loginLoader>()
   const signIn = useSignInWithGoogle(next)
   // After success the browser is navigating to Google; keep the button busy.
   const redirecting = signIn.isPending || signIn.isSuccess
@@ -38,6 +38,13 @@ export function LoginPage() {
         <p className="mt-1 text-sm text-muted-foreground">
           A workspace for learning and teaching software engineering.
         </p>
+
+        {inactive && !message && !redirecting && (
+          <div role="status" className="mt-6 flex gap-2 rounded-lg border px-3 py-2.5 text-sm text-muted-foreground">
+            <Clock className="mt-0.5 size-4 shrink-0" />
+            <span>You were signed out because you hadn’t used DevDock for a while. Sign in to pick up where you left off.</span>
+          </div>
+        )}
 
         {message && (
           <div

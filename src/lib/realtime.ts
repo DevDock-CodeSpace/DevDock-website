@@ -1,4 +1,5 @@
 import type { Query, QueryKey } from '@tanstack/react-query'
+import { inactivityExpiredNow } from './inactivity'
 import { setLiveConnected } from './live'
 import { queryClient } from './query-client'
 import { supabase } from './supabase'
@@ -215,6 +216,17 @@ const isSignedUrl = (query: Query) => query.queryKey[0] === 'documents' && query
 let channels = 0
 
 /**
+ * Asks again for everything on screen, after a stretch in which change events
+ * could not arrive. Not when the person has been away past the inactivity limit:
+ * a laptop waking in the night is being signed out, not caught up.
+ */
+export function refreshAfterGap() {
+  if (inactivityExpiredNow()) return
+  // cancelRefetch off: coming back to a tab also refetches what has gone stale, and those requests shouldn't be sent twice.
+  void queryClient.invalidateQueries({ predicate: (query) => !isSignedUrl(query) }, { cancelRefetch: false })
+}
+
+/**
  * Subscribes to row changes until the returned function is called. Events are
  * batched, and wait while one of our own saves is running so a refetch can't
  * put an older value over an optimistic one.
@@ -267,7 +279,7 @@ export function startRealtimeSync(): () => void {
       if (status !== 'SUBSCRIBED') return
       console.info('[realtime] Live updates connected')
       // Back after a dropped connection (sleep, offline): events were missed, so refresh everything.
-      if (joined) void queryClient.invalidateQueries({ predicate: (query) => !isSignedUrl(query) })
+      if (joined) refreshAfterGap()
       joined = true
     })
 

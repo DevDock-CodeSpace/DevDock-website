@@ -2,6 +2,7 @@ import { ChevronUp, LoaderCircle, Maximize2, Minus, PhoneOff } from 'lucide-reac
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router'
 import { Button } from '@/components/ui/button'
+import { holdActivity } from '@/lib/inactivity'
 import { cn } from '@/lib/utils'
 import { LiveCallContext, useLiveCall, type ActiveCall } from './context'
 
@@ -27,6 +28,10 @@ export function LiveCallProvider({ children }: { children: ReactNode }) {
     if (el) setMinimized(false)
     setAnchor(el)
   }, [])
+  // Someone listening to a call touches nothing, and the call's own frame keeps its
+  // clicks to itself: being in one counts as activity (lib/inactivity).
+  const inCall = call !== null
+  useEffect(() => (inCall ? holdActivity() : undefined), [inCall])
   const value = useMemo(
     () => ({ call, anchorEl, minimized, setMinimized, startCall, endCall, setAnchorEl }),
     [call, anchorEl, minimized, startCall, endCall, setAnchorEl],

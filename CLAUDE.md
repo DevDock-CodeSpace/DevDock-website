@@ -86,6 +86,7 @@ npm run perf        # after a build: fails if the first load got heavier (budget
 npm run check       # everything below in one go: lint, typecheck + build, perf (CI runs this on every PR)
 npm run preview     # serve dist/
 npm run test:ai     # Deno tests for the ai-agent Edge Function (needs Deno; database tests: see docs/AI_AGENT.md)
+npm run test:idle   # Deno tests for the inactivity sign-out clock (src/lib/inactivity.ts)
 npm run db:types    # regenerate src/types/database.types.ts from the linked project (Supabase CLI)
 ```
 
@@ -313,13 +314,22 @@ supabase/
 - **Identity changes** (sign-in/out in another tab, expired session) are handled once, in `watchAuthIdentity` (router.tsx): clear the query cache, then `router.revalidate()`. Never call Supabase APIs inside an `onAuthStateChange` callback (deadlock risk; defer with `setTimeout`).
 - **Profiles are created only by the DB trigger.** Don't add client-side profile inserts. If a profile is missing or fails to load, the UI falls back to Google metadata (`useUserIdentity`).
 - **Route guards are UX, not security.** Every data rule must be enforced by RLS. Don't pass user IDs from the client as proof of anything.
+- **Inactivity sign-out** (`lib/inactivity.ts`, `lib/inactivity-config.ts`, `hooks/use-inactivity-logout.ts`, `InactivityGuard` on the `app` route): the owner asked for it because idle tabs kept making requests, and every request is a log line. Browser only: no server setting, table or request is involved.
+  - 15 minutes without input in **any** DevDock tab (`VITE_INACTIVITY_LIMIT_MINUTES` overrides it) signs the browser out (`signOutForInactivity`, `scope: 'local'`) and opens `/login?reason=inactive&next=…`. A dialog asks first, 120 s before.
+  - The decision is always `Date.now()` minus the last activity, kept in localStorage (`devdock:lastActivityAt`, one clock for all tabs, written at most every 5 s). Timers only ask the question again (every 30 s, on becoming visible, focus, `pageshow`, `online`, a `storage` event), because they stop while a laptop sleeps. Never replace this with one long `setTimeout`.
+  - Once the limit has passed nothing revives the session: the first mouse move after waking doesn't count, and a failed sign-out (offline) is retried by the next check.
+  - `requireUser` checks the same clock, so opening the app after a long absence goes to login before any data loads. Signing in restarts the clock (`startActivityClock` in `authCallbackLoader` and `signInWithPassword`); a new way to sign in must call it or the old timestamp signs the person straight back out.
+  - **A call counts as activity** (`holdActivity()` in `LiveCallProvider`): its frame is cross-origin, so no input reaches the page. Use `holdActivity()` for anything else a person watches without touching.
+  - Live updates ask the clock before refetching after a reconnect (`refreshAfterGap` → `inactivityExpiredNow`), so a laptop waking in the night is signed out, not caught up. A tab hidden for 5 minutes stops listening altogether (`useRealtimeSync`) and, when looked at again, subscribes and refreshes what's on screen once (about 11 requests on Home). The Realtime client closes its socket about a minute after the last channel goes.
+  - It is a convenience, not security: it runs in the person's browser. Supabase's own session limits need the Pro plan.
+  - Tests: `npm run test:idle` (Deno, no browser; time is a number the test moves).
 - **Errors:** show friendly messages (`features/auth/errors.ts`), log the raw error with `console.error('[auth] …')`, and never render Supabase/Postgres error text.
 - **Adding a deployed environment:** add `<origin>/auth/callback` to Supabase → Authentication → URL Configuration → Redirect URLs, and the origin to Google's Authorized JavaScript origins. The Google client secret lives only in the Supabase dashboard.
 
 ## Environment & secrets
 
 - Env vars live in `.env.local` (git-ignored). `.env.example` lists variable names only (no values) and is committed. Declare new `VITE_` vars in `src/env.d.ts` too.
-- Current vars: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, and optional `VITE_GITHUB_APP_SLUG` (public; hides Connect GitHub when unset). Live/JaaS keys (`JAAS_APP_ID`, `JAAS_KEY_ID`, `JAAS_PRIVATE_KEY`) and GitHub App keys (`GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY` as PKCS#8, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_WEBHOOK_SECRET`) are **Edge Function secrets**, set with `supabase secrets set`, never `VITE_` vars.
+- Current vars: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, and optional `VITE_GITHUB_APP_SLUG` (public; hides Connect GitHub when unset) and `VITE_INACTIVITY_LIMIT_MINUTES` (minutes before the inactivity sign-out; 15 when unset). Live/JaaS keys (`JAAS_APP_ID`, `JAAS_KEY_ID`, `JAAS_PRIVATE_KEY`) and GitHub App keys (`GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY` as PKCS#8, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_WEBHOOK_SECRET`) are **Edge Function secrets**, set with `supabase secrets set`, never `VITE_` vars.
 - Only `VITE_`-prefixed vars reach the browser, and **everything in the bundle is public**. Never put a service-role/secret key or any other secret in a `VITE_` var or in client code.
 - Security must come from Supabase RLS policies, not client-side checks.
 
