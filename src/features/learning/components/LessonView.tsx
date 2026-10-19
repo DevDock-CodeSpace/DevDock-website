@@ -161,7 +161,7 @@ export default function LessonView({ lesson }: { lesson: Lesson }) {
   }, [lesson.title, lesson.body, editor])
 
   return (
-    <div className="max-w-[760px]">
+    <div>
       <div className="mb-6 flex items-center justify-between gap-3">
         <nav aria-label="Lesson path" className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
           <Link to={learningPath(team.slug, workspace.id)} className="inline-flex shrink-0 items-center gap-1 hover:text-foreground">

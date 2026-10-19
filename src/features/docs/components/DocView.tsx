@@ -265,7 +265,7 @@ export default function DocView({ doc, canEdit, canDelete }: { doc: Doc; canEdit
 
   return (
     // Left gutter holds the drag handle and the heading collapse toggles.
-    <div className="max-w-[820px] pl-6 md:pl-16" onKeyDown={onKeyDown}>
+    <div className="pl-6 md:pl-16" onKeyDown={onKeyDown}>
       <div className="mb-8 flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3 text-xs text-muted-foreground">
           <nav aria-label="Folder path" className="flex min-w-0 items-center gap-1">
