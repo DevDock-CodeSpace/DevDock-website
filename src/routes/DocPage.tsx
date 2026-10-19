@@ -31,7 +31,7 @@ export function DocPage() {
 
 function DocSkeleton() {
   return (
-    <div className="max-w-[820px] space-y-4 pl-6 md:pl-16">
+    <div className="space-y-4 pl-6 md:pl-16">
       <Skeleton className="h-3 w-24" />
       <Skeleton className="mt-8 h-11 w-2/3" />
       <Skeleton className="h-3 w-40" />

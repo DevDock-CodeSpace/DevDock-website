@@ -17,12 +17,12 @@ export function SettingsSection({
   tone?: 'default' | 'danger'
 }) {
   return (
-    <section className="grid gap-4 border-t py-8 first:border-t-0 first:pt-2 lg:grid-cols-[260px_minmax(0,1fr)] lg:gap-10">
+    <section className="grid gap-4 border-t py-8 first:border-t-0 first:pt-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,3fr)] lg:gap-10">
       <div className="space-y-1">
         <h2 className={cn('text-sm font-semibold', tone === 'danger' && 'text-destructive')}>{title}</h2>
         {description && <p className="text-sm text-muted-foreground">{description}</p>}
       </div>
-      <div className="min-w-0 max-w-xl">{children}</div>
+      <div className="min-w-0">{children}</div>
     </section>
   )
 }

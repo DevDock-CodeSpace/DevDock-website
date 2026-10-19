@@ -150,7 +150,7 @@ export function LiveSessionView({ session, workspaceId }: LiveSessionViewProps) 
   }
 
   return (
-    <div className="max-w-3xl">
+    <div>
       <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
         <Video className="size-3.5" />
         <span>Meeting</span>
