@@ -26,6 +26,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
 import { buildContext } from './agent/context.ts'
 import { logEvent } from './agent/log.ts'
 import { buildSystemPrompt, readHistory } from './agent/prompt.ts'
+import { saveRequest, type RecordedStep } from './agent/record.ts'
 import { runAgent } from './agent/runner.ts'
 import { isUuid } from './agent/schema.ts'
 import { AiProviderError, type AiAgentResponse, type AiExecutionContext } from './agent/types.ts'
@@ -144,12 +145,16 @@ Deno.serve(async (req) => {
   if (!built.ok) return json({ error: built.code }, built.status)
   const context = built.context
 
-  // The service role, for ai_pending_actions only; tools never receive this client.
-  const store = supabasePendingStore(
-    createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false, autoRefreshToken: false } }),
-  )
+  // The service role, for ai_pending_actions and ai_requests only; tools never receive this client.
+  const admin = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false, autoRefreshToken: false } })
+  const store = supabasePendingStore(admin)
 
-  const finish = (response: AiAgentResponse) => {
+  // What the person typed and what the tools did, kept in ai_requests (readable only by them).
+  const steps: RecordedStep[] = []
+  let asked = ''
+
+  const finish = async (response: AiAgentResponse) => {
+    if (asked) await saveRequest(admin, { context, message: asked, steps, response, ms: Date.now() - started })
     logEvent(requestId, 'done', {
       userId,
       action: String(action),
@@ -187,6 +192,7 @@ Deno.serve(async (req) => {
     const provider = createProvider((name) => Deno.env.get(name))
     if (!provider) return json({ error: 'not_configured' }, 503)
 
+    asked = message
     return finish(
       await runAgent({
         provider,
@@ -197,6 +203,7 @@ Deno.serve(async (req) => {
         history: readHistory(body.history),
         message,
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        onStep: (step) => steps.push(step),
       }),
     )
   } catch (error) {

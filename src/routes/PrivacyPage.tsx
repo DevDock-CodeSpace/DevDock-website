@@ -88,8 +88,10 @@ export function PrivacyPage() {
           <p>
             It can only see and do what you are allowed to see and do, and it asks you before sending a message.
             DevDock does not send your email address, your sign-in, your documents or your chat history to the model,
-            and it does not keep a record of your Ask DevDock chats: they exist only in your browser tab until you close
-            it. A message you ask it to prepare is held for up to ten minutes while it waits for your confirmation.
+            and the chat itself lives only in your browser tab until you close it. DevDock does keep a private record of
+            each request you send: what you typed, the steps it took in DevDock to answer (which actions it ran and
+            with what details), and its reply. It is there so a wrong answer can be traced and fixed; only you can read
+            it, other people in your group can’t, and it is kept until your account or group is deleted. A message you ask it to prepare is held for up to ten minutes while it waits for your confirmation.
           </p>
           <p>
             Google processes these requests under the terms of its Gemini API. On the free plan DevDock currently uses,
