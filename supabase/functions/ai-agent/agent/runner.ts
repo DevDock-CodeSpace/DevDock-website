@@ -6,6 +6,7 @@
 import { requiresConfirmation, type PendingActionStore } from '../safety/confirmation.ts'
 import type { ToolFilter, ToolRegistry } from '../tools/registry.ts'
 import { logEvent } from './log.ts'
+import { recordStep, type RecordedStep } from './record.ts'
 import { validate } from './schema.ts'
 import type { AiAgentResponse, AiExecutionContext, AiMessage, AiProvider, AiToolCall, AiToolResult } from './types.ts'
 
@@ -63,6 +64,8 @@ export async function runAgent(input: {
   tools?: ToolFilter
   limits?: Partial<RunnerLimits>
   signal?: AbortSignal
+  /** Told about every tool call and its outcome, for the request record. */
+  onStep?: (step: RecordedStep) => void
 }): Promise<AiAgentResponse> {
   const { provider, registry, context, store, system } = input
   const limits = { ...DEFAULT_LIMITS, ...input.limits }
@@ -74,10 +77,18 @@ export async function runAgent(input: {
 
   async function runCall(call: AiToolCall, modelText: string | null): Promise<Outcome> {
     const tool = allowed.has(call.name) ? registry.get(call.name) : undefined
-    if (!tool) return { kind: 'result', result: fail('UNKNOWN_TOOL', `There is no tool called "${call.name}".`) }
+    if (!tool) {
+      const result = fail('UNKNOWN_TOOL', `There is no tool called "${call.name}".`)
+      input.onStep?.(recordStep(call.name, 'execute', call.args, result))
+      return { kind: 'result', result }
+    }
 
     const checked = validate(tool.definition.inputSchema, call.args)
-    if (!checked.ok) return { kind: 'result', result: fail('INVALID_ARGUMENTS', checked.errors.join('; ')) }
+    if (!checked.ok) {
+      const result = fail('INVALID_ARGUMENTS', checked.errors.join('; '))
+      input.onStep?.(recordStep(call.name, 'execute', call.args, result))
+      return { kind: 'result', result }
+    }
 
     // The same call with the same arguments over and over is a loop, not progress.
     const signature = `${call.name}:${JSON.stringify(checked.value)}`
@@ -87,6 +98,7 @@ export async function runAgent(input: {
 
     const started = Date.now()
     const finish = (result: AiToolResult, phase: 'execute' | 'prepare') => {
+      input.onStep?.(recordStep(call.name, phase, checked.value, result))
       logEvent(context.requestId, 'tool', {
         tool: call.name,
         phase,

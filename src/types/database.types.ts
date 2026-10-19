@@ -72,6 +72,76 @@ export type Database = {
           },
         ]
       }
+      ai_requests: {
+        Row: {
+          asked_at: string
+          id: string
+          message: string
+          ms: number | null
+          outcome: string
+          page: string | null
+          reply: string | null
+          request_id: string
+          steps: Json
+          team_id: string
+          time_zone: string | null
+          user_id: string
+          workspace_id: string | null
+        }
+        Insert: {
+          asked_at?: string
+          id?: string
+          message: string
+          ms?: number | null
+          outcome: string
+          page?: string | null
+          reply?: string | null
+          request_id: string
+          steps?: Json
+          team_id: string
+          time_zone?: string | null
+          user_id: string
+          workspace_id?: string | null
+        }
+        Update: {
+          asked_at?: string
+          id?: string
+          message?: string
+          ms?: number | null
+          outcome?: string
+          page?: string | null
+          reply?: string | null
+          request_id?: string
+          steps?: Json
+          team_id?: string
+          time_zone?: string | null
+          user_id?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_requests_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_requests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_requests_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversation_members: {
         Row: {
           conversation_id: string
