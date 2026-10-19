@@ -23,8 +23,17 @@ Ask DevDock panel (src/features/ai, lazy-loaded)
   → Supabase RLS, grants and triggers decide
 ```
 
-The function is stateless except for one table, `ai_pending_actions`. Chat history lives in the browser tab and the
-last 12 turns are sent with each request (bounded again on the server); nothing about a chat is stored.
+The function keeps two tables: `ai_pending_actions` (confirmations waiting) and `ai_requests` (a record of each request,
+below). Chat history lives in the browser tab and the last 12 turns are sent with each request (bounded again on the
+server); the chat itself isn't stored, only each request on its own.
+
+**Request record (`ai_requests`, `agent/record.ts`):** the owner asked (2026-10-19) to keep what people type so a wrong
+answer can be traced (a reminder came out at the wrong time). One row per message request: the text, open page, time
+zone and the clock the model was given, every tool call (name, arguments, success/code, result cut to 2,000
+characters) and the reply, including failures. Written with the service role, pinned to the verified user id; a failed
+write is logged and never fails the request. RLS: a person reads only their own rows (group admins can't, as with
+reminders); no update/delete grants; kept until the person or group is deleted (no purge). `/privacy` says so, keep it
+true. Confirm and cancel actions aren't recorded.
 
 | Folder | What it holds | Knows about |
 |--------|---------------|-------------|
@@ -94,7 +103,7 @@ written through the service role, pinned to the verified user id, and that clien
   the same checks).
 - Limits: 2,000 characters per request, 6 model rounds, 4 tool calls per round, the same call refused the third
   time, 15 s per tool, 25 s per model call, 50 s per request, 20 requests a minute per person (per isolate).
-- Logs carry request id, user id, tool name, duration, outcome and model. Never arguments, message text or tokens.
+- Function logs carry request id, user id, tool name, duration, outcome and model. Never arguments, message text or tokens (those go to `ai_requests`, not the logs).
 
 ## Configuration
 
