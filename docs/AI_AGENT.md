@@ -179,7 +179,7 @@ service role.
 - **Message body.** Plain text becomes the same one-paragraph-per-line TipTap JSON the browser sends by default.
 - **Issue description.** Plain text becomes a TipTap doc of paragraphs (no images).
 - **Reminder times.** The model never does date arithmetic for a reminder: it passes `inMinutes`, a local `date` and/or
-  `time`, or an exact `remindAt`, and the tool turns that into an instant in the person's zone (`zonedInstant`, DST-safe:
+  `time`, or a `meetingId` with `minutesBefore` (counted from the meeting's stored start on the server; no raw timestamp is accepted, because a model once copied a UTC start's digits under a local offset and a reminder for 11:00 AM landed at 4:00 PM), and the tool turns that into an instant in the person's zone (`zonedInstant`, DST-safe:
   a skipped time lands after the gap, a repeated one is the first). A date alone keeps a reminder's time of day and a
   time alone keeps its date; a new reminder with a day but no time is a question, not 9 AM. Past times are refused.
 - **Cancelling a reminder is a `write`, not `destructive`:** it is kept and can be reopened (`update_reminder`,
