@@ -17,7 +17,7 @@ export function LessonPage() {
   return (
     <Suspense
       fallback={
-        <div className="max-w-[760px] space-y-4">
+        <div className="space-y-4">
           <Skeleton className="h-3 w-40" />
           <Skeleton className="h-8 w-2/3" />
           <Skeleton className="h-4 w-full" />

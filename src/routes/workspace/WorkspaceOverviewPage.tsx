@@ -29,7 +29,7 @@ export function WorkspaceOverviewPage() {
       <div className="min-w-0 space-y-10">
         <Section title="About">
           {workspace.description ? (
-            <p className="max-w-prose whitespace-pre-wrap text-[15px] leading-relaxed">{workspace.description}</p>
+            <p className="whitespace-pre-wrap text-[15px] leading-relaxed">{workspace.description}</p>
           ) : (
             <p className="text-sm text-muted-foreground">
               No description yet.

@@ -130,7 +130,7 @@ export default function IssueView({ issue }: { issue: IssueDetail }) {
 
   return (
     <div className="flex flex-col gap-8 lg:flex-row lg:gap-10">
-      <div className="min-w-0 flex-1 lg:max-w-[760px]">
+      <div className="min-w-0 flex-1">
         <div className="mb-6 flex items-center justify-between gap-3">
           <nav aria-label="Issue" className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
             <Link to={issuesPath(team.slug, workspace.id)} className="inline-flex shrink-0 items-center gap-1 hover:text-foreground">
