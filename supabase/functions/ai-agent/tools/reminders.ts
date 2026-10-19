@@ -3,8 +3,11 @@
 // (owner only), the column grants and the check_reminder trigger decide what is allowed. Delivery
 // is the database's job (pg_cron → the bell); these tools only create and change reminders.
 //
-// Times: the model never does date arithmetic. It passes minutes from now, a local date and time,
-// or an exact ISO time, and the server turns that into an instant in the user's time zone.
+// Times: the model never does date arithmetic or time-zone conversion. It passes minutes from now,
+// a local date and time, or a meeting and "minutes before it", and the server turns that into an
+// instant in the user's time zone. There is deliberately no way to pass a raw timestamp: a model
+// that was handed a UTC start time kept its digits and stamped the local offset on them (a
+// reminder for 11:00 AM came out at 4:00 PM).
 
 import { isUuid } from '../agent/schema.ts'
 import { formatLocal, localDate, localTimeOfDay, rangeOf, zonedInstant, type DayRange } from '../agent/time.ts'
@@ -66,7 +69,7 @@ function summary(row: ReminderRow, context: AiExecutionContext) {
 
 // ------------------------------------------------------------------- when
 
-type WhenArgs = { inMinutes?: number; date?: string; time?: string; remindAt?: string }
+type WhenArgs = { inMinutes?: number; date?: string; time?: string; meetingId?: string; minutesBefore?: number }
 
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/
 
@@ -74,25 +77,62 @@ const WHEN_PROPERTIES: Record<string, JsonSchema> = {
   inMinutes: { type: 'integer', minimum: 1, maximum: 525_600, description: 'Minutes from now ("in 45 minutes" → 45, "in 2 hours" → 120).' },
   date: { type: 'string', format: 'date', description: 'Local date, YYYY-MM-DD, worked out from today in the context.' },
   time: { type: 'string', maxLength: 5, description: 'Local time, 24-hour HH:MM ("9 am" → 09:00, "3:30 pm" → 15:30, "afternoon" → 15:00, "morning" → 09:00, "evening" → 18:00).' },
-  remindAt: { type: 'string', format: 'date-time', description: 'An exact ISO time instead, e.g. 15 minutes before a meeting’s startsAt.' },
+  meetingId: { type: 'string', format: 'uuid', description: 'A meeting’s id from the meetings tools, to remind the user shortly before it starts. Needs minutesBefore.' },
+  minutesBefore: { type: 'integer', minimum: 0, maximum: 10_080, description: 'With meetingId: how many minutes before the meeting starts ("10 minutes before" → 10, "when it starts" → 0). If the user didn’t say, ask.' },
+}
+
+/** Past, absurdly far ahead, or not a date at all. A time a little in the past is "now". */
+function checkBounds(at: Date, context: AiExecutionContext): AiToolResult<Date> {
+  const now = new Date(context.currentTime)
+  if (Number.isNaN(at.getTime())) return fail('INVALID_ARGUMENTS', 'That isn’t a valid time.')
+  if (at.getTime() < now.getTime() - GRACE_MS) {
+    return fail('INVALID_ARGUMENTS', `That time (${formatLocal(at.toISOString(), context.timeZone)}) has already passed. Ask for a later one.`)
+  }
+  if (at.getTime() > now.getTime() + MAX_AHEAD_MS) return fail('INVALID_ARGUMENTS', 'That is too far ahead. Pick a time within five years.')
+  return ok(at)
+}
+
+type Meeting = { title: string; startsAt: string; when: string }
+
+/** The meeting's start, read as the caller (RLS decides whether they can see it). */
+async function findMeeting(context: AiExecutionContext, id: string): Promise<AiToolResult<Meeting>> {
+  if (!isUuid(id)) return fail('INVALID_ARGUMENTS', 'meetingId must be a meeting id from the meetings tools.')
+  const { data, error } = await context.db.from('live_sessions').select('title, starts_at').eq('id', id).eq('team_id', context.teamId).maybeSingle()
+  if (error) return dbFailure('load the meeting', error)
+  if (!data) return fail('NOT_FOUND', 'That meeting isn’t one you can open in this group.')
+  const row = data as { title: string; starts_at: string }
+  return ok({ title: row.title, startsAt: row.starts_at, when: formatLocal(row.starts_at, context.timeZone) })
 }
 
 /**
  * The instant the arguments describe, or null when they give no time. Exactly one way: minutes
- * from now, a local date and/or time, or an exact time. When changing a reminder, a date alone
- * keeps its time of day and a time alone keeps its date. A new reminder with a time and no date
- * is today, or tomorrow if that time has passed.
+ * from now, a local date and/or time, or minutes before a meeting. When changing a reminder, a
+ * date alone keeps its time of day and a time alone keeps its date. A new reminder with a time
+ * and no date is today, or tomorrow if that time has passed. `meeting` is set when one was used.
  */
-function resolveWhen(args: WhenArgs, context: AiExecutionContext, current?: string): AiToolResult<Date> | null {
-  const ways = [args.inMinutes !== undefined, args.date !== undefined || args.time !== undefined, args.remindAt !== undefined].filter(Boolean).length
+async function resolveWhen(
+  args: WhenArgs,
+  context: AiExecutionContext,
+  current?: string,
+): Promise<(AiToolResult<Date> & { meeting?: Meeting }) | null> {
+  const meetingWay = args.meetingId !== undefined || args.minutesBefore !== undefined
+  const ways = [args.inMinutes !== undefined, args.date !== undefined || args.time !== undefined, meetingWay].filter(Boolean).length
   if (ways === 0) return null
-  if (ways > 1) return fail('INVALID_ARGUMENTS', 'Give the time one way: inMinutes, or date and time, or remindAt.')
+  if (ways > 1) return fail('INVALID_ARGUMENTS', 'Give the time one way: inMinutes, or date and time, or meetingId with minutesBefore.')
   if (args.time !== undefined && !TIME.test(args.time)) return fail('INVALID_ARGUMENTS', 'time must be 24-hour HH:MM, like 09:00 or 15:30.')
+
+  if (meetingWay) {
+    if (args.meetingId === undefined) return fail('INVALID_ARGUMENTS', 'minutesBefore needs a meetingId.')
+    if (args.minutesBefore === undefined) return fail('NEEDS_CLARIFICATION', 'Ask how many minutes before the meeting to remind them (for example 5, 10 or 15).')
+    const meeting = await findMeeting(context, args.meetingId)
+    if (!meeting.success) return meeting
+    const at = checkBounds(new Date(Date.parse(meeting.data.startsAt) - args.minutesBefore * MINUTE), context)
+    return at.success ? { ...at, meeting: meeting.data } : at
+  }
 
   const now = new Date(context.currentTime)
   let at: Date
   if (args.inMinutes !== undefined) at = new Date(now.getTime() + args.inMinutes * MINUTE)
-  else if (args.remindAt !== undefined) at = new Date(args.remindAt)
   else {
     const was = current ? new Date(current) : null
     const time = args.time ?? (was ? localTimeOfDay(was, context.timeZone) : undefined)
@@ -104,12 +144,7 @@ function resolveWhen(args: WhenArgs, context: AiExecutionContext, current?: stri
       if (at.getTime() <= now.getTime()) at = zonedInstant(localDate(new Date(now.getTime() + 24 * 60 * MINUTE), context.timeZone), time, context.timeZone)
     }
   }
-  if (Number.isNaN(at.getTime())) return fail('INVALID_ARGUMENTS', 'That isn’t a valid time.')
-  if (at.getTime() < now.getTime() - GRACE_MS) {
-    return fail('INVALID_ARGUMENTS', `That time (${formatLocal(at.toISOString(), context.timeZone)}) has already passed. Ask for a later one.`)
-  }
-  if (at.getTime() > now.getTime() + MAX_AHEAD_MS) return fail('INVALID_ARGUMENTS', 'That is too far ahead. Pick a time within five years.')
-  return ok(at)
+  return checkBounds(at, context)
 }
 
 // --------------------------------------------------------- what it is about
@@ -225,7 +260,9 @@ export const reminderTools = [
     description:
       'Set a reminder for the signed-in user: at that time it shows up in their DevDock notifications. ' +
       'Only for the user themselves; reminders can’t be set for other people. Write the title as what to do ("Review CAP-12", "Deploy staging"). ' +
-      'Give the time as inMinutes, or a local date and time, or remindAt. If the user gave a day but no time, ask what time.',
+      'Give the time as inMinutes, or a local date and time, or, for a reminder before a meeting, meetingId (from the meetings tools) with minutesBefore. ' +
+      'Never work out a time from a meeting’s startsAt yourself. If the user gave a day but no time, ask what time. ' +
+      'When you tell the user the result, say the reminder’s own `when`, not the meeting’s time.',
     domain: 'reminders',
     capability: 'create',
     risk: 'write',
@@ -240,7 +277,7 @@ export const reminderTools = [
       required: ['title'],
     },
     async execute(args, context) {
-      const at = resolveWhen(args, context)
+      const at = await resolveWhen(args, context)
       if (at === null) return fail('NEEDS_CLARIFICATION', 'Ask the user when to remind them.')
       if (!at.success) return at
       const about = await resolveAbout(args, context)
@@ -251,7 +288,10 @@ export const reminderTools = [
         .select(COLUMNS)
         .single()
       if (error) return dbFailure('create the reminder', error, WRITE_ERRORS)
-      return ok({ created: summary(data as unknown as ReminderRow, context) })
+      return ok({
+        created: summary(data as unknown as ReminderRow, context),
+        ...(at.meeting ? { forMeeting: { title: at.meeting.title, starts: at.meeting.when } } : {}),
+      })
     },
   }),
 
@@ -330,7 +370,7 @@ export const reminderTools = [
       const found = await findReminder(context, args, args.reopen ? ['completed', 'cancelled'] : ['pending'])
       if (!found.success) return found
       const reminder = found.data
-      const at = resolveWhen(args, context, reminder.remind_at)
+      const at = await resolveWhen(args, context, reminder.remind_at)
       if (at && !at.success) return at
       const about = await resolveAbout(args, context)
       if (!about.success) return about

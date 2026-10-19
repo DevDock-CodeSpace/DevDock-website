@@ -387,13 +387,32 @@ Deno.test({
         assertEquals([garden.project, garden.issue], ['Beta Garden', null])
       })
 
+      await t.step('create_reminder: before a meeting is counted from its start on the server', async () => {
+        const { data: start } = await f.admin.from('live_sessions').select('starts_at').eq('id', f.meetings.group).single()
+        const made = data<{ created: Reminder; forMeeting: { title: string } }>(
+          await run('create_reminder', { title: 'Group sync', meetingId: f.meetings.group, minutesBefore: 15 }, f.context(kumar)),
+        )
+        assertEquals(Date.parse(made.created.remindAt), Date.parse((start as { starts_at: string }).starts_at) - 15 * 60_000)
+        assertEquals(made.forMeeting.title, 'Group sync')
+        // How long before is asked, not guessed; zero means "when it starts".
+        assertEquals(code(await run('create_reminder', { title: 'x', meetingId: f.meetings.group }, f.context(kumar))), 'NEEDS_CLARIFICATION')
+        assertEquals(code(await run('create_reminder', { title: 'x', minutesBefore: 10 }, f.context(kumar))), 'INVALID_ARGUMENTS')
+        // Only a meeting the person can open.
+        assertEquals(code(await run('create_reminder', { title: 'x', meetingId: f.meetings.alpha, minutesBefore: 10 }, f.context(reddy))), 'NOT_FOUND')
+        // One way to give the time.
+        assertEquals(code(await run('create_reminder', { title: 'x', meetingId: f.meetings.group, minutesBefore: 10, inMinutes: 5 }, f.context(kumar))), 'INVALID_ARGUMENTS')
+      })
+
       await t.step('create_reminder: unclear or impossible times are asked about, never guessed', async () => {
         const ctx = f.context(kumar)
         assertEquals(code(await run('create_reminder', { title: 'x' }, ctx)), 'NEEDS_CLARIFICATION')
         assertEquals(code(await run('create_reminder', { title: 'x', date: localDate(new Date(Date.now() + 86_400_000), 'UTC') }, ctx)), 'NEEDS_CLARIFICATION')
         assertEquals(code(await run('create_reminder', { title: 'x', inMinutes: 5, time: '10:00' }, ctx)), 'INVALID_ARGUMENTS')
         assertEquals(code(await run('create_reminder', { title: 'x', time: '9am' }, ctx)), 'INVALID_ARGUMENTS')
-        assertEquals(code(await run('create_reminder', { title: 'x', remindAt: new Date(Date.now() - 3_600_000).toISOString() }, ctx)), 'INVALID_ARGUMENTS')
+        // Two hours before a meeting that starts in one is already past.
+        assertEquals(code(await run('create_reminder', { title: 'x', meetingId: f.meetings.group, minutesBefore: 120 }, ctx)), 'INVALID_ARGUMENTS')
+        // A raw timestamp is not a way to give the time (a UTC start time once came back with a local offset on it): it is ignored, so the time is still asked.
+        assertEquals(code(await run('create_reminder', { title: 'x', remindAt: new Date(Date.now() + 3_600_000).toISOString() }, ctx)), 'NEEDS_CLARIFICATION')
         assertEquals(code(await run('create_reminder', { title: 'x', inMinutes: 5, issue: 'the login one' }, ctx)), 'INVALID_ARGUMENTS')
       })
 
@@ -412,7 +431,7 @@ Deno.test({
         const open = data<Reminders>(await run('list_reminders', {}, f.context(kumar)))
         assertEquals(open.reminders[0].title, 'Send the invoice')
         assertEquals(open.reminders[0].status, 'overdue')
-        assertEquals(open.total, 4)
+        assertEquals(open.total, 5)
         assertEquals(data<Reminders>(await run('list_reminders', { status: 'overdue' }, f.context(kumar))).reminders.map((r) => r.title), ['Send the invoice'])
         assertEquals(data<Reminders>(await run('list_reminders', { query: 'staging' }, f.context(kumar))).reminders.map((r) => r.title), ['Deploy staging'])
         const tomorrow = data<Reminders>(await run('list_reminders', { range: 'tomorrow' }, f.context(kumar, { timeZone: 'Asia/Kolkata' })))
