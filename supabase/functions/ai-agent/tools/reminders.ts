@@ -1,7 +1,8 @@
-// Reminders: the user's own, private, time-based reminders in the current group. Every query and
+// Notes (the tools and tables still say reminders): the user's own, private notes in the current group,
+// each optionally with a time at which it pops up and reaches the bell. Every query and
 // write is the one the Reminders page makes (src/features/reminders/api.ts), as the caller, so RLS
 // (owner only), the column grants and the check_reminder trigger decide what is allowed. Delivery
-// is the database's job (pg_cron → the bell); these tools only create and change reminders.
+// is the database's job (pg_cron → the bell); these tools only create and change notes.
 //
 // Times: the model never does date arithmetic or time-zone conversion. It passes minutes from now,
 // a local date and time, or a meeting and "minutes before it", and the server turns that into an
@@ -33,7 +34,8 @@ type ReminderRow = {
   id: string
   title: string
   notes: string | null
-  remind_at: string
+  /** Null for a note with no time. */
+  remind_at: string | null
   status: ReminderStatus
   completed_at: string | null
   cancelled_at: string | null
@@ -53,13 +55,22 @@ const WRITE_ERRORS = {
 function summary(row: ReminderRow, context: AiExecutionContext) {
   const now = Date.parse(context.currentTime)
   const state =
-    row.status === 'pending' ? (Date.parse(row.remind_at) <= now ? 'overdue' : 'upcoming') : row.status === 'completed' ? 'completed' : 'cancelled'
+    row.status === 'pending'
+      ? row.remind_at === null
+        ? 'note'
+        : Date.parse(row.remind_at) <= now
+          ? 'overdue'
+          : 'upcoming'
+      : row.status === 'completed'
+        ? 'completed'
+        : 'cancelled'
   return {
     id: row.id,
     title: row.title,
     /** In the user's time zone, ready to say. */
-    when: formatLocal(row.remind_at, context.timeZone),
-    remindAt: new Date(row.remind_at).toISOString(),
+    // Null for a note that has no time.
+    when: row.remind_at ? formatLocal(row.remind_at, context.timeZone) : null,
+    remindAt: row.remind_at ? new Date(row.remind_at).toISOString() : null,
     status: state,
     issue: row.issue && row.workspace ? `${row.workspace.issue_key}-${row.issue.number}` : null,
     project: row.workspace?.title ?? null,
@@ -245,9 +256,9 @@ async function write(context: AiExecutionContext, id: string, patch: Record<stri
 const LIST_STATUSES = ['upcoming', 'overdue', 'completed', 'cancelled'] as const
 const RANGES = ['today', 'tomorrow', 'this_week', 'next_week'] as const
 
-type CreateArgs = WhenArgs & AboutArgs & { title: string; notes?: string }
+type CreateArgs = WhenArgs & AboutArgs & { title: string; notes?: string; withoutTime?: boolean }
 type ListArgs = { status?: (typeof LIST_STATUSES)[number]; range?: (typeof RANGES)[number]; query?: string; limit?: number }
-type UpdateArgs = TargetArgs & WhenArgs & AboutArgs & { title?: string; notes?: string; reopen?: boolean }
+type UpdateArgs = TargetArgs & WhenArgs & AboutArgs & { title?: string; notes?: string; reopen?: boolean; removeTime?: boolean }
 
 const ABOUT_PROPERTIES: Record<string, JsonSchema> = {
   issue: { type: 'string', maxLength: 20, description: 'An issue identifier like CAP-12 (for "this", the one the user is looking at), or "none" to remove it.' },
@@ -258,11 +269,12 @@ export const reminderTools = [
   defineTool<CreateArgs>({
     name: 'create_reminder',
     description:
-      'Set a reminder for the signed-in user: at that time it shows up in their DevDock notifications. ' +
-      'Only for the user themselves; reminders can’t be set for other people. Write the title as what to do ("Review CAP-12", "Deploy staging"). ' +
-      'Give the time as inMinutes, or a local date and time, or, for a reminder before a meeting, meetingId (from the meetings tools) with minutesBefore. ' +
+      'Save a note for the signed-in user. A note may have a time: then it pops up on their screen and reaches their notifications then. Without a time it just stays in their notes. ' +
+      'Only for the user themselves. Write the title as what to remember or do ("Review CAP-12", "Deploy staging"). ' +
+      'If the user wants it to show up at a time, give the time as inMinutes, or a local date and time, or, for a time before a meeting, meetingId (from the meetings tools) with minutesBefore. ' +
       'Never work out a time from a meeting’s startsAt yourself. If the user gave a day but no time, ask what time. ' +
-      'When you tell the user the result, say the reminder’s own `when`, not the meeting’s time.',
+      'If the user gave no time at all, ask whether they want it to show up at a particular time; set withoutTime: true ONLY when their words are about saving or jotting something down ("note that", "jot down", "write down", "save") and do not ask to be reminded. "Remind me" or "alert me" with no time is never withoutTime: ask when. ' +
+      'When you tell the user the result, say the note’s own `when`, not the meeting’s time.',
     domain: 'reminders',
     capability: 'create',
     risk: 'write',
@@ -272,25 +284,29 @@ export const reminderTools = [
         title: { type: 'string', maxLength: TITLE_MAX, description: 'What to be reminded of.' },
         notes: { type: 'string', maxLength: NOTES_MAX, description: 'Optional details.' },
         ...WHEN_PROPERTIES,
+        withoutTime: { type: 'boolean', description: 'true: save it as a plain note with no time (only when the user said so).' },
         ...ABOUT_PROPERTIES,
       },
       required: ['title'],
     },
     async execute(args, context) {
       const at = await resolveWhen(args, context)
-      if (at === null) return fail('NEEDS_CLARIFICATION', 'Ask the user when to remind them.')
-      if (!at.success) return at
+      if (at === null && !args.withoutTime) {
+        return fail('NEEDS_CLARIFICATION', 'Ask the user whether this note should show up at a particular time, and when. If they only want it saved, call again with withoutTime: true.')
+      }
+      if (at && !at.success) return at
+      if (at && args.withoutTime) return fail('INVALID_ARGUMENTS', 'withoutTime can’t be combined with a time.')
       const about = await resolveAbout(args, context)
       if (!about.success) return about
       const { data, error } = await context.db
         .from('reminders')
-        .insert({ team_id: context.teamId, title: args.title, notes: args.notes ?? null, remind_at: at.data.toISOString(), ...about.data })
+        .insert({ team_id: context.teamId, title: args.title, notes: args.notes ?? null, remind_at: at ? at.data.toISOString() : null, ...about.data })
         .select(COLUMNS)
         .single()
       if (error) return dbFailure('create the reminder', error, WRITE_ERRORS)
       return ok({
         created: summary(data as unknown as ReminderRow, context),
-        ...(at.meeting ? { forMeeting: { title: at.meeting.title, starts: at.meeting.when } } : {}),
+        ...(at?.meeting ? { forMeeting: { title: at.meeting.title, starts: at.meeting.when } } : {}),
       })
     },
   }),
@@ -298,7 +314,7 @@ export const reminderTools = [
   defineTool<ListArgs>({
     name: 'list_reminders',
     description:
-      'List the signed-in user’s reminders in this group. status: "upcoming" (default: every open one, overdue first), ' +
+      'List the signed-in user’s notes in this group. status: "upcoming" (default: every open note, ones with a time first and plain notes after), ' +
       '"overdue" (its time has passed and it isn’t done), "completed" or "cancelled". range narrows open ones to a day or week; query matches the title.',
     domain: 'reminders',
     capability: 'search',
@@ -349,8 +365,9 @@ export const reminderTools = [
   defineTool<UpdateArgs>({
     name: 'update_reminder',
     description:
-      'Change one of the user’s reminders: title, notes, time, issue or project, or reopen a completed or cancelled one (reopen: true). ' +
-      'A date alone keeps its time of day; a time alone keeps its date. "Snooze for an hour" is inMinutes: 60. Moving it later makes it remind again.',
+      'Change one of the user’s notes: title, details, time, issue or project, or reopen a done or archived one (reopen: true). ' +
+      'removeTime: true makes it a plain note again. A date alone keeps its time of day; a time alone keeps its date, and a note with no time needs both. ' +
+      '"Snooze for an hour" is inMinutes: 60. Moving it later makes it show up again.',
     domain: 'reminders',
     capability: 'update',
     risk: 'write',
@@ -362,7 +379,8 @@ export const reminderTools = [
         notes: { type: 'string', maxLength: NOTES_MAX, description: 'New notes; an empty string removes them.' },
         ...WHEN_PROPERTIES,
         ...ABOUT_PROPERTIES,
-        reopen: { type: 'boolean', description: 'Make a completed or cancelled reminder open again.' },
+        reopen: { type: 'boolean', description: 'Make a done or archived note open again.' },
+        removeTime: { type: 'boolean', description: 'Take its time away so it stays a note and no longer pops up.' },
       },
     },
     async execute(args, context) {
@@ -370,7 +388,10 @@ export const reminderTools = [
       const found = await findReminder(context, args, args.reopen ? ['completed', 'cancelled'] : ['pending'])
       if (!found.success) return found
       const reminder = found.data
-      const at = await resolveWhen(args, context, reminder.remind_at)
+      if (args.removeTime && (args.inMinutes !== undefined || args.date !== undefined || args.time !== undefined || args.meetingId !== undefined)) {
+        return fail('INVALID_ARGUMENTS', 'removeTime can’t be combined with a time.')
+      }
+      const at = await resolveWhen(args, context, reminder.remind_at ?? undefined)
       if (at && !at.success) return at
       const about = await resolveAbout(args, context)
       if (!about.success) return about
@@ -378,6 +399,7 @@ export const reminderTools = [
         ...(args.title !== undefined ? { title: args.title } : {}),
         ...(args.notes !== undefined ? { notes: args.notes || null } : {}),
         ...(at ? { remind_at: at.data.toISOString() } : {}),
+        ...(args.removeTime ? { remind_at: null } : {}),
         ...about.data,
         ...(args.reopen && reminder.status !== 'pending' ? { status: 'pending' } : {}),
       }

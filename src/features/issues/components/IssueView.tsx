@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
-import { AlarmClock, ArrowLeft, ChevronRight, GitBranch, Trash2 } from 'lucide-react'
+import { ArrowLeft, ChevronRight, GitBranch, NotebookPen, Trash2 } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { toast } from 'sonner'
@@ -173,14 +173,14 @@ export default function IssueView({ issue }: { issue: IssueDetail }) {
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  aria-label="Add reminder"
+                  aria-label="Add a note"
                   className="text-muted-foreground hover:text-foreground"
                   onClick={() => setReminding(true)}
                 >
-                  <AlarmClock />
+                  <NotebookPen />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Add reminder</TooltipContent>
+              <TooltipContent>Add a note about this issue</TooltipContent>
             </Tooltip>
             {canManage && (
               <Button
@@ -249,12 +249,12 @@ export default function IssueView({ issue }: { issue: IssueDetail }) {
       </div>
 
       <ShortcutsDialog open={help} onOpenChange={setHelp} />
-      {/* Mounted only while open: the issue page loads nothing for reminders. */}
+      {/* Mounted only while open: the issue page loads nothing for notes. */}
       {reminding && (
         <ReminderDialog
           open
           onOpenChange={setReminding}
-          defaults={{ workspaceId: workspace.id, issueId: issue.id, issueLabel: `${id} ${issue.title}` }}
+          defaults={{ remind: true, workspaceId: workspace.id, issueId: issue.id, issueLabel: `${id} ${issue.title}` }}
         />
       )}
       <ConfirmDialog

@@ -3,8 +3,8 @@ import { requireAffected, toDataError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
 import type { Database } from '@/types/database.types'
 
-// Reminders: private, time-based notes to self in one group, optionally about a workspace and an
-// issue in it. Every rule lives in the database (RLS, column grants and the check_reminder
+// Notes (code and tables still say reminders): private notes to self in one group, optionally with a
+// time at which they pop up and land in the bell, and optionally about a workspace and an issue in it. Every rule lives in the database (RLS, column grants and the check_reminder
 // trigger), so these functions stay thin and anything else that writes reminders (the AI agent,
 // later) goes through the same rules. Delivery is server-side: a pg_cron job puts a notification in
 // the bell when one is due (private.fire_due_reminders). Design record: docs/REMINDERS.md.
@@ -23,7 +23,8 @@ export type Reminder = {
   issue_id: string | null
   title: string
   notes: string | null
-  remind_at: string
+  /** When the note should pop up and reach the bell; null for a note that doesn't remind. */
+  remind_at: string | null
   status: ReminderStatus
   completed_at: string | null
   cancelled_at: string | null
@@ -67,7 +68,9 @@ export const remindersPageQuery = (teamId: string, userId: string, status: Remin
         .eq('team_id', teamId)
         .eq('user_id', userId)
         .eq('status', status)
+        // Notes with a time first (soonest); Postgres puts the ones without last. Then newest first.
         .order(column, { ascending })
+        .order('created_at', { ascending: false })
         .order('id')
         .range(pageParam, pageParam + REMINDERS_PAGE - 1)
       if (error) throw toDataError('load reminders', error)
@@ -102,8 +105,8 @@ export const reminderIssueOptionsQuery = (workspaceId: string) =>
 export type ReminderInput = {
   title: string
   notes?: string | null
-  /** ISO timestamp (stored as timestamptz, shown in the browser's time zone). */
-  remindAt: string
+  /** ISO timestamp (stored as timestamptz, shown in the browser's time zone); null = a note with no time. */
+  remindAt: string | null
   workspaceId?: string | null
   /** An issue brings its workspace (the database sets it). */
   issueId?: string | null
@@ -115,11 +118,11 @@ export type CreateReminderInput = ReminderInput & { teamId: string }
 export function reminderInputProblem(input: Partial<ReminderInput>): string | null {
   if (input.title !== undefined) {
     const title = input.title.trim()
-    if (!title) return 'Give the reminder a title.'
+    if (!title) return 'Give the note a title.'
     if (title.length > TITLE_MAX) return `Keep the title under ${TITLE_MAX} characters.`
   }
   if (input.notes && input.notes.trim().length > NOTES_MAX) return `Keep the notes under ${NOTES_MAX} characters.`
-  if (input.remindAt !== undefined && Number.isNaN(Date.parse(input.remindAt))) return 'Pick a valid date and time.'
+  if (input.remindAt && Number.isNaN(Date.parse(input.remindAt))) return 'Pick a valid date and time.'
   return null
 }
 
@@ -133,7 +136,7 @@ function toRow(input: Partial<ReminderInput>) {
   return {
     ...(input.title !== undefined && { title: input.title.trim() }),
     ...(input.notes !== undefined && { notes: input.notes?.trim() || null }),
-    ...(input.remindAt !== undefined && { remind_at: new Date(input.remindAt).toISOString() }),
+    ...(input.remindAt !== undefined && { remind_at: input.remindAt === null ? null : new Date(input.remindAt).toISOString() }),
     ...(input.workspaceId !== undefined && { workspace_id: input.workspaceId }),
     ...(input.issueId !== undefined && { issue_id: input.issueId }),
   }
@@ -143,7 +146,7 @@ export async function createReminder(input: CreateReminderInput): Promise<Remind
   assertValid(input)
   const { data, error } = await supabase
     .from('reminders')
-    .insert({ team_id: input.teamId, title: input.title, remind_at: input.remindAt, ...toRow(input) })
+    .insert({ team_id: input.teamId, title: input.title, ...toRow(input) })
     .select(COLUMNS)
     .single()
   if (error) throw toDataError('create the reminder', error)

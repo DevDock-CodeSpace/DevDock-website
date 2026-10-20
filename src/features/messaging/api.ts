@@ -16,7 +16,7 @@ export type UnreadCount = Database['public']['Functions']['conversation_unread_c
 export type Notification = Tables<'notifications'> & {
   message?: { parent_id: string | null } | null
   /** A reminder notification's reminder: what to say, and where a click leads (its issue, else Reminders). */
-  reminder?: { title: string; workspace_id: string | null; issue: { number: number } | null } | null
+  reminder?: { title: string; notes: string | null; workspace_id: string | null; issue: { number: number } | null } | null
 }
 export type Reaction = Tables<'message_reactions'>
 export type Pin = Tables<'message_pins'>
@@ -236,7 +236,7 @@ export const notificationsQuery = (teamId: string, userId: string) =>
       const { data, error } = await supabase
         .from('notifications')
         .select(
-          'id, team_id, recipient_id, conversation_id, message_id, reminder_id, kind, dedupe_key, read_at, created_at, message:messages(parent_id), reminder:reminders(title, workspace_id, issue:issues(number))',
+          'id, team_id, recipient_id, conversation_id, message_id, reminder_id, kind, dedupe_key, read_at, created_at, message:messages(parent_id), reminder:reminders(title, notes, workspace_id, issue:issues(number))',
         )
         .eq('team_id', teamId)
         .eq('recipient_id', userId)

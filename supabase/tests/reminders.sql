@@ -207,6 +207,31 @@ begin
   v_checks := v_checks + 1;
   if v_count <> 0 then v_fail := v_fail || 'completing a reminder leaves its notification unread'::text; end if;
 
+  -- ------------------------------------------------------------------ notes without a time
+  -- A note may have no time: it never fires. Giving it one makes it fire; taking the time away
+  -- and giving a new one re-arms a note that already fired.
+  perform pg_temp.act_as(v_alice);
+  insert into public.reminders (team_id, title) values (v_team, 'Just a note') returning id into v_about;
+  execute 'reset role';
+  perform private.fire_due_reminders();
+  select count(*) into v_count from public.notifications where reminder_id = v_about;
+  v_checks := v_checks + 1;
+  if v_count <> 0 then v_fail := v_fail || 'a note without a time fired'::text; end if;
+  update public.reminders set remind_at = now() - interval '1 minute' where id = v_about;
+  perform private.fire_due_reminders();
+  select count(*) into v_count from public.notifications where reminder_id = v_about;
+  v_checks := v_checks + 1;
+  if v_count <> 1 then v_fail := v_fail || format('a note given a time fired %s times, expected 1', v_count); end if;
+  perform pg_temp.act_as(v_alice);
+  update public.reminders set remind_at = null where id = v_about returning * into v_row;
+  v_checks := v_checks + 1;
+  if v_row.notified_at is not null then v_fail := v_fail || 'clearing the time keeps notified_at'::text; end if;
+  execute 'reset role';
+  perform private.fire_due_reminders();
+  select count(*) into v_count from public.notifications where reminder_id = v_about;
+  v_checks := v_checks + 1;
+  if v_count <> 1 then v_fail := v_fail || 'a note with its time cleared fired again'::text; end if;
+
   -- ------------------------------------------------------------------ deletes elsewhere
   -- Deleting the issue keeps the reminder, without the issue; deleting the workspace, without it.
   perform pg_temp.act_as(v_alice);
