@@ -1866,7 +1866,7 @@ export type Database = {
           issue_id: string | null
           notes: string | null
           notified_at: string | null
-          remind_at: string
+          remind_at: string | null
           status: Database["public"]["Enums"]["reminder_status"]
           team_id: string
           title: string
@@ -1882,7 +1882,7 @@ export type Database = {
           issue_id?: string | null
           notes?: string | null
           notified_at?: string | null
-          remind_at: string
+          remind_at?: string | null
           status?: Database["public"]["Enums"]["reminder_status"]
           team_id: string
           title: string
@@ -1898,7 +1898,7 @@ export type Database = {
           issue_id?: string | null
           notes?: string | null
           notified_at?: string | null
-          remind_at?: string
+          remind_at?: string | null
           status?: Database["public"]["Enums"]["reminder_status"]
           team_id?: string
           title?: string

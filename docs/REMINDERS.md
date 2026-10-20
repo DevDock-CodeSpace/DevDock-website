@@ -1,4 +1,6 @@
-# Reminders
+# Notes (formerly Reminders)
+
+> **2026-10-19:** Reminders became **Notes**. A note is private text that may have a time (`remind_at` is nullable; migration `20261019210000`). With a time it pops up as a card on the right of the screen (`NotePopups`) and lands in the bell; without one it just stays in the list. A header button beside Ask DevDock opens a panel of all your notes (`NotesButton`/`NotesPanel`). Statuses read Done and Archived in the UI (`completed`/`cancelled` in the database). Ask DevDock asks whether a note should show up at a time unless told to save it plain (`withoutTime`). The code, table, route and query keys keep the name `reminders`. Everything below still holds except where it says a reminder always has a time.
 
 Private, time-based reminders to self: "Review CAP-12, tomorrow at 9". Each one belongs to one person in one group, can be about a workspace and an issue in it, and puts a notification in that person's bell when it's due, whether or not a browser is open.
 

@@ -1,5 +1,4 @@
 import {
-  AlarmClock,
   BookOpen,
   CircleDot,
   FileText,
@@ -7,6 +6,7 @@ import {
   Home,
   LayoutDashboard,
   MessageSquare,
+  NotebookPen,
   Settings,
   Shapes,
   Users,
@@ -72,7 +72,7 @@ export function isTeamTool(tool: string): tool is TeamToolId {
   return (TEAM_TOOLS as string[]).includes(tool)
 }
 
-/** Your own reminders in the group (private, so not a team tool: there is no workspace view). */
+/** Your own notes in the group (private, so not a team tool: there is no workspace view). The code and URL say reminders; the UI says Notes. */
 export const remindersPath = (slug: string) => `${teamPath(slug)}/reminders`
 
 /** Group-wide issues: every project's issues in one list. */
@@ -117,7 +117,7 @@ export function getTeamNav(
         ? [{ id: 'issues' as const, title: 'Issues', icon: workspaceTabDefs.issues.icon, to: teamIssuesPath(slug) }]
         : []),
     ],
-    reminders: { title: 'Reminders', to: remindersPath(slug), icon: AlarmClock },
+    reminders: { title: 'Notes', to: remindersPath(slug), icon: NotebookPen },
     members: { title: 'Members', to: `${base}/members`, icon: Users },
     settings: { title: 'Settings', to: `${base}/settings`, icon: Settings },
   }

@@ -5,6 +5,8 @@ import { AppSidebar } from '@/components/AppSidebar'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { AskDevDockButton } from '@/features/ai/components/AskDevDockButton'
 import { NotificationBell } from '@/features/messaging/components/NotificationBell'
+import { NotePopups } from '@/features/reminders/components/NotePopups'
+import { NotesButton } from '@/features/reminders/components/NotesButton'
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -62,10 +64,12 @@ function AppShell() {
           {workspaceId ? <WorkspaceBreadcrumb /> : <TeamBreadcrumb />}
           <div className="ml-auto flex items-center gap-1">
             <AskDevDockButton />
+            <NotesButton />
             <NotificationBell />
             <ThemeToggle />
           </div>
         </header>
+        <NotePopups />
         <PageArea fullBleed={fullBleed}>
           <Outlet />
         </PageArea>
