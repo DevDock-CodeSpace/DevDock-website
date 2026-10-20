@@ -35,12 +35,12 @@ type ReminderSectionProps = {
   empty?: ReactNode
 }
 
-/** One section of the Reminders page: the caller's reminders with one status, a page at a time. */
+/** One section of the Notes page: the caller's notes with one status, a page at a time. */
 export function ReminderSection({ title, status, teamId, userId, now, highlight, auto, empty }: ReminderSectionProps) {
   const query = useInfiniteQuery(remindersPageQuery(teamId, userId, status))
   if (query.isPending) return <div className="h-24 animate-pulse rounded-md bg-muted/40" aria-label={`Loading ${title.toLowerCase()}`} />
   if (query.isError) {
-    return <div className="border-y py-8 text-center text-sm text-muted-foreground">Couldn’t load reminders. Reload the page to try again.</div>
+    return <div className="border-y py-8 text-center text-sm text-muted-foreground">Couldn’t load notes. Reload the page to try again.</div>
   }
   // Rows another section now owns (changed here a moment ago, before the refetch) are left out.
   const rows = rowsOf(query.data.pages).filter((r) => r.status === status)
@@ -110,8 +110,8 @@ function ReminderRow({ reminder, now, highlighted }: { reminder: Reminder; now: 
     >
       <button
         type="button"
-        onClick={() => (pending ? change('completed', 'Reminder completed.') : change('pending', 'Reminder reopened.'))}
-        aria-label={pending ? `Mark “${reminder.title}” complete` : `Reopen “${reminder.title}”`}
+        onClick={() => (pending ? change('completed', 'Note marked done.') : change('pending', 'Note reopened.'))}
+        aria-label={pending ? `Mark “${reminder.title}” done` : `Reopen “${reminder.title}”`}
         className="mt-0.5 shrink-0 rounded-full text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
       >
         {reminder.status === 'completed' ? (
@@ -151,13 +151,15 @@ function ReminderRow({ reminder, now, highlighted }: { reminder: Reminder; now: 
 
       <span
         className={cn('w-36 shrink-0 pt-0.5 text-right font-mono text-xs', overdue ? 'text-destructive' : 'text-muted-foreground')}
-        title={new Date(reminder.remind_at).toLocaleString()}
+        title={reminder.remind_at ? new Date(reminder.remind_at).toLocaleString() : undefined}
       >
         {reminder.status === 'completed' && reminder.completed_at
           ? `Done ${formatReminderDay(reminder.completed_at, now).toLowerCase()}`
           : reminder.status === 'cancelled' && reminder.cancelled_at
-            ? `Cancelled ${formatReminderDay(reminder.cancelled_at, now).toLowerCase()}`
-            : formatReminderWhen(reminder.remind_at, now)}
+            ? `Archived ${formatReminderDay(reminder.cancelled_at, now).toLowerCase()}`
+            : reminder.remind_at
+              ? formatReminderWhen(reminder.remind_at, now)
+              : ''}
       </span>
 
       <DropdownMenu>
@@ -172,16 +174,16 @@ function ReminderRow({ reminder, now, highlighted }: { reminder: Reminder; now: 
           </DropdownMenuItem>
           {pending ? (
             <>
-              <DropdownMenuItem onSelect={() => change('completed', 'Reminder completed.')}>
-                <Check /> Mark complete
+              <DropdownMenuItem onSelect={() => change('completed', 'Note marked done.')}>
+                <Check /> Mark done
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem variant="destructive" onSelect={() => change('cancelled', 'Reminder cancelled.')}>
-                <X /> Cancel reminder
+              <DropdownMenuItem variant="destructive" onSelect={() => change('cancelled', 'Note archived.')}>
+                <X /> Archive
               </DropdownMenuItem>
             </>
           ) : (
-            <DropdownMenuItem onSelect={() => change('pending', 'Reminder reopened.')}>
+            <DropdownMenuItem onSelect={() => change('pending', 'Note reopened.')}>
               <RotateCcw /> Reopen
             </DropdownMenuItem>
           )}

@@ -46,8 +46,8 @@ export function formatReminderWhen(iso: string, now: number): string {
   return `${formatReminderDay(iso, now)} · ${getFormats().time.format(Date.parse(iso))}`
 }
 
-/** A pending reminder whose time has passed (it has fired, or is about to). */
-export const isOverdue = (iso: string, now: number) => Date.parse(iso) <= now
+/** A pending note whose time has passed (it has fired, or is about to). A note with no time never is. */
+export const isOverdue = (iso: string | null, now: number) => iso !== null && Date.parse(iso) <= now
 
 export type QuickTime = { label: string; at: Date }
 

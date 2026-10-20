@@ -16,7 +16,6 @@ import { queryClient } from '@/lib/query-client'
 import { DiagramPage } from '@/routes/DiagramPage'
 import { DocPage } from '@/routes/DocPage'
 import { GitHubCallbackPage } from '@/routes/GitHubCallbackPage'
-import { LiveSessionPage } from '@/routes/LiveSessionPage'
 import { MessagesPage } from '@/routes/team/MessagesPage'
 import { FULL_BLEED } from '@/layouts/full-bleed'
 import { LoginPage } from '@/routes/LoginPage'
@@ -120,7 +119,7 @@ export const router = createBrowserRouter([
               { path: 'issues', element: <TeamIssuesPage /> },
               // Group → Live: video sessions (Jitsi via JaaS) for the group and its workspaces.
               { path: 'live', element: <TeamLivePage /> },
-              { path: 'live/:sessionId', loader: liveSessionLoader, element: <LiveSessionPage /> },
+              { path: 'live/:sessionId', loader: liveSessionLoader, lazy: async () => ({ Component: (await import('@/routes/LiveSessionPage')).LiveSessionPage }) },
               // Your own reminders in this group (private; not a workspace tool).
               // Loader and page are separate lazy chunks, fetched side by side on the first visit.
               {
@@ -186,7 +185,7 @@ export const router = createBrowserRouter([
                     element: <WorkspaceToolGate tool="live" />,
                     children: [
                       { index: true, element: <WorkspaceLivePage /> },
-                      { path: ':sessionId', loader: liveSessionLoader, element: <LiveSessionPage /> },
+                      { path: ':sessionId', loader: liveSessionLoader, lazy: async () => ({ Component: (await import('@/routes/LiveSessionPage')).LiveSessionPage }) },
                     ],
                   },
                   {

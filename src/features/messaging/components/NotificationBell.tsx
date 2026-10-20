@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlarmClock, AtSign, Bell, MessageCircle } from 'lucide-react'
+import { AtSign, Bell, MessageCircle, NotebookPen } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
@@ -13,7 +13,7 @@ import { conversationKeys, markAllNotificationsRead, markNotificationRead, notif
 import { useConversationTitles } from '../hooks'
 import { displayName, formatWhen } from '../names'
 
-/** The bell in the header: unread message, mention and reminder notifications, and where each one leads. */
+/** The bell in the header: unread message, mention and note notifications, and where each one leads. */
 export function NotificationBell() {
   const { team } = useCurrentTeam()
   const { user } = useAuth()
@@ -79,7 +79,7 @@ export function NotificationBell() {
           <div className="flex flex-col items-center gap-1 px-6 py-10 text-center">
             <Bell className="size-5 text-muted-foreground" />
             <p className="text-sm font-medium">You’re all caught up</p>
-            <p className="text-xs text-muted-foreground">New messages, mentions and reminders show up here.</p>
+            <p className="text-xs text-muted-foreground">New messages, mentions and notes you set a time for show up here.</p>
           </div>
         ) : (
           <ul className="max-h-96 overflow-y-auto py-1">
@@ -87,7 +87,7 @@ export function NotificationBell() {
               const mention = notification.kind === 'mention'
               const reminder = notification.kind === 'reminder'
               const where = displayName(titleOf(notification.conversation_id))
-              const Icon = reminder ? AlarmClock : mention ? AtSign : MessageCircle
+              const Icon = reminder ? NotebookPen : mention ? AtSign : MessageCircle
               return (
                 <li key={notification.id}>
                   <button type="button" onClick={() => void go(notification)} className="flex w-full items-start gap-2.5 px-3 py-2 text-left transition-colors hover:bg-muted">
@@ -96,10 +96,10 @@ export function NotificationBell() {
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium">
-                        {reminder ? (notification.reminder?.title ?? 'Reminder') : mention ? `Mentioned you in ${where}` : `New message in ${where}`}
+                        {reminder ? (notification.reminder?.title ?? 'Note') : mention ? `Mentioned you in ${where}` : `New message in ${where}`}
                       </span>
                       <span className="block text-xs text-muted-foreground">
-                        {reminder && 'Reminder · '}
+                        {reminder && 'Note · '}
                         {formatWhen(notification.created_at)}
                       </span>
                     </span>

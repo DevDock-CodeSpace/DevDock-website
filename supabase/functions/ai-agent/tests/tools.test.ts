@@ -403,6 +403,24 @@ Deno.test({
         assertEquals(code(await run('create_reminder', { title: 'x', meetingId: f.meetings.group, minutesBefore: 10, inMinutes: 5 }, f.context(kumar))), 'INVALID_ARGUMENTS')
       })
 
+      await t.step('notes: a note without a time is only saved when the person said so', async () => {
+        const kumarCtx = f.context(kumar)
+        // Neither a time nor "just a note" is asked about, not assumed.
+        assertEquals(code(await run('create_reminder', { title: 'Buy milk' }, kumarCtx)), 'NEEDS_CLARIFICATION')
+        const note = data<{ created: Pick<Reminder, 'id' | 'status'> & { when: string | null; remindAt: string | null } }>(await run('create_reminder', { title: 'Buy milk', withoutTime: true }, kumarCtx)).created
+        assertEquals([note.when, note.remindAt, note.status], [null, null, 'note'])
+        assertEquals(code(await run('create_reminder', { title: 'x', withoutTime: true, inMinutes: 5 }, kumarCtx)), 'INVALID_ARGUMENTS')
+        // Giving it a time later, then taking it away again.
+        const timed = data<{ updated: Reminder }>(await run('update_reminder', { reminderId: note.id, inMinutes: 30 }, kumarCtx)).updated
+        assertEquals(timed.status, 'upcoming')
+        const plain = data<{ updated: { when: string | null; status: string } }>(await run('update_reminder', { reminderId: note.id, removeTime: true }, kumarCtx)).updated
+        assertEquals([plain.when, plain.status], [null, 'note'])
+        assertEquals(code(await run('update_reminder', { reminderId: note.id, removeTime: true, inMinutes: 5 }, kumarCtx)), 'INVALID_ARGUMENTS')
+        // A day alone cannot time a note that had no time.
+        assertEquals(code(await run('update_reminder', { reminderId: note.id, date: localDate(new Date(Date.now() + 86_400_000), 'UTC') }, kumarCtx)), 'NEEDS_CLARIFICATION')
+        await f.admin.from('reminders').delete().eq('id', note.id)
+      })
+
       await t.step('create_reminder: unclear or impossible times are asked about, never guessed', async () => {
         const ctx = f.context(kumar)
         assertEquals(code(await run('create_reminder', { title: 'x' }, ctx)), 'NEEDS_CLARIFICATION')

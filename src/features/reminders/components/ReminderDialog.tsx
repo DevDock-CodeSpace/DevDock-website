@@ -1,5 +1,5 @@
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query'
-import { AlarmClock, ChevronDown, CircleDot, LoaderCircle } from 'lucide-react'
+import { ChevronDown, CircleDot, LoaderCircle, NotebookPen } from 'lucide-react'
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -34,6 +34,8 @@ const NO_ISSUE = 'none'
 
 /** What a new reminder starts with when it's created from somewhere (an issue page). */
 export type ReminderDefaults = {
+  /** Start with "show at a time" on (the issue page's alarm button). A plain new note starts off. */
+  remind?: boolean
   workspaceId: string
   issueId?: string
   /** "CAP-12 Login bug", so the picker can show it without loading the issue list. */
@@ -44,16 +46,16 @@ type ReminderDialogProps = {
   /** Edit this reminder instead of creating one. */
   reminder?: Reminder
   defaults?: ReminderDefaults
-  /** Custom trigger (defaults to a "New reminder" button). Ignored when controlled. */
+  /** Custom trigger (defaults to a "New note" button). Ignored when controlled. */
   children?: ReactNode
   open?: boolean
   onOpenChange?: (open: boolean) => void
 }
 
 /**
- * New or edit reminder: title, when (quick times or a date and time), optionally a workspace and
- * an issue in it, and notes. Times are entered and shown in the browser's time zone and saved as
- * an instant.
+ * New or edit note: a title, details, optionally a time at which it pops up (quick times or a date
+ * and time) and optionally a workspace and an issue in it. Times are entered and shown in the
+ * browser's time zone and saved as an instant.
  */
 export function ReminderDialog({ reminder, defaults, children, open: controlledOpen, onOpenChange }: ReminderDialogProps) {
   const { team } = useCurrentTeam()
@@ -65,12 +67,13 @@ export function ReminderDialog({ reminder, defaults, children, open: controlledO
   const save = editing ? update : create
 
   const initial = () => {
-    const { date, time } = toLocalInputs(reminder ? new Date(reminder.remind_at) : defaultRemindAt(Date.now()))
+    const { date, time } = toLocalInputs(reminder?.remind_at ? new Date(reminder.remind_at) : defaultRemindAt(Date.now()))
     const workspaceId = reminder?.workspace_id ?? defaults?.workspaceId ?? null
     const issueKey = reminder?.workspace?.issue_key
     return {
       title: reminder?.title ?? '',
       notes: reminder?.notes ?? '',
+      remind: reminder ? reminder.remind_at !== null : (defaults?.remind ?? false),
       date,
       time,
       workspaceId,
@@ -91,25 +94,26 @@ export function ReminderDialog({ reminder, defaults, children, open: controlledO
   const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) => setForm((f) => ({ ...f, [key]: value }))
   const [now] = useState(Date.now)
 
-  const at = fromLocalInputs(form.date, form.time)
+  // No time chosen (the box is off) is a note that never pops up.
+  const at = form.remind ? fromLocalInputs(form.date, form.time) : null
   const workspace = workspaces.find((w) => w.id === form.workspaceId)
-  const problem = reminderInputProblem({ title: form.title, notes: form.notes, remindAt: at?.toISOString() ?? '' })
+  const problem = reminderInputProblem({ title: form.title, notes: form.notes, remindAt: at?.toISOString() ?? null }) ?? (form.remind && !at ? 'Pick a date and time.' : null)
   const firedBefore = editing && reminder.notified_at !== null
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
-    if (problem || !at) return
+    if (problem) return
     const input = {
       title: form.title,
       notes: form.notes,
-      remindAt: at.toISOString(),
+      remindAt: at?.toISOString() ?? null,
       workspaceId: form.workspaceId,
       issueId: form.issueId,
     }
     const done = {
       onSuccess: () => {
         setOpen(false)
-        toast.success(editing ? 'Reminder saved.' : `Reminder set for ${formatReminderWhen(input.remindAt, Date.now())}.`)
+        toast.success(input.remindAt ? `Note saved. It will show up ${formatReminderWhen(input.remindAt, Date.now()).toLowerCase()}.` : 'Note saved.')
       },
       onError: (error: unknown) => toast.error(errorMessage(error)),
     }
@@ -131,7 +135,7 @@ export function ReminderDialog({ reminder, defaults, children, open: controlledO
         <DialogTrigger asChild>
           {children ?? (
             <Button size="sm">
-              <AlarmClock /> New reminder
+              <NotebookPen /> New note
             </Button>
           )}
         </DialogTrigger>
@@ -139,13 +143,13 @@ export function ReminderDialog({ reminder, defaults, children, open: controlledO
       <DialogContent className="flex max-h-[90svh] flex-col sm:max-w-lg">
         <form onSubmit={submit} className="flex min-h-0 flex-col gap-4">
           <DialogHeader>
-            <DialogTitle>{editing ? 'Edit reminder' : 'New reminder'}</DialogTitle>
-            <DialogDescription>Only you can see it. It shows up in your notifications at the time you pick.</DialogDescription>
+            <DialogTitle>{editing ? 'Edit note' : 'New note'}</DialogTitle>
+            <DialogDescription>Only you can see it. Pick a time if you want it to pop up then; otherwise it stays a note.</DialogDescription>
           </DialogHeader>
 
           <div className="-mr-2 min-h-0 flex-1 space-y-4 overflow-y-auto pr-2">
             <div className="space-y-1.5">
-              <Label htmlFor="reminder-title">Remind me to</Label>
+              <Label htmlFor="reminder-title">Note</Label>
               <Input
                 id="reminder-title"
                 value={form.title}
@@ -157,6 +161,17 @@ export function ReminderDialog({ reminder, defaults, children, open: controlledO
               />
             </div>
 
+            <label className="flex cursor-pointer items-center gap-2.5 text-sm">
+              <input
+                type="checkbox"
+                checked={form.remind}
+                onChange={(e) => set('remind', e.target.checked)}
+                className="size-4 accent-brand"
+              />
+              Show this note to me at a set time
+            </label>
+
+            {form.remind && (
             <div className="space-y-2">
               <div className="flex flex-wrap gap-1.5" role="group" aria-label="Quick times">
                 {quickTimes(now).map((quick) => {
@@ -192,10 +207,11 @@ export function ReminderDialog({ reminder, defaults, children, open: controlledO
               <p className="font-mono text-xs text-muted-foreground" aria-live="polite">
                 {at ? formatReminderWhen(at.toISOString(), now) : 'Pick a date and time.'}
                 {at && at.getTime() <= now && ' · in the past, it will show up right away'}
-                {firedBefore && at && at.getTime() > now && at.toISOString() !== new Date(reminder.remind_at).toISOString() &&
-                  ' · it will remind you again then'}
+                {firedBefore && at && at.getTime() > now && at.toISOString() !== new Date(reminder.remind_at ?? 0).toISOString() &&
+                  ' · it will show up again then'}
               </p>
             </div>
+            )}
 
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
@@ -246,13 +262,13 @@ export function ReminderDialog({ reminder, defaults, children, open: controlledO
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="reminder-notes">Notes</Label>
+              <Label htmlFor="reminder-notes">Details</Label>
               <Textarea
                 id="reminder-notes"
                 value={form.notes}
                 maxLength={NOTES_MAX}
                 rows={3}
-                placeholder="Anything you'll want to know then"
+                placeholder="Anything you'll want to remember"
                 onChange={(e) => set('notes', e.target.value)}
               />
             </div>
@@ -261,7 +277,7 @@ export function ReminderDialog({ reminder, defaults, children, open: controlledO
           <DialogFooter>
             <Button type="submit" disabled={!!problem || save.isPending}>
               {save.isPending && <LoaderCircle className="animate-spin" />}
-              {editing ? 'Save changes' : 'Set reminder'}
+              {editing ? 'Save changes' : 'Save note'}
             </Button>
           </DialogFooter>
         </form>
