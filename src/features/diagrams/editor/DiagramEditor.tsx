@@ -15,17 +15,17 @@ import {
   type NodeChange,
   type XYPosition,
 } from '@xyflow/react'
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import { toast } from 'sonner'
 import type { Json } from '@/types/database.types'
 import { cn } from '@/lib/utils'
-import { BlockNode } from './BlockNode'
-import { ConnectorEdge } from './ConnectorEdge'
-import { ContainerNode } from './ContainerNode'
 import { DiagramEditorContext } from './context'
+import { edgeTypes, flowStyle, nodeTypes } from './flowTypes'
 import { GuideLines } from './GuideLines'
 import { snapToGuides, type Guides } from './guides'
-import { IconNode } from './IconNode'
+import { findMermaid } from './mermaid/detect'
+import { importSummary, skippedSummary } from './mermaid/summary'
+import { MermaidImportDialog, type ImportedDiagram } from './MermaidImportDialog'
 import {
   createEdge,
   createNode,
@@ -43,12 +43,8 @@ import {
 import { PropertiesPanel, type Alignment } from './PropertiesPanel'
 import { LIBRARY_DRAG_TYPE, ShapePanel } from './ShapePanel'
 import { readRecent, toLibraryItem, withoutRecent, withRecent } from './recent'
-import { ShapeNode } from './ShapeNode'
 import { Toolbar } from './Toolbar'
 import { useHistory } from './useHistory'
-
-const nodeTypes = { shape: ShapeNode, icon: IconNode, container: ContainerNode, block: BlockNode }
-const edgeTypes = { connector: ConnectorEdge }
 
 const GRID = 16
 const PROPERTIES_KEY = 'devdock-diagram-properties'
@@ -61,15 +57,6 @@ const CLIP_MARKER = 'devdock-diagram/v1\n'
 const MAX_CLIP_CHARS = 2_000_000
 
 const snapValue = (v: number) => Math.round(v / GRID) * GRID
-
-// React Flow's own colors, pointed at DevDock's theme tokens.
-const flowStyle = {
-  '--xy-background-color': 'var(--background)',
-  '--xy-selection-background-color': 'color-mix(in oklab, var(--brand) 8%, transparent)',
-  '--xy-selection-border': '1px solid var(--brand)',
-  '--xy-connectionline-stroke': 'var(--brand)',
-  '--xy-connectionline-stroke-width': '1.5',
-} as CSSProperties
 
 type Rect = { x: number; y: number; w: number; h: number }
 type Clip = { nodes: DiagramNode[]; edges: DiagramEdge[] }
@@ -476,25 +463,9 @@ function Editor({ initial, readOnly, onChange, fullscreen, onFullscreen }: Diagr
   // like anything loaded, and never trusts the text it finds.
   const editorId = useRef(crypto.randomUUID())
 
-  /** Content copied in this editor is pasted a step down and right each time; content from elsewhere lands in the middle of the view. */
-  const pasteFromClipboard = useCallback(
-    (text: string) => {
-      if (!text.startsWith(CLIP_MARKER) || text.length > MAX_CLIP_CHARS) return false
-      let payload: unknown
-      try {
-        payload = JSON.parse(text.slice(CLIP_MARKER.length))
-      } catch {
-        return false
-      }
-      if (typeof payload !== 'object' || payload === null) return false
-      const clip = parse(payload as Json)
-      if (clip.nodes.length === 0) return false
-      const from = (payload as { from?: unknown }).from
-      if (from === editorId.current) {
-        pasteCount.current += 1
-        paste(clip, { x: PASTE_OFFSET * pasteCount.current, y: PASTE_OFFSET * pasteCount.current })
-        return true
-      }
+  /** The offset that puts pasted content in the middle of the visible canvas (kept on the grid when snapping). */
+  const offsetToView = useCallback(
+    (clip: Clip): XYPosition => {
       const top = clip.nodes.filter((n) => !n.parentId)
       const minX = Math.min(...top.map((n) => n.position.x))
       const minY = Math.min(...top.map((n) => n.position.y))
@@ -512,10 +483,89 @@ function Editor({ initial, readOnly, onChange, fullscreen, onFullscreen }: Diagr
         dx = snapValue(dx)
         dy = snapValue(dy)
       }
-      paste(clip, { x: Math.round(dx), y: Math.round(dy) })
+      return { x: Math.round(dx), y: Math.round(dy) }
+    },
+    [flow, snapToGrid],
+  )
+
+  // ------------------------------------------------------------ Mermaid import
+  // Mermaid code (pasted on the canvas, or from the Import dialog) is laid out by
+  // mermaid/layout.ts into the saved format, then goes through parse() and paste() like
+  // any clipboard content: one undo step, selected, in the middle of the view.
+  const [mermaidOpen, setMermaidOpen] = useState(false)
+
+  const addImported = useCallback(
+    (result: ImportedDiagram) => {
+      const clip = parse(result.diagram)
+      if (clip.nodes.length === 0) return
+      if (snapToGrid) {
+        for (const n of clip.nodes) {
+          n.position = { x: snapValue(n.position.x), y: snapValue(n.position.y) }
+          if (n.width) n.width = Math.max(GRID, snapValue(n.width))
+          if (n.height) n.height = Math.max(GRID, snapValue(n.height))
+        }
+      }
+      paste(clip, offsetToView(clip))
+      // Shown whole once React Flow has measured the new shapes (tables size themselves).
+      window.setTimeout(() => {
+        void flow.fitView({ nodes: flow.getNodes().filter((n) => n.selected), padding: 0.2, maxZoom: 1, duration: 300 })
+      }, 80)
+      toast.success(`Imported ${importSummary(result.kind, result.counts)}`, {
+        description: result.skipped.length > 0 ? skippedSummary(result.skipped) : 'Undo with ⌘Z if it isn’t what you wanted.',
+      })
+    },
+    [flow, offsetToView, paste, snapToGrid],
+  )
+
+  const importPasted = useCallback(
+    async (code: string) => {
+      let importer: typeof import('./mermaid/layout')
+      try {
+        importer = await import('./mermaid/layout')
+      } catch {
+        toast.error('The Mermaid importer couldn’t load. Check your connection and try again.')
+        return
+      }
+      const result = importer.mermaidToDiagram(code)
+      if (!result.ok) {
+        toast.error('This Mermaid code can’t be imported', { description: result.error })
+        return
+      }
+      addImported(result)
+    },
+    [addImported],
+  )
+
+  /** Content copied in this editor is pasted a step down and right each time; content from elsewhere lands in the middle of the view. */
+  const pasteFromClipboard = useCallback(
+    (text: string) => {
+      if (!text.startsWith(CLIP_MARKER)) {
+        // Not ours: Mermaid code (bare, or in a chatbot's ```mermaid reply) becomes shapes.
+        const mermaid = findMermaid(text)
+        if (!mermaid) return false
+        void importPasted(mermaid.code)
+        return true
+      }
+      if (text.length > MAX_CLIP_CHARS) return false
+      let payload: unknown
+      try {
+        payload = JSON.parse(text.slice(CLIP_MARKER.length))
+      } catch {
+        return false
+      }
+      if (typeof payload !== 'object' || payload === null) return false
+      const clip = parse(payload as Json)
+      if (clip.nodes.length === 0) return false
+      const from = (payload as { from?: unknown }).from
+      if (from === editorId.current) {
+        pasteCount.current += 1
+        paste(clip, { x: PASTE_OFFSET * pasteCount.current, y: PASTE_OFFSET * pasteCount.current })
+        return true
+      }
+      paste(clip, offsetToView(clip))
       return true
     },
-    [flow, paste, snapToGrid],
+    [offsetToView, paste, importPasted],
   )
 
   const duplicate = useCallback(() => {
@@ -718,7 +768,9 @@ function Editor({ initial, readOnly, onChange, fullscreen, onFullscreen }: Diagr
           onToggleProperties={toggleProperties}
           snapToGrid={snapToGrid}
           onSnapToGrid={setSnapToGrid}
+          onImportMermaid={() => setMermaidOpen(true)}
         />
+        {!readOnly && <MermaidImportDialog open={mermaidOpen} onOpenChange={setMermaidOpen} onImport={addImported} />}
         <div className="flex min-h-0 flex-1">
           {!readOnly && (
             <ShapePanel
@@ -810,7 +862,7 @@ function Editor({ initial, readOnly, onChange, fullscreen, onFullscreen }: Diagr
             </ReactFlow>
             {nodes.length === 0 && (
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-muted-foreground">
-                {readOnly ? 'This diagram is empty.' : 'Drag shapes and icons from the left, or click one to add it.'}
+                {readOnly ? 'This diagram is empty.' : 'Drag shapes and icons from the left, click one to add it, or paste Mermaid code.'}
               </div>
             )}
           </div>
