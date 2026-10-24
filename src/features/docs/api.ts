@@ -28,7 +28,7 @@ export type Doc = DocSummary & { content: string; body: Json | null }
 const SUMMARY =
   'id, team_id, workspace_id, folder_id, title, created_at, updated_at, author:profiles!documents_created_by_fkey(display_name, avatar_url), workspace:workspaces!documents_workspace_team_fkey(id, title, type)'
 
-/** A docs folder, group-wide (workspace_id null) or in one workspace; depth 1–3. */
+/** A folder of docs and diagrams, group-wide (workspace_id null) or in one workspace; depth 1–3. */
 export type DocFolder = {
   id: string
   team_id: string
@@ -165,12 +165,13 @@ export async function deleteDocument(teamId: string, docId: string) {
 }
 
 /**
- * Moves docs and folders into a folder of their scope, or to the top level (null), in one step: either
- * everything moves or nothing does. Writers only; the database checks scope, depth and names.
+ * Moves docs, diagrams and folders into a folder of their scope, or to the top level (null), in one
+ * step: either everything moves or nothing does. Writers only; the database checks scope, depth and names.
  */
-export async function moveDocItems(input: { docIds: string[]; folderIds: string[]; targetId: string | null }) {
-  const { error } = await supabase.rpc('move_doc_items', {
+export async function moveFolderItems(input: { docIds: string[]; diagramIds: string[]; folderIds: string[]; targetId: string | null }) {
+  const { error } = await supabase.rpc('move_folder_items', {
     p_doc_ids: input.docIds,
+    p_diagram_ids: input.diagramIds,
     p_folder_ids: input.folderIds,
     // Generated types can't express a nullable argument.
     p_target: input.targetId as string,
@@ -217,10 +218,15 @@ export async function renameFolder(folderId: string, name: string) {
 
 /**
  * Deletes a folder and everything in it: each doc inside is deleted properly
- * first (its Storage images too), then the folder, whose subfolders cascade.
+ * first (its Storage images too), then the diagrams inside (one request), then
+ * the folder, whose subfolders cascade.
  */
-export async function deleteFolder(teamId: string, folderId: string, docIdsInside: string[]) {
-  for (const docId of docIdsInside) await deleteDocument(teamId, docId)
+export async function deleteFolder(teamId: string, folderId: string, inside: { docIds: string[]; diagramIds: string[] }) {
+  for (const docId of inside.docIds) await deleteDocument(teamId, docId)
+  if (inside.diagramIds.length > 0) {
+    const { error } = await supabase.from('diagrams').delete().in('id', inside.diagramIds)
+    if (error) throw toDataError('delete the folder', error, writeErrors)
+  }
   const { data, error } = await supabase.from('doc_folders').delete().eq('id', folderId).select('id')
   if (error) throw toDataError('delete the folder', error, writeErrors)
   requireAffected(data, 'delete folder')

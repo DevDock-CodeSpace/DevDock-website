@@ -7,9 +7,20 @@ import { useCanEditDocs } from '../hooks'
 /**
  * New doc. With `workspaceId` the scope is that workspace; with `folderId`
  * it's created in that folder (whose scope is fixed: the workspace's, or
- * group-wide when `workspaceId` is omitted).
+ * group-wide when `workspaceId` is omitted). `open`/`onOpenChange` open it
+ * from a "New" menu instead of its own button.
  */
-export function CreateDocDialog({ workspaceId, folderId }: { workspaceId?: string; folderId?: string | null }) {
+export function CreateDocDialog({
+  workspaceId,
+  folderId,
+  open,
+  onOpenChange,
+}: {
+  workspaceId?: string
+  folderId?: string | null
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+}) {
   const { team } = useCurrentTeam()
   return (
     <CreateInScopeDialog
@@ -23,6 +34,8 @@ export function CreateDocDialog({ workspaceId, folderId }: { workspaceId?: strin
       table="documents"
       // Open it where it was created: inside the workspace tab, or in the team view.
       pathFor={(id) => docPath(team.slug, id, workspaceId)}
+      open={open}
+      onOpenChange={onOpenChange}
     />
   )
 }
