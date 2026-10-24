@@ -345,6 +345,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           data: Json
+          folder_id: string | null
           id: string
           team_id: string
           title: string
@@ -355,6 +356,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           data?: Json
+          folder_id?: string | null
           id?: string
           team_id: string
           title: string
@@ -365,6 +367,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           data?: Json
+          folder_id?: string | null
           id?: string
           team_id?: string
           title?: string
@@ -377,6 +380,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "diagrams_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "doc_folders"
             referencedColumns: ["id"]
           },
           {
@@ -2565,6 +2575,15 @@ export type Database = {
       mark_thread_read: { Args: { p_parent_id: string }; Returns: undefined }
       move_doc_items: {
         Args: { p_doc_ids: string[]; p_folder_ids: string[]; p_target: string }
+        Returns: undefined
+      }
+      move_folder_items: {
+        Args: {
+          p_diagram_ids: string[]
+          p_doc_ids: string[]
+          p_folder_ids: string[]
+          p_target: string
+        }
         Returns: undefined
       }
       move_open_issues: {

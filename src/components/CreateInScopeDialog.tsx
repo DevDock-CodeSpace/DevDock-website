@@ -39,6 +39,9 @@ type CreateInScopeDialogProps = {
   table: string
   /** Where to go after creating. */
   pathFor: (id: string) => string
+  /** Opened from elsewhere (a "New" menu): no button of its own. */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 /**
@@ -55,6 +58,8 @@ export function CreateInScopeDialog({
   queryKeys,
   table,
   pathFor,
+  open: openProp,
+  onOpenChange,
 }: CreateInScopeDialogProps) {
   const { team } = useCurrentTeam()
   // Only the collection being looked at (everything, in a group without collections).
@@ -71,7 +76,13 @@ export function CreateInScopeDialog({
         ? [TEAM_WIDE]
         : []
       : [...(canWrite(null) ? [TEAM_WIDE] : []), ...workspaces.filter((w) => canWrite(w.id)).map((w) => w.id)]
-  const [open, setOpen] = useState(false)
+  const [openState, setOpenState] = useState(false)
+  const controlled = openProp !== undefined
+  const open = controlled ? openProp : openState
+  const setOpen = (next: boolean) => {
+    if (!controlled) setOpenState(next)
+    onOpenChange?.(next)
+  }
   const [title, setTitle] = useState('')
   const [scope, setScope] = useState(options[0] ?? TEAM_WIDE)
 
@@ -107,11 +118,13 @@ export function CreateInScopeDialog({
         }
       }}
     >
-      <DialogTrigger asChild>
-        <Button size="sm">
-          <Plus /> New {noun}
-        </Button>
-      </DialogTrigger>
+      {!controlled && (
+        <DialogTrigger asChild>
+          <Button size="sm">
+            <Plus /> New {noun}
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-md">
         <form onSubmit={submit} className="space-y-4">
           <DialogHeader>

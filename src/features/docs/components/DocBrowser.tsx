@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { ChevronRight, FileText, Folder, FolderInput, FolderPlus, MoreHorizontal } from 'lucide-react'
+import { ChevronDown, ChevronRight, FileText, Folder, FolderInput, FolderPlus, MoreHorizontal, Plus, Workflow } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
@@ -14,6 +14,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { useCollectionView } from '@/features/collections/hooks'
+import type { DiagramSummary } from '@/features/diagrams/api'
+import { CreateDiagramDialog } from '@/features/diagrams/components/CreateDiagramDialog'
 import { errorMessage } from '@/lib/errors'
 import { timeAgo } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -21,13 +24,23 @@ import {
   createFolder,
   deleteFolder,
   MAX_FOLDER_DEPTH,
-  moveDocItems,
+  moveFolderItems,
   renameFolder,
   type DocFolder,
   type DocSummary,
 } from '../api'
-import { describeItems, docKey, DRAG_TYPE, dropBlocker, folderKey, itemsOf, type DragItems } from '../dragDrop'
+import {
+  describeItems,
+  diagramKey,
+  docKey,
+  DRAG_TYPE,
+  dropBlocker,
+  folderKey,
+  itemsOf,
+  type DragItems,
+} from '../dragDrop'
 import { folderPath, folderSubtree } from '../folders'
+import { useCanWriteDocs } from '../hooks'
 import { useSelection } from '../useSelection'
 import { CreateDocDialog } from './CreateDocDialog'
 import { MoveDocDialog } from './MoveDocDialog'
@@ -39,26 +52,53 @@ type DocBrowserProps = {
   teamId: string
   /** The scope being browsed: a workspace, or group-wide (null). */
   workspaceId: string | null
+  /** The scope's docs (on the Diagrams page too, unshown: deleting a folder deletes them). */
   docs: DocSummary[]
+  /** The scope's diagrams (empty when the Diagrams tool is off there). */
+  diagrams: DiagramSummary[]
   folders: DocFolder[]
-  /** Delete/move docs and manage folders (writers). */
+  /**
+   * 'docs': the Docs page, docs and diagrams together with an All / Docs / Diagrams filter
+   * (`?show=`). 'diagrams': the Diagrams page, the same folders showing diagrams only.
+   */
+  mode: 'docs' | 'diagrams'
+  /** The Diagrams tool is on in this scope: diagrams show, and can be made, here. */
+  diagramsEnabled: boolean
+  /** Delete/move docs and diagrams, manage folders, and create diagrams (writers). */
   canWrite: boolean
   /** Create docs here (everyone who can edit docs in this scope). */
   canCreate: boolean
   docHref: (doc: DocSummary) => string
+  diagramHref: (diagram: DiagramSummary) => string
   /** Shown when the top level is empty. */
   empty: ReactNode
 }
 
+type Show = 'all' | 'docs' | 'diagrams'
+type Row = { kind: 'doc'; item: DocSummary } | { kind: 'diagram'; item: DiagramSummary }
+
 /**
- * Dropbox-style docs browser for one scope: folders (3 levels deep) and docs,
- * a breadcrumb path, a new doc here for editors, and for writers: new folder,
- * rename/delete folders, and moving docs and folders like in a file manager:
- * drag onto a folder or the path above (hover a folder to open it), select
- * several with the checkboxes or Ctrl/⌘/Shift-click and drag them together, or
- * use "Move to…". Moves can be undone. The open folder is in the URL (?folder=<id>).
+ * Dropbox-style browser for one scope's folders (3 levels deep), which hold docs and diagrams
+ * side by side: a breadcrumb path, new docs for editors, and for writers: new diagrams, new
+ * folder, rename/delete folders, and moving docs, diagrams and folders like in a file manager:
+ * drag onto a folder or the path above (hover a folder to open it), select several with the
+ * checkboxes or Ctrl/⌘/Shift-click and drag them together, or use "Move to…". Moves can be
+ * undone. The open folder is in the URL (?folder=<id>), and so is the Docs page's filter (?show=).
  */
-export function DocBrowser({ teamId, workspaceId, docs, folders, canWrite, canCreate, docHref, empty }: DocBrowserProps) {
+export function DocBrowser({
+  teamId,
+  workspaceId,
+  docs,
+  diagrams,
+  folders,
+  mode,
+  diagramsEnabled,
+  canWrite,
+  canCreate,
+  docHref,
+  diagramHref,
+  empty,
+}: DocBrowserProps) {
   const queryClient = useQueryClient()
   const [params, setParams] = useSearchParams()
   const [now] = useState(Date.now)
@@ -66,11 +106,45 @@ export function DocBrowser({ teamId, workspaceId, docs, folders, canWrite, canCr
   // A stale or foreign folder id falls back to the top level.
   const current = folders.find((f) => f.id === requested) ?? null
   const path = folderPath(current?.id ?? null, folders)
+  const rootName = mode === 'diagrams' ? 'Diagrams' : 'Docs'
+  const filtering = mode === 'docs' && diagramsEnabled
+  const requestedShow = params.get('show')
+  const show: Show = mode === 'diagrams' ? 'diagrams' : filtering && (requestedShow === 'docs' || requestedShow === 'diagrams') ? requestedShow : 'all'
+  const showDocs = show !== 'diagrams'
+  const showDiagrams = diagramsEnabled && show !== 'docs'
+  const entries = useMemo(() => ({ docs, diagrams: diagramsEnabled ? diagrams : [] }), [docs, diagrams, diagramsEnabled])
   const subfolders = folders.filter((f) => f.parent_id === (current?.id ?? null))
-  const here = docs.filter((d) => d.folder_id === (current?.id ?? null))
+  const inFolder = (folderId: string | null): Row[] =>
+    [
+      ...(showDocs ? docs.filter((d) => d.folder_id === folderId).map((item) => ({ kind: 'doc' as const, item })) : []),
+      ...(showDiagrams ? entries.diagrams.filter((d) => d.folder_id === folderId).map((item) => ({ kind: 'diagram' as const, item })) : []),
+    ].sort((a, b) => b.item.updated_at.localeCompare(a.item.updated_at))
+  const here = inFolder(current?.id ?? null)
   const canNest = (current?.depth ?? 0) < MAX_FOLDER_DEPTH
 
-  const refresh = () => queryClient.invalidateQueries({ queryKey: ['documents'] })
+  // Who may make a diagram here. At a group's top level the new diagram may go in any workspace the
+  // person writes in (the dialog asks); inside a folder or a workspace it's this scope's writers.
+  const canWriteIn = useCanWriteDocs()
+  const { workspaces } = useCollectionView()
+  const canNewDiagram =
+    diagramsEnabled &&
+    (workspaceId !== null || current ? canWrite : canWriteIn(null) || workspaces.some((w) => canWriteIn(w.id)))
+  const canNewDoc = mode === 'docs' && canCreate
+  const [creating, setCreating] = useState<'doc' | 'diagram' | null>(null)
+
+  // What a move or delete can change: the lists and the folders, never an open doc or its images.
+  const refresh = () =>
+    Promise.all(
+      [['documents', 'team'], ['documents', 'workspace'], ['documents', 'folders'], ['diagrams', 'team'], ['diagrams', 'workspace']].map((queryKey) =>
+        queryClient.invalidateQueries({ queryKey }),
+      ),
+    )
+  const setShow = (next: Show) =>
+    setParams((p) => {
+      if (next === 'all') p.delete('show')
+      else p.set('show', next)
+      return p
+    })
   const open = (folderId: string | null) =>
     setParams((p) => {
       if (folderId) p.set('folder', folderId)
@@ -85,6 +159,7 @@ export function DocBrowser({ teamId, workspaceId, docs, folders, canWrite, canCr
   const [busy, setBusy] = useState(false)
   const toDelete = deleting ? folderSubtree(deleting.id, folders) : new Set<string>()
   const docsToDelete = docs.filter((d) => d.folder_id && toDelete.has(d.folder_id))
+  const diagramsToDelete = entries.diagrams.filter((d) => d.folder_id && toDelete.has(d.folder_id))
 
   const removeFolder = async () => {
     if (!deleting) return
@@ -92,7 +167,10 @@ export function DocBrowser({ teamId, workspaceId, docs, folders, canWrite, canCr
     try {
       // Step out of the folder first if we're inside it.
       if (current && toDelete.has(current.id)) open(deleting.parent_id)
-      await deleteFolder(teamId, deleting.id, docsToDelete.map((d) => d.id))
+      await deleteFolder(teamId, deleting.id, {
+        docIds: docsToDelete.map((d) => d.id),
+        diagramIds: diagramsToDelete.map((d) => d.id),
+      })
       toast.success(`${deleting.name} was deleted`)
       await refresh()
     } catch (error) {
@@ -104,7 +182,8 @@ export function DocBrowser({ teamId, workspaceId, docs, folders, canWrite, canCr
   }
 
   // ------------------------------------------------------------ selection
-  const keys = useMemo(() => [...subfolders.map((f) => folderKey(f.id)), ...here.map((d) => docKey(d.id))], [subfolders, here])
+  const rowKey = (row: Row) => (row.kind === 'doc' ? docKey(row.item.id) : diagramKey(row.item.id))
+  const keys = useMemo(() => [...subfolders.map((f) => folderKey(f.id)), ...here.map(rowKey)], [subfolders, here])
   const selection = useSelection(keys)
   useEffect(() => {
     if (selection.count === 0) return
@@ -120,24 +199,24 @@ export function DocBrowser({ teamId, workspaceId, docs, folders, canWrite, canCr
   }
 
   // ------------------------------------------------------------ moving
-  const targetName = (folderId: string | null) => folders.find((f) => f.id === folderId)?.name ?? 'Docs'
+  const targetName = (folderId: string | null) => folders.find((f) => f.id === folderId)?.name ?? rootName
 
   const move = async (items: DragItems, targetId: string | null, origin: string | null) => {
-    const blocked = dropBlocker(items, targetId, folders, docs)
+    const blocked = dropBlocker(items, targetId, folders, entries)
     if (blocked) {
       if (blocked !== 'Already here') toast.error(blocked)
       return
     }
-    const what = describeItems(items, docs, folders)
+    const what = describeItems(items, entries, folders)
     try {
-      await moveDocItems({ ...items, targetId })
+      await moveFolderItems({ ...items, targetId })
       selection.clear()
       await refresh()
       toast.success(`Moved ${what} to ${targetName(targetId)}`, {
         action: {
           label: 'Undo',
           onClick: () => {
-            moveDocItems({ ...items, targetId: origin })
+            moveFolderItems({ ...items, targetId: origin })
               .then(() => refresh())
               .catch((error: unknown) => toast.error(errorMessage(error)))
           },
@@ -170,7 +249,7 @@ export function DocBrowser({ teamId, workspaceId, docs, folders, canWrite, canCr
     event.dataTransfer.effectAllowed = 'move'
     // A small label instead of a faded copy of the whole row.
     const ghost = document.createElement('div')
-    ghost.textContent = describeItems(items, docs, folders).replace(/[“”]/g, '')
+    ghost.textContent = describeItems(items, entries, folders).replace(/[“”]/g, '')
     ghost.className = 'fixed -top-96 left-0 max-w-64 truncate rounded-md border bg-background px-3 py-1.5 text-sm font-medium shadow-lg'
     document.body.append(ghost)
     event.dataTransfer.setDragImage(ghost, 12, 12)
@@ -189,7 +268,7 @@ export function DocBrowser({ teamId, workspaceId, docs, folders, canWrite, canCr
     disarmSpring()
   }
 
-  const blockerFor = (folderId: string | null) => (dragging ? dropBlocker(dragging.items, folderId, folders, docs) : null)
+  const blockerFor = (folderId: string | null) => (dragging ? dropBlocker(dragging.items, folderId, folders, entries) : null)
   const dropProps = (folderId: string | null, springLoad = false) =>
     canWrite
       ? {
@@ -232,10 +311,14 @@ export function DocBrowser({ teamId, workspaceId, docs, folders, canWrite, canCr
     const reason = blockerFor(folderId)
     return reason !== null && reason !== 'Already here'
   }
-  const isDragged = (key: string) => dragging !== null && (dragging.items.docIds.map(docKey).includes(key) || dragging.items.folderIds.map(folderKey).includes(key))
+  const isDragged = (key: string) =>
+    dragging !== null &&
+    (dragging.items.docIds.map(docKey).includes(key) ||
+      dragging.items.diagramIds.map(diagramKey).includes(key) ||
+      dragging.items.folderIds.map(folderKey).includes(key))
 
-  const count = (folder: DocFolder) =>
-    folders.filter((f) => f.parent_id === folder.id).length + docs.filter((d) => d.folder_id === folder.id).length
+  /** What a folder holds, counting only the kinds on show. */
+  const count = (folder: DocFolder) => folders.filter((f) => f.parent_id === folder.id).length + inFolder(folder.id).length
 
   const checkbox = (key: string, name: string) =>
     canWrite && (
@@ -272,15 +355,33 @@ export function DocBrowser({ teamId, workspaceId, docs, folders, canWrite, canCr
                   )}
                   {...(last ? {} : dropProps(folder?.id ?? null))}
                 >
-                  {folder?.name ?? 'Docs'}
+                  {folder?.name ?? rootName}
                 </button>
               </span>
             )
           })}
           <span className="ml-2 font-mono text-xs text-muted-foreground">{subfolders.length + here.length}</span>
         </nav>
-        {(canWrite || canCreate) && (
-          <div className="flex items-center gap-2">
+        {(canWrite || canNewDoc || canNewDiagram || filtering) && (
+          <div className="flex flex-wrap items-center gap-2">
+            {filtering && (
+              <div role="group" aria-label="Show" className="flex items-center rounded-md border p-0.5">
+                {(['all', 'docs', 'diagrams'] as const).map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    aria-pressed={show === option}
+                    onClick={() => setShow(option)}
+                    className={cn(
+                      'h-6 rounded-sm px-2 text-xs transition-colors',
+                      show === option ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    {option === 'all' ? 'All' : option === 'docs' ? 'Docs' : 'Diagrams'}
+                  </button>
+                ))}
+              </div>
+            )}
             {canWrite && (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -299,7 +400,41 @@ export function DocBrowser({ teamId, workspaceId, docs, folders, canWrite, canCr
                 {!canNest && <TooltipContent>Folders can be nested {MAX_FOLDER_DEPTH} levels deep</TooltipContent>}
               </Tooltip>
             )}
-            {canCreate && <CreateDocDialog workspaceId={workspaceId ?? undefined} folderId={current?.id ?? null} />}
+            {canNewDoc && canNewDiagram ? (
+              <>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm">
+                      <Plus /> New <ChevronDown className="opacity-60" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onSelect={() => setCreating('doc')}>
+                      <FileText /> Doc
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setCreating('diagram')}>
+                      <Workflow /> Diagram
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <CreateDocDialog
+                  workspaceId={workspaceId ?? undefined}
+                  folderId={current?.id ?? null}
+                  open={creating === 'doc'}
+                  onOpenChange={(o) => setCreating(o ? 'doc' : null)}
+                />
+                <CreateDiagramDialog
+                  workspaceId={workspaceId ?? undefined}
+                  folderId={current?.id ?? null}
+                  open={creating === 'diagram'}
+                  onOpenChange={(o) => setCreating(o ? 'diagram' : null)}
+                />
+              </>
+            ) : canNewDoc ? (
+              <CreateDocDialog workspaceId={workspaceId ?? undefined} folderId={current?.id ?? null} />
+            ) : canNewDiagram ? (
+              <CreateDiagramDialog workspaceId={workspaceId ?? undefined} folderId={current?.id ?? null} />
+            ) : null}
           </div>
         )}
       </div>
@@ -320,7 +455,7 @@ export function DocBrowser({ teamId, workspaceId, docs, folders, canWrite, canCr
 
       {subfolders.length === 0 && here.length === 0 ? (
         <div className="border-y py-10 text-center text-sm text-muted-foreground">
-          {current ? 'This folder is empty.' : empty}
+          {show !== 'all' ? `No ${show} ${current ? 'in this folder' : 'here yet'}.` : current ? 'This folder is empty.' : empty}
         </div>
       ) : (
         <ul className={cn('divide-y border-y', canWrite && 'select-none')}>
@@ -362,7 +497,7 @@ export function DocBrowser({ teamId, workspaceId, docs, folders, canWrite, canCr
                 {canWrite && (
                   <RowMenu label={`${folder.name} actions`}>
                     <DropdownMenuItem onSelect={() => setNaming({ mode: 'rename', folder })}>Rename</DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => setMoving({ docIds: [], folderIds: [folder.id] })}>Move to…</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setMoving({ docIds: [], diagramIds: [], folderIds: [folder.id] })}>Move to…</DropdownMenuItem>
                     <DropdownMenuItem variant="destructive" onSelect={() => setDeleting(folder)}>
                       Delete
                     </DropdownMenuItem>
@@ -371,11 +506,13 @@ export function DocBrowser({ teamId, workspaceId, docs, folders, canWrite, canCr
               </li>
             )
           })}
-          {here.map((doc) => {
-            const key = docKey(doc.id)
+          {here.map((row) => {
+            const key = rowKey(row)
+            const { item } = row
+            const Icon = row.kind === 'doc' ? FileText : Workflow
             return (
               <li
-                key={doc.id}
+                key={key}
                 data-selected={selection.has(key) || undefined}
                 draggable={canWrite}
                 onDragStart={(e) => startDrag(e, key)}
@@ -386,29 +523,39 @@ export function DocBrowser({ teamId, workspaceId, docs, folders, canWrite, canCr
                   isDragged(key) && 'opacity-40',
                 )}
               >
-                {checkbox(key, doc.title)}
-                <FileText className="size-4 shrink-0 text-muted-foreground" />
+                {checkbox(key, item.title)}
+                <Icon className="size-4 shrink-0 text-muted-foreground" aria-label={row.kind === 'doc' ? 'Doc' : 'Diagram'} />
                 <Link
-                  to={docHref(doc)}
+                  to={row.kind === 'doc' ? docHref(row.item) : diagramHref(row.item)}
                   draggable={false}
                   onClick={selectClick(key)}
                   className="min-w-0 truncate text-sm font-medium outline-none after:absolute after:inset-0"
                 >
-                  {doc.title}
+                  {item.title}
                 </Link>
                 <span className="flex-1" />
                 <span className="hidden min-w-0 items-center gap-2 md:flex">
-                  <PersonAvatar profile={doc.author} className="size-5" />
+                  <PersonAvatar profile={item.author} className="size-5" />
                   <span className="max-w-32 truncate text-xs text-muted-foreground">
-                    {doc.author?.display_name ?? 'Former member'}
+                    {item.author?.display_name ?? 'Former member'}
                   </span>
                 </span>
                 <span className="hidden w-24 text-right font-mono text-xs text-muted-foreground sm:inline">
-                  {timeAgo(doc.updated_at, now)}
+                  {timeAgo(item.updated_at, now)}
                 </span>
                 {canWrite && (
-                  <RowMenu label={`${doc.title} actions`}>
-                    <DropdownMenuItem onSelect={() => setMoving({ docIds: [doc.id], folderIds: [] })}>Move to…</DropdownMenuItem>
+                  <RowMenu label={`${item.title} actions`}>
+                    <DropdownMenuItem
+                      onSelect={() =>
+                        setMoving(
+                          row.kind === 'doc'
+                            ? { docIds: [item.id], diagramIds: [], folderIds: [] }
+                            : { docIds: [], diagramIds: [item.id], folderIds: [] },
+                        )
+                      }
+                    >
+                      Move to…
+                    </DropdownMenuItem>
                   </RowMenu>
                 )}
               </li>
@@ -418,7 +565,7 @@ export function DocBrowser({ teamId, workspaceId, docs, folders, canWrite, canCr
       )}
       {canWrite && subfolders.length + here.length > 0 && selection.count === 0 && (
         <p className="mt-2 text-xs text-muted-foreground">
-          Tip: drag docs and folders onto a folder, or onto the path above, to move them. Tick the boxes (or Ctrl/⌘-click, Shift-click) to move several at once.
+          Tip: drag {mode === 'diagrams' ? 'diagrams' : diagramsEnabled ? 'docs, diagrams' : 'docs'} and folders onto a folder, or onto the path above, to move them. Tick the boxes (or Ctrl/⌘-click, Shift-click) to move several at once.
         </p>
       )}
 
@@ -429,8 +576,8 @@ export function DocBrowser({ teamId, workspaceId, docs, folders, canWrite, canCr
         title={naming?.mode === 'rename' ? `Rename “${naming.folder.name}”` : 'New folder'}
         description={
           naming?.mode === 'rename'
-            ? 'Everyone who can see these docs sees the new name.'
-            : `In ${current?.name ?? 'Docs'}. Folders can be nested ${MAX_FOLDER_DEPTH} levels deep.`
+            ? 'Everyone who can see what’s inside sees the new name.'
+            : `In ${current?.name ?? rootName}. Folders hold docs and diagrams, and can be nested ${MAX_FOLDER_DEPTH} levels deep.`
         }
         initialName={naming?.mode === 'rename' ? naming.folder.name : ''}
         submitLabel={naming?.mode === 'rename' ? 'Rename' : 'Create folder'}
@@ -442,13 +589,13 @@ export function DocBrowser({ teamId, workspaceId, docs, folders, canWrite, canCr
         }}
       />
       <MoveDocDialog
-        key={moving ? `move-${[...moving.docIds, ...moving.folderIds].join(',')}` : 'move-closed'}
+        key={moving ? `move-${[...moving.docIds, ...moving.diagramIds, ...moving.folderIds].join(',')}` : 'move-closed'}
         open={moving !== null}
         onOpenChange={(o) => !o && setMoving(null)}
-        title={moving ? describeItems(moving, docs, folders) : ''}
+        title={moving ? describeItems(moving, entries, folders) : ''}
         currentFolderId={current?.id ?? null}
         folders={folders}
-        blocker={(folderId) => (moving ? dropBlocker(moving, folderId, folders, docs) : null)}
+        blocker={(folderId) => (moving ? dropBlocker(moving, folderId, folders, entries) : null)}
         onMove={async (folderId) => {
           if (moving) await move(moving, folderId, current?.id ?? null)
         }}
@@ -458,9 +605,17 @@ export function DocBrowser({ teamId, workspaceId, docs, folders, canWrite, canCr
         onOpenChange={(o) => !o && setDeleting(null)}
         title={`Delete “${deleting?.name}”?`}
         description={
-          toDelete.size - 1 + docsToDelete.length === 0
+          toDelete.size - 1 + docsToDelete.length + diagramsToDelete.length === 0
             ? 'The folder is empty. This can’t be undone.'
-            : `Everything inside goes too: ${plural(toDelete.size - 1, 'folder')} and ${plural(docsToDelete.length, 'doc')}. This can’t be undone.`
+            : `Everything inside goes too: ${listOf(
+                [
+                  [toDelete.size - 1, 'folder'] as const,
+                  [docsToDelete.length, 'doc'] as const,
+                  [diagramsToDelete.length, 'diagram'] as const,
+                ]
+                  .filter(([n]) => n > 0)
+                  .map(([n, word]) => plural(n, word)),
+              )}. This can’t be undone.`
         }
         confirmLabel="Delete folder"
         pending={busy}
@@ -471,6 +626,7 @@ export function DocBrowser({ teamId, workspaceId, docs, folders, canWrite, canCr
 }
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
+const listOf = (parts: string[]) => (parts.length < 2 ? parts.join('') : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`)
 
 function RowMenu({ label, children }: { label: string; children: ReactNode }) {
   return (
