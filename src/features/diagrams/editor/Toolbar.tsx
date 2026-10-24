@@ -8,6 +8,7 @@ import {
   PanelRightOpen,
   Redo2,
   Undo2,
+  Workflow,
   ZoomIn,
   ZoomOut,
   type LucideIcon,
@@ -28,9 +29,10 @@ type ToolbarProps = {
   onToggleProperties: () => void
   snapToGrid: boolean
   onSnapToGrid: (on: boolean) => void
+  onImportMermaid: () => void
 }
 
-/** Undo/redo, zoom, snap to grid, full screen and the properties-panel toggle, above the canvas. */
+/** Undo/redo, zoom, snap to grid, Mermaid import, full screen and the properties-panel toggle, above the canvas. */
 export function Toolbar({
   readOnly,
   canUndo,
@@ -43,6 +45,7 @@ export function Toolbar({
   onToggleProperties,
   snapToGrid,
   onSnapToGrid,
+  onImportMermaid,
 }: ToolbarProps) {
   const flow = useReactFlow()
   const zoom = useStore((s) => s.transform[2])
@@ -84,6 +87,7 @@ export function Toolbar({
             onClick={() => onSnapToGrid(!snapToGrid)}
             pressed={snapToGrid}
           />
+          <ToolButton icon={Workflow} label="Import Mermaid" onClick={onImportMermaid} />
         </>
       )}
       <div className="ml-auto flex items-center gap-0.5">

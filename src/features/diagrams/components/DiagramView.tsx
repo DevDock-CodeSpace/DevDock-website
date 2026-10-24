@@ -1,12 +1,14 @@
-import { useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Trash2 } from 'lucide-react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { ArrowLeft, ChevronRight, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link, useBlocker, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { OthersTypingAlert } from '@/components/OthersTypingAlert'
 import { Button } from '@/components/ui/button'
+import { foldersQuery } from '@/features/docs/api'
 import { DocScope } from '@/features/docs/components/DocScope'
+import { folderPath } from '@/features/docs/folders'
 import { useCurrentTeam } from '@/features/teams/hooks'
 import { useOthersTyping } from '@/hooks/use-others-typing'
 import { diagramsPath } from '@/features/teams/nav'
@@ -36,7 +38,13 @@ export default function DiagramView({ diagram, canWrite }: { diagram: Diagram; c
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [now] = useState(Date.now)
-  const backTo = diagramsPath(team.slug, workspaceId)
+  const listPath = diagramsPath(team.slug, workspaceId)
+  // Folders are asked for only when the diagram is in one (most aren't); the path fills in when they arrive.
+  const folders = useQuery({ ...foldersQuery(diagram.team_id, diagram.workspace_id), enabled: diagram.folder_id !== null }).data ?? []
+  const path = folderPath(diagram.folder_id, folders)
+  const folderLink = (folderId: string | null) => (folderId ? `${listPath}?folder=${folderId}` : listPath)
+  // Back (and after deleting): the folder the diagram is in.
+  const backTo = folderLink(diagram.folder_id)
   const [initial, setInitial] = useState(() => parse(diagram.data))
 
   // ------------------------------------------------------------ autosave
@@ -223,9 +231,19 @@ export default function DiagramView({ diagram, canWrite }: { diagram: Diagram; c
     <div>
       <div className="mb-4 flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3 text-xs text-muted-foreground">
-          <Link to={backTo} className="inline-flex shrink-0 items-center gap-1 hover:text-foreground">
-            <ArrowLeft className="size-3.5" /> Diagrams
-          </Link>
+          <nav aria-label="Folder path" className="flex min-w-0 items-center gap-1">
+            <Link to={listPath} className="inline-flex shrink-0 items-center gap-1 hover:text-foreground">
+              <ArrowLeft className="size-3.5" /> Diagrams
+            </Link>
+            {path.map((folder) => (
+              <span key={folder.id} className="flex min-w-0 items-center gap-1">
+                <ChevronRight className="size-3 shrink-0" />
+                <Link to={folderLink(folder.id)} className="max-w-32 truncate hover:text-foreground">
+                  {folder.name}
+                </Link>
+              </span>
+            ))}
+          </nav>
           {/* In a workspace the scope is obvious from the tabs above. */}
           {!workspaceId && (
             <>

@@ -1,18 +1,28 @@
-import { useSuspenseQuery } from '@tanstack/react-query'
+import { useSuspenseQueries } from '@tanstack/react-query'
 import { ArrowRight } from 'lucide-react'
 import { Link } from 'react-router'
+import { noDiagramsQuery, workspaceDiagramsQuery } from '@/features/diagrams/api'
 import { foldersQuery, workspaceDocsQuery } from '@/features/docs/api'
 import { DocBrowser } from '@/features/docs/components/DocBrowser'
 import { useCanEditDocs, useCanWriteDocs } from '@/features/docs/hooks'
 import { useCurrentTeam, useCurrentWorkspace } from '@/features/teams/hooks'
-import { docPath, docsPath } from '@/features/teams/nav'
+import { diagramPath, docPath, docsPath } from '@/features/teams/nav'
 
-/** Workspace → Docs: this workspace's folders and docs (WorkspaceToolGate checks the tool is on). */
+/**
+ * Workspace → Docs: this workspace's folders, holding its docs and (when the Diagrams tool is on)
+ * its diagrams side by side. WorkspaceToolGate checks the Docs tool is on.
+ */
 export function WorkspaceDocsPage() {
   const { team } = useCurrentTeam()
   const { workspace } = useCurrentWorkspace()
-  const docs = useSuspenseQuery(workspaceDocsQuery(workspace.id)).data
-  const folders = useSuspenseQuery(foldersQuery(team.id, workspace.id)).data
+  const diagramsEnabled = workspace.modules.includes('diagrams')
+  const [{ data: docs }, { data: folders }, { data: diagrams }] = useSuspenseQueries({
+    queries: [
+      workspaceDocsQuery(workspace.id),
+      foldersQuery(team.id, workspace.id),
+      diagramsEnabled ? workspaceDiagramsQuery(workspace.id) : noDiagramsQuery,
+    ],
+  })
   const canWrite = useCanWriteDocs()(workspace.id)
   const canEdit = useCanEditDocs()(workspace.id)
 
@@ -30,13 +40,17 @@ export function WorkspaceDocsPage() {
         teamId={team.id}
         workspaceId={workspace.id}
         docs={docs}
+        diagrams={diagrams}
         folders={folders}
+        mode="docs"
+        diagramsEnabled={diagramsEnabled}
         canWrite={canWrite}
         canCreate={canEdit}
         docHref={(doc) => docPath(team.slug, doc.id, workspace.id)}
+        diagramHref={(diagram) => diagramPath(team.slug, diagram.id, workspace.id)}
         empty={
           canWrite
-            ? 'No docs in this workspace yet. Create a doc or a folder.'
+            ? `No docs in this workspace yet. Create a doc${diagramsEnabled ? ', a diagram' : ''} or a folder.`
             : canEdit
               ? 'No docs in this workspace yet. Create the first one.'
               : 'No docs in this workspace yet.'

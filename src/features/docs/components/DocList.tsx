@@ -7,7 +7,7 @@ import type { DocSummary } from '../api'
 import { DocScope } from './DocScope'
 
 /** What a row needs (docs and diagrams both fit). */
-type ListItem = Omit<DocSummary, 'folder_id'>
+type ListItem = DocSummary
 
 type DocListProps = {
   docs: ListItem[]
@@ -18,10 +18,12 @@ type DocListProps = {
   empty: ReactNode
   /** Row icon (the diagrams list reuses this component). */
   icon?: LucideIcon
+  /** A row's own icon, for a list that mixes docs and diagrams. */
+  iconFor?: (doc: ListItem) => LucideIcon
 }
 
 /** Dense, hairline-separated doc list (title | scope | author | updated). */
-export function DocList({ docs, href, showScope = false, empty, icon: Icon = FileText }: DocListProps) {
+export function DocList({ docs, href, showScope = false, empty, icon = FileText, iconFor }: DocListProps) {
   const [now] = useState(Date.now)
   const columns = showScope
     ? 'md:grid-cols-[minmax(0,1fr)_200px_160px_96px]'
@@ -42,7 +44,9 @@ export function DocList({ docs, href, showScope = false, empty, icon: Icon = Fil
         <span className="text-right">Updated</span>
       </div>
       <ul className="divide-y">
-        {docs.map((doc) => (
+        {docs.map((doc) => {
+          const Icon = iconFor?.(doc) ?? icon
+          return (
           <li key={doc.id}>
             <Link
               to={href(doc)}
@@ -66,7 +70,8 @@ export function DocList({ docs, href, showScope = false, empty, icon: Icon = Fil
               <span className="text-right font-mono text-xs text-muted-foreground">{timeAgo(doc.updated_at, now)}</span>
             </Link>
           </li>
-        ))}
+          )
+        })}
       </ul>
     </div>
   )

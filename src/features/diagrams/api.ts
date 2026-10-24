@@ -5,16 +5,17 @@ import { supabase } from '@/lib/supabase'
 import type { Json } from '@/types/database.types'
 
 // Diagrams: same scope model and access rules as docs (workspace_id null =
-// team-wide). RLS decides who sees what; these queries ask for "everything I can see".
+// team-wide), and they live in the same folders (doc_folders). RLS decides who
+// sees what; these queries ask for "everything I can see".
 
-/** A doc summary minus folders (diagrams have none), so the doc list/scope components render diagrams too. */
-export type DiagramSummary = Omit<DocSummary, 'folder_id'>
+/** The same shape as a doc summary, so the doc browser, list and scope components render diagrams too. */
+export type DiagramSummary = DocSummary
 /** `data` is the editor JSON ({ nodes, edges }); parsed by the editor. */
 export type Diagram = DiagramSummary & { data: Json }
 
 // `data` is left out of lists; it can be large.
 const SUMMARY =
-  'id, team_id, workspace_id, title, created_at, updated_at, author:profiles!diagrams_created_by_fkey(display_name, avatar_url), workspace:workspaces!diagrams_workspace_team_fkey(id, title, type)'
+  'id, team_id, workspace_id, folder_id, title, created_at, updated_at, author:profiles!diagrams_created_by_fkey(display_name, avatar_url), workspace:workspaces!diagrams_workspace_team_fkey(id, title, type)'
 
 const writeErrors = { '42501': 'You don’t have permission to change diagrams here.' }
 
@@ -50,6 +51,16 @@ export const workspaceDiagramsQuery = (workspaceId: string) =>
     },
   })
 
+/**
+ * Stands in for a scope's diagrams where the Diagrams tool is off, so a page can read its queries
+ * as one batch either way. Answered locally: it never makes a request.
+ */
+export const noDiagramsQuery = queryOptions({
+  queryKey: ['diagrams', 'none'],
+  queryFn: (): DiagramSummary[] => [],
+  staleTime: Infinity,
+})
+
 /** null when the diagram doesn't exist or the caller can't read it. */
 export const diagramQuery = (diagramId: string) =>
   queryOptions({
@@ -72,10 +83,17 @@ export async function createDiagram(input: {
   teamId: string
   workspaceId: string | null
   title: string
+  /** Create it inside this folder (same scope). */
+  folderId?: string | null
 }): Promise<{ id: string }> {
   const { data, error } = await supabase
     .from('diagrams')
-    .insert({ team_id: input.teamId, workspace_id: input.workspaceId, title: input.title.trim() })
+    .insert({
+      team_id: input.teamId,
+      workspace_id: input.workspaceId,
+      title: input.title.trim(),
+      folder_id: input.folderId ?? null,
+    })
     .select('id')
     .single()
   if (error) throw toDataError('create the diagram', error, writeErrors)
