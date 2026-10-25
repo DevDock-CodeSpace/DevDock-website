@@ -1,9 +1,9 @@
-import markUrl from '@/assets/brand/devdock-mark.webp'
-import wordmarkDarkUrl from '@/assets/brand/devdock-wordmark-dark.webp'
-import wordmarkUrl from '@/assets/brand/devdock-wordmark.webp'
+import markUrl from '../../brand/devdock-mark.svg?no-inline'
+import wordmarkDarkUrl from '../../brand/devdock-wordmark-dark.svg?no-inline'
+import wordmarkUrl from '../../brand/devdock-wordmark.svg?no-inline'
 import { cn } from '@/lib/utils'
 
-// Brand assets are generated from the masters in /brand (see brand/README.md).
+// The logo files live in /brand (see brand/README.md); Vite serves them as separate, cached files.
 // Size with a height class; width follows the intrinsic aspect ratio.
 
 /** DevDock icon. Decorative: pair it with the wordmark or visible text. */
@@ -12,8 +12,8 @@ export function LogoMark({ className }: { className?: string }) {
     <img
       src={markUrl}
       alt=""
-      width={808}
-      height={575}
+      width={256}
+      height={221}
       draggable={false}
       className={cn('h-8 w-auto shrink-0 select-none', className)}
     />
@@ -28,16 +28,16 @@ export function LogoWordmark({ className }: { className?: string }) {
       <img
         src={wordmarkUrl}
         alt="DevDock"
-        width={972}
-        height={169}
+        width={1362}
+        height={246}
         draggable={false}
         className={cn(base, 'dark:hidden', className)}
       />
       <img
         src={wordmarkDarkUrl}
         alt="DevDock"
-        width={972}
-        height={169}
+        width={1362}
+        height={246}
         draggable={false}
         className={cn(base, 'hidden dark:block', className)}
       />

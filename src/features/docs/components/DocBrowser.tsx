@@ -86,8 +86,6 @@ type DocBrowserProps = {
   diagramHref: (diagram: DiagramSummary) => string
   /** Shown when the scope has nothing at all. */
   empty: ReactNode
-  /** Beside the search: the place dropdown on the group page. */
-  placeControl?: ReactNode
   /** The place's name, the first step of the folder path ("Software Fundamentals › Week 1"). */
   rootLabel?: string
 }
@@ -118,7 +116,6 @@ export function DocBrowser({
   docHref,
   diagramHref,
   empty,
-  placeControl,
   rootLabel = 'Files',
 }: DocBrowserProps) {
   const queryClient = useQueryClient()
@@ -472,7 +469,6 @@ export function DocBrowser({
               </p>
             )}
             <div className="ml-auto flex items-center gap-2 pb-1.5 sm:pb-0">
-              {placeControl}
               <label className="flex h-8 w-44 items-center gap-2 rounded-md border bg-background px-2 text-sm focus-within:ring-2 focus-within:ring-brand/40 sm:w-56">
                 <Search className="size-3.5 shrink-0 text-muted-foreground" />
                 <input

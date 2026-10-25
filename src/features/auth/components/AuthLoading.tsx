@@ -1,5 +1,4 @@
-import { LoaderCircle } from 'lucide-react'
-import { LogoMark } from '@/components/Logo'
+import { DockSpinner } from '@/components/DockSpinner'
 
 /** Full-screen placeholder while the session is restored or the OAuth callback completes. */
 export function AuthLoading({ label = 'Loading DevDock…' }: { label?: string }) {
@@ -9,12 +8,9 @@ export function AuthLoading({ label = 'Loading DevDock…' }: { label?: string }
       role="status"
       aria-live="polite"
     >
-      <div className="flex flex-col items-center gap-5">
-        <LogoMark className="h-12" />
-        <div className="flex items-center gap-2 font-mono text-sm">
-          <LoaderCircle className="size-4 animate-spin" />
-          {label}
-        </div>
+      <div className="flex flex-col items-center gap-4">
+        <DockSpinner className="size-14" label={null} />
+        <p className="font-mono text-sm">{label}</p>
       </div>
     </div>
   )

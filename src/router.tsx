@@ -18,7 +18,6 @@ import { DocPage } from '@/routes/DocPage'
 import { GitHubCallbackPage } from '@/routes/GitHubCallbackPage'
 import { MessagesPage } from '@/routes/team/MessagesPage'
 import { FULL_BLEED } from '@/layouts/full-bleed'
-import { LoginPage } from '@/routes/LoginPage'
 import { NotFoundPage, RouteErrorPage } from '@/routes/NotFoundPage'
 import { OnboardingPage } from '@/routes/OnboardingPage'
 import { PrivacyPage } from '@/routes/PrivacyPage'
@@ -49,7 +48,8 @@ export const router = createBrowserRouter([
   {
     path: '/login',
     loader: loginLoader,
-    element: <LoginPage />,
+    // Loaded on demand: signed-in people never download the sign-in page.
+    lazy: async () => ({ Component: (await import('@/routes/LoginPage')).LoginPage }),
     hydrateFallbackElement: <AuthLoading />,
     errorElement: <RouteErrorPage />,
   },

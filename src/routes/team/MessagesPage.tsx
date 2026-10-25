@@ -2,6 +2,7 @@ import { useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-quer
 import { MessageCircle, Search } from 'lucide-react'
 import { lazy, Suspense, useCallback, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router'
+import { DockSpinner } from '@/components/DockSpinner'
 import { Input } from '@/components/ui/input'
 import { useAuth } from '@/features/auth/hooks'
 import { teamMembersQuery } from '@/features/teams/api'
@@ -130,7 +131,7 @@ export function MessagesPage() {
       </aside>
       <section className="flex min-h-0 min-w-0 flex-1 flex-col">
         {selected ? (
-          <Suspense fallback={<div className="flex h-full items-center justify-center text-sm text-muted-foreground">Loading…</div>}>
+          <Suspense fallback={<div className="flex h-full items-center justify-center"><DockSpinner label="Loading the conversation" /></div>}>
             <ConversationView
               key={selected.id}
               conversationId={selected.id}

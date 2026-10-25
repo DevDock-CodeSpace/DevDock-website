@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 300 300" role="img" aria-label="Dev Dock icon">
+<defs>
+<linearGradient id="blue-d" x1="5%" y1="12%" x2="95%" y2="92%">
+<stop offset="0" stop-color="#175BFF"/><stop offset=".38" stop-color="#038DFF"/><stop offset=".67" stop-color="#087CF9"/><stop offset="1" stop-color="#3544F4"/>
+</linearGradient>
+<linearGradient id="teal" x1="0%" y1="0%" x2="100%" y2="100%"><stop stop-color="#02D0C4"/><stop offset="1" stop-color="#00BDBD"/></linearGradient>
+<linearGradient id="purple" x1="0%" y1="0%" x2="100%" y2="100%"><stop stop-color="#8A56FC"/><stop offset="1" stop-color="#5334EC"/></linearGradient>
+<linearGradient id="violet-blue" x1="0%" y1="50%" x2="100%" y2="50%"><stop stop-color="#7246F7"/><stop offset=".55" stop-color="#3775FE"/><stop offset="1" stop-color="#01A9FA"/></linearGradient>
+</defs>
+<path fill="url(#blue-d)" d="M97 39 H167 C232 39 279 83 279 148 C279 215 233 258 169 258 H99 C85 258 77 248 77 235 C77 223 86 213 100 213 H157 C184 213 207 193 207 151 C207 115 186 88 156 88 H97 C82 88 72 78 72 63 C72 49 82 39 97 39 Z"/><circle cx="82.5" cy="125.5" r="27.5" fill="url(#teal)"/><circle cx="131" cy="166" r="25.5" fill="url(#purple)"/><circle cx="56" cy="192" r="37" fill="url(#violet-blue)"/>
+</svg>

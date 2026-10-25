@@ -92,10 +92,11 @@ export function AppSidebar({ sidebarWidth }: { sidebarWidth: SidebarWidth }) {
     <Sidebar collapsible="icon">
       {/* Match the app header (h-12 + border-b) so the team switcher lines up with the top bar.
           The same px-2 collapsed or not keeps the logo centered over the icon column below. */}
-      <SidebarHeader className="h-12 flex-row items-center gap-1 border-b px-2 py-0">
+      <SidebarHeader className="h-12 flex-row items-center gap-0 border-b px-2 py-0">
         <TeamSwitcher />
-        {/* Closes the sidebar from inside it (ChatGPT-style); collapsed, the logo opens it again. */}
-        <SidebarTrigger className="ml-auto shrink-0 text-muted-foreground group-data-[collapsible=icon]:hidden" />
+        {/* Closes the sidebar from inside it (ChatGPT-style); collapsed, the logo opens it again. Shifted
+            towards the sidebar's edge without moving the group menu's arrow (a transform takes no space). */}
+        <SidebarTrigger className="-ml-1 shrink-0 translate-x-1.5 text-muted-foreground group-data-[collapsible=icon]:hidden" />
       </SidebarHeader>
 
       <SidebarContent className="gap-0">

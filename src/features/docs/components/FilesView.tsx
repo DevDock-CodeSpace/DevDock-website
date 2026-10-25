@@ -39,12 +39,22 @@ type Row = { kind: 'doc'; item: DocSummary } | { kind: 'diagram'; item: DiagramS
 /**
  * Files (the UI name; URLs say docs), on the group page and in a workspace's Files tab. The chips
  * choose what to see: Recent (newest of both), Folders (one place's folders, then what isn't in a
- * folder; inside one, its contents), Docs or Diagrams (flat lists that say which folder each is in). The place is the
- * dropdown beside the search (the group page only; a workspace's tab is its own place). Everything
+ * folder; inside one, its contents), Docs or Diagrams (flat lists that say which folder each is in). The place is a
+ * dropdown the group page puts at the right of its header (`header`; a workspace's tab is its own place). Everything
  * reads the group's doc and diagram lists (shared with links and kept live), plus the folders of
  * the place in view.
  */
-export function FilesView({ workspace, aside }: { workspace?: Space; /** On the chips row, at the right (a workspace's link to the group's files). */ aside?: ReactNode }) {
+export function FilesView({
+  workspace,
+  aside,
+  header,
+}: {
+  workspace?: Space
+  /** On the chips row, at the right (a workspace's link to the group's files). */
+  aside?: ReactNode
+  /** The page header, given the place dropdown to show at its right (group page only). */
+  header?: (placeControl: ReactNode) => ReactNode
+}) {
   const { team } = useCurrentTeam()
   const [{ data: docs }, { data: diagrams }] = useSuspenseQueries({ queries: [teamDocsQuery(team.id), teamDiagramsQuery(team.id)] })
   const canWrite = useCanWriteDocs()
@@ -120,6 +130,7 @@ export function FilesView({ workspace, aside }: { workspace?: Space; /** On the 
 
   return (
     <>
+      {header?.(placeControl)}
       <div className="mb-4 flex items-center gap-3">
       <nav aria-label="View" className="-mx-1 flex min-w-0 flex-1 gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {chips.map((chip) => (
@@ -155,7 +166,6 @@ export function FilesView({ workspace, aside }: { workspace?: Space; /** On the 
             canWrite={canWrite(placeWorkspace ?? null)}
             canCreate={canEdit(placeWorkspace ?? null)}
             hrefFor={hrefFor}
-            placeControl={placeControl}
             rootLabel={space?.title ?? 'Group-wide'}
             empty={space ? `Nothing in ${space.title} yet.` : 'Nothing group-wide yet. Create a doc, a diagram or a folder.'}
           />
@@ -168,7 +178,6 @@ export function FilesView({ workspace, aside }: { workspace?: Space; /** On the 
             ...(view !== 'docs' ? placeDiagrams.map((item) => ({ kind: 'diagram' as const, item })) : []),
           ]}
           placeWorkspace={placeWorkspace}
-          placeControl={placeControl}
           hrefFor={hrefFor}
           canNewDoc={view !== 'diagrams' && canNewDoc}
           canNewDiagram={view !== 'docs' && canNewDiagram}
@@ -179,7 +188,7 @@ export function FilesView({ workspace, aside }: { workspace?: Space; /** On the 
   )
 }
 
-/** The place dropdown beside the search. */
+/** The place dropdown, at the right of the group page's header. */
 function PlaceSelect({
   value,
   allowEverywhere,
@@ -245,7 +254,6 @@ function PlaceFiles({
   canWrite: boolean
   canCreate: boolean
   hrefFor: (kind: 'doc' | 'diagram', item: DocSummary) => string
-  placeControl?: ReactNode
   rootLabel?: string
   empty: string
 }) {
@@ -273,7 +281,6 @@ function FlatList({
   view,
   rows,
   placeWorkspace,
-  placeControl,
   hrefFor,
   canNewDoc,
   canNewDiagram,
@@ -282,7 +289,6 @@ function FlatList({
   view: Exclude<View, 'files'>
   rows: Row[]
   placeWorkspace: string | null | undefined
-  placeControl?: ReactNode
   hrefFor: (kind: 'doc' | 'diagram', item: DocSummary) => string
   canNewDoc: boolean
   canNewDiagram: boolean
@@ -330,7 +336,6 @@ function FlatList({
           {needle ? `${plural(shown.length, noun)} match` : recent ? `Latest ${Math.min(rows.length, RECENT_LIMIT)}` : plural(rows.length, noun)}
         </p>
         <div className="ml-auto flex items-center gap-2 pb-1.5 sm:pb-0">
-          {placeControl}
           <label className="flex h-8 w-44 items-center gap-2 rounded-md border bg-background px-2 text-sm focus-within:ring-2 focus-within:ring-brand/40 sm:w-56">
             <Search className="size-3.5 shrink-0 text-muted-foreground" />
             <input
