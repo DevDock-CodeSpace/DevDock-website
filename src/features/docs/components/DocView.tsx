@@ -17,7 +17,7 @@ import { docsPath } from '@/features/teams/nav'
 import type { Json } from '@/types/database.types'
 import { errorMessage } from '@/lib/errors'
 import { sameJson } from '@/lib/json'
-import { timeAgo } from '@/lib/format'
+import { timeSince } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import {
   deleteDocument,
@@ -339,7 +339,7 @@ export default function DocView({ doc, canEdit, canDelete }: { doc: Doc; canEdit
         <PersonAvatar profile={doc.author} className="size-5" />
         <span>{doc.author?.display_name ?? 'Former member'}</span>
         <span aria-hidden>·</span>
-        <span>Updated {timeAgo(doc.updated_at, now)}</span>
+        <span>Updated {timeSince(doc.updated_at, now)}</span>
         {!canEdit && (
           <>
             <span aria-hidden>·</span>

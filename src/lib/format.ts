@@ -19,6 +19,14 @@ export function timeAgo(iso: string, now: number): string {
   return 'just now'
 }
 
+/**
+ * "Updated 3 min. ago" for something that changed: like timeAgo, but never "in 3 min." when the
+ * change is newer than `now` (a save made after the page captured its clock).
+ */
+export function timeSince(iso: string, now: number): string {
+  return timeAgo(iso, Math.max(now, new Date(iso).getTime()))
+}
+
 export function formatDate(iso: string): string {
   return shortDate.format(parseDate(iso))
 }
