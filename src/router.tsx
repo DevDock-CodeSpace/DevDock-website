@@ -113,7 +113,8 @@ export const router = createBrowserRouter([
               { path: 'docs/:docId', loader: docLoader, element: <DocPage /> },
               // The old Diagrams list opens Files showing diagrams; diagram pages keep their URLs.
               { path: 'diagrams', element: <DiagramsRedirect /> },
-              { path: 'diagrams/:diagramId', loader: diagramLoader, element: <DiagramPage /> },
+              // Full-bleed: the canvas takes the whole area under the top bar (DiagramView sets its height).
+              { path: 'diagrams/:diagramId', loader: diagramLoader, handle: FULL_BLEED, element: <DiagramPage /> },
               // Development groups: issues from every project (the page checks the group type).
               { path: 'issues', element: <TeamIssuesPage /> },
               // Group → Live: video sessions (Jitsi via JaaS) for the group and its workspaces.
@@ -152,7 +153,7 @@ export const router = createBrowserRouter([
                     element: <WorkspaceToolGate tool="diagrams" />,
                     children: [
                       { index: true, element: <DiagramsRedirect /> },
-                      { path: ':diagramId', loader: diagramLoader, element: <DiagramPage /> },
+                      { path: ':diagramId', loader: diagramLoader, handle: FULL_BLEED, element: <DiagramPage /> },
                     ],
                   },
                   {

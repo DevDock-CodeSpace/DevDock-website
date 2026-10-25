@@ -2,7 +2,7 @@ import { useSuspenseQuery } from '@tanstack/react-query'
 import { CalendarDays, CircleUserRound, Gauge, GitPullRequestArrow, IterationCw, Tag, X } from 'lucide-react'
 import { useState, type ComponentProps, type ReactNode } from 'react'
 import { PersonAvatar } from '@/components/PersonRow'
-import { formatDate, localDateISO, timeAgo } from '@/lib/format'
+import { formatDate, localDateISO, timeAgo, timeSince } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { workspaceIssuesQuery, type IssueDetail } from '../api'
 import { cycleTitle } from '../cycles'
@@ -208,7 +208,7 @@ export function IssueProperties({
       <p className="px-2 pt-4 text-xs text-muted-foreground">
         Created by {issue.creator?.display_name ?? 'a former member'} · {timeAgo(issue.created_at, now)}
         <br />
-        Updated {timeAgo(issue.updated_at, now)}
+        Updated {timeSince(issue.updated_at, now)}
         {issue.completed_at && (
           <>
             <br />
