@@ -1,6 +1,7 @@
-import { ChevronUp, LoaderCircle, Maximize2, Minus, PhoneOff } from 'lucide-react'
+import { ChevronUp, Maximize2, Minus, PhoneOff } from 'lucide-react'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router'
+import { DockSpinner } from '@/components/DockSpinner'
 import { Button } from '@/components/ui/button'
 import { holdActivity } from '@/lib/inactivity'
 import { cn } from '@/lib/utils'
@@ -151,8 +152,9 @@ export function CallDock() {
 
 function Connecting() {
   return (
-    <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-      <LoaderCircle className="mr-2 size-4 animate-spin" /> Connecting…
+    <div className="flex h-full flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
+      <DockSpinner label={null} />
+      Connecting…
     </div>
   )
 }

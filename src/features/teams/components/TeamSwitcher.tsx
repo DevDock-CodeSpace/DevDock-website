@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { Check, ChevronDown, PanelLeft, Plus } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { LogoMark } from '@/components/Logo'
 import { cn } from '@/lib/utils'
@@ -31,7 +31,10 @@ import { teamPermissions, teamRoleLabel, teamTypes } from '../permissions'
  */
 export function TeamSwitcher() {
   const { user } = useAuth()
-  const { team, role } = useCurrentTeam()
+  const { team } = useCurrentTeam()
+  // Closed by a click elsewhere: don't hand focus back to the button, or Chrome draws the keyboard
+  // focus ring on it. Closed with the keyboard (Esc), focus still returns so keyboard users keep their place.
+  const closedByPointer = useRef(false)
   const view = useCollectionView()
   const memberships = useMyTeams()
   const queryClient = useQueryClient()
@@ -67,7 +70,7 @@ export function TeamSwitcher() {
   }
 
   return (
-    // Hugs the group's name, with the menu's arrow right after it; the sidebar button sits beside (AppSidebar).
+    // Fills the header up to the sidebar button (AppSidebar), so the menu's arrow sits right beside it.
     <SidebarMenu className="min-w-0 flex-1">
       <SidebarMenuItem>
         <DropdownMenu>
@@ -75,21 +78,30 @@ export function TeamSwitcher() {
             <SidebarMenuButton
               size="lg"
               tooltip={view.collection ? `${team.name} · ${view.collection.name}` : team.name}
-              className="w-auto max-w-full data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+              className="w-full pr-1.5 data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <GroupIcon team={team} className="size-8" fallback={<LogoMark className="size-8 object-contain" />} />
-              <div className="grid min-w-0 text-left leading-tight">
+              <div className="grid min-w-0 flex-1 text-left leading-tight">
                 <span className="truncate font-semibold">{team.name}</span>
                 <span className="truncate font-mono text-xs text-muted-foreground">
-                  {view.collection
-                    ? view.collection.name
-                    : `${teamRoleLabel[role].toLowerCase()} · ${teamTypes[team.type].label.toLowerCase()}`}
+                  {/* The collection in view, else what kind of group it is (Learning, Development, General). */}
+                  {view.collection ? view.collection.name : teamTypes[team.type].label}
                 </span>
               </div>
-              <ChevronDown className="text-muted-foreground" />
+              <ChevronDown className="ml-auto text-muted-foreground" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
-          <DropdownMenuContent side={isMobile ? 'bottom' : 'right'} align="start" sideOffset={4} className="min-w-60">
+          <DropdownMenuContent
+            side={isMobile ? 'bottom' : 'right'}
+            align="start"
+            sideOffset={4}
+            className="min-w-60"
+            onPointerDownOutside={() => (closedByPointer.current = true)}
+            onCloseAutoFocus={(event) => {
+              if (closedByPointer.current) event.preventDefault()
+              closedByPointer.current = false
+            }}
+          >
             <DropdownMenuLabel className="text-xs text-muted-foreground">Groups</DropdownMenuLabel>
             {memberships.map((m) => {
               const Icon = teamTypes[m.team.type].icon

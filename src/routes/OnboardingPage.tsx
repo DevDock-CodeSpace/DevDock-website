@@ -1,11 +1,10 @@
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
-import { ArrowLeft, LoaderCircle } from 'lucide-react'
+import { ArrowLeft, CircleAlert, KeyRound, LoaderCircle, Plus, type LucideIcon } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { LogoMark, LogoWordmark } from '@/components/Logo'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuth, useSignOut, useUserIdentity } from '@/features/auth/hooks'
@@ -15,53 +14,115 @@ import { teamTypes } from '@/features/teams/permissions'
 import { slugify } from '@/features/teams/slug'
 import { cn } from '@/lib/utils'
 
-/** Create a team (→ owner) or join one with an invite code (→ member). */
+type Choice = 'join' | 'create'
+
+/** Create a team (→ owner) or join one with an invite code (→ member): pick one, then one form. */
 export function OnboardingPage() {
   const { user } = useAuth()
   const memberships = useSuspenseQuery(myTeamsQuery(user.id)).data
   const isFirstTeam = memberships.length === 0
+  // Most people arrive with a code from their instructor or team; the one who starts a group picks it once.
+  const [choice, setChoice] = useState<Choice>('join')
 
   return (
-    <div className="relative min-h-svh bg-background px-4 py-10">
-      <div className="absolute top-4 right-4">
-        <ThemeToggle />
-      </div>
-
-      <main className="mx-auto w-full max-w-3xl">
-        <div className="mb-10 flex items-center gap-3">
-          <LogoMark className="h-10" />
-          <LogoWordmark className="h-6" />
+    <div className="flex min-h-svh flex-col bg-background">
+      <header className="flex h-16 items-center justify-between gap-4 px-6">
+        <span className="flex items-center gap-2.5">
+          <LogoMark className="h-7" />
+          <LogoWordmark className="h-5" />
+        </span>
+        <div className="flex items-center gap-3">
+          <SignedInAs />
+          <ThemeToggle />
         </div>
+      </header>
 
-        {!isFirstTeam && (
-          <Button variant="ghost" size="sm" asChild className="-ml-2 mb-4">
-            <Link to="/app">
-              <ArrowLeft /> Back to your group
-            </Link>
-          </Button>
-        )}
+      <main className="flex flex-1 justify-center px-6 pt-4 pb-12 sm:pt-8">
+        <div className="w-full max-w-2xl animate-in duration-500 fade-in slide-in-from-bottom-2 motion-reduce:animate-none">
+          {!isFirstTeam && (
+            <Button variant="ghost" size="sm" asChild className="-ml-2.5 mb-3 text-muted-foreground">
+              <Link to="/app">
+                <ArrowLeft /> Back to your group
+              </Link>
+            </Button>
+          )}
 
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {isFirstTeam ? 'Welcome to DevDock' : 'Create or join a group'}
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {isFirstTeam
-            ? 'Start your own group, or join one with an invite code from a group member or instructor.'
-            : 'You can belong to several groups, with a different role in each.'}
-        </p>
+          <h1 className="text-[1.75rem] leading-tight font-semibold tracking-tight">
+            {isFirstTeam ? 'Welcome to DevDock' : 'Create or join a group'}
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {isFirstTeam
+              ? 'Everything in DevDock happens inside a group. Join yours, or start a new one.'
+              : 'You can belong to several groups, with a different role in each.'}
+          </p>
 
-        <div className="mt-8 grid gap-4 md:grid-cols-2">
-          <CreateTeamCard />
-          <JoinTeamCard />
+          <div role="radiogroup" aria-label="What would you like to do?" className="mt-6 grid gap-3 sm:grid-cols-2">
+            <ChoiceOption
+              selected={choice === 'join'}
+              onSelect={() => setChoice('join')}
+              icon={KeyRound}
+              title="Join with an invite code"
+              description="You have a code from your instructor or a group admin."
+            />
+            <ChoiceOption
+              selected={choice === 'create'}
+              onSelect={() => setChoice('create')}
+              icon={Plus}
+              title="Start a new group"
+              description="For a class, cohort, project or organization. You’ll own it."
+            />
+          </div>
+
+          <div key={choice} className="mt-6 border-t pt-6 animate-in duration-300 fade-in motion-reduce:animate-none">
+            {choice === 'join' ? <JoinTeamForm /> : <CreateTeamForm />}
+          </div>
         </div>
-
-        {isFirstTeam && <SignedInAs />}
       </main>
     </div>
   )
 }
 
-function CreateTeamCard() {
+function ChoiceOption({
+  selected,
+  onSelect,
+  icon: Icon,
+  title,
+  description,
+}: {
+  selected: boolean
+  onSelect: () => void
+  icon: LucideIcon
+  title: string
+  description: string
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      onClick={onSelect}
+      className={cn(
+        'flex items-center gap-3 rounded-lg border px-3.5 py-3 text-left transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+        selected ? 'border-brand bg-brand/5 ring-1 ring-brand' : 'hover:bg-muted/50',
+      )}
+    >
+      <span
+        className={cn(
+          'flex size-9 shrink-0 items-center justify-center rounded-md border',
+          selected ? 'border-brand/40 bg-background text-brand' : 'bg-muted/50 text-muted-foreground',
+        )}
+      >
+        <Icon className="size-4" />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-sm font-medium">{title}</span>
+        <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">{description}</span>
+      </span>
+    </button>
+  )
+}
+
+function CreateTeamForm() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [name, setName] = useState('')
@@ -85,85 +146,90 @@ function CreateTeamCard() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Create a group</CardTitle>
-        <CardDescription>For your class, cohort, project group or organization. You’ll be its owner.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form className="space-y-4" onSubmit={submit}>
-          <fieldset className="space-y-1.5">
-            <legend className="text-sm font-medium">Type</legend>
-            <div className="grid grid-cols-3 gap-2">
-              {(Object.keys(teamTypes) as TeamType[]).map((value) => {
-                const { label, icon: Icon } = teamTypes[value]
-                return (
-                  <button
-                    key={value}
-                    type="button"
-                    aria-pressed={type === value}
-                    onClick={() => setType(value)}
-                    className={cn(
-                      'flex flex-col items-center gap-1 rounded-md border px-2 py-2.5 text-xs transition-colors',
-                      type === value ? 'border-primary bg-primary/5 font-medium' : 'text-muted-foreground hover:bg-muted',
-                    )}
-                  >
-                    <Icon className="size-4" />
-                    {label}
-                  </button>
-                )
-              })}
-            </div>
-            <p className="text-xs text-muted-foreground">{teamTypes[type].hint}</p>
-          </fieldset>
-          <div className="space-y-1.5">
-            <Label htmlFor="team-name">Name</Label>
-            <Input
-              id="team-name"
-              value={name}
-              maxLength={100}
-              placeholder="Evening Cohort"
-              onChange={(e) => setName(e.target.value)}
-              required
+    <form className="space-y-5" onSubmit={submit}>
+      <fieldset>
+        <legend className="mb-2 text-sm font-medium">What kind of group?</legend>
+        <div className="grid gap-2 sm:grid-cols-3">
+          {(Object.keys(teamTypes) as TeamType[]).map((value) => {
+            const { label, hint, icon: Icon } = teamTypes[value]
+            const selected = type === value
+            return (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={selected}
+                onClick={() => setType(value)}
+                className={cn(
+                  'flex flex-col gap-1 rounded-lg border px-3 py-2.5 text-left transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+                  selected ? 'border-brand bg-brand/5 ring-1 ring-brand' : 'hover:bg-muted/50',
+                )}
+              >
+                <span className="flex items-center gap-2 text-sm font-medium">
+                  <Icon className={cn('size-4', selected ? 'text-brand' : 'text-muted-foreground')} />
+                  {label}
+                </span>
+                <span className="text-xs leading-relaxed text-muted-foreground">{hint}</span>
+              </button>
+            )
+          })}
+        </div>
+      </fieldset>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label htmlFor="team-name">Name</Label>
+          <Input
+            id="team-name"
+            value={name}
+            maxLength={100}
+            placeholder="Evening Cohort"
+            className="h-10"
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="team-slug">Address</Label>
+          <div className="flex h-10 items-center rounded-md border bg-muted/40 pl-3 font-mono text-sm focus-within:ring-2 focus-within:ring-ring/50">
+            <span className="text-muted-foreground">/t/</span>
+            <input
+              id="team-slug"
+              className="h-full min-w-0 flex-1 bg-transparent pr-3 outline-none"
+              value={effectiveSlug}
+              maxLength={48}
+              placeholder="evening-cohort"
+              aria-invalid={effectiveSlug !== '' && !slugValid}
+              onChange={(e) => {
+                setSlugEdited(true)
+                setSlug(e.target.value.toLowerCase())
+              }}
             />
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="team-slug">URL</Label>
-            <div className="flex items-center rounded-md border bg-muted/40 pl-3 font-mono text-sm focus-within:ring-2 focus-within:ring-ring/50">
-              <span className="text-muted-foreground">/t/</span>
-              <input
-                id="team-slug"
-                className="h-8 min-w-0 flex-1 bg-transparent pr-3 outline-none"
-                value={effectiveSlug}
-                maxLength={48}
-                placeholder="evening-cohort"
-                aria-invalid={effectiveSlug !== '' && !slugValid}
-                onChange={(e) => {
-                  setSlugEdited(true)
-                  setSlug(e.target.value.toLowerCase())
-                }}
-              />
-            </div>
-            {effectiveSlug !== '' && !slugValid && (
-              <p className="text-xs text-destructive">3–48 lowercase letters, numbers, and single dashes.</p>
-            )}
-          </div>
-          {create.isError && (
-            <p role="alert" className="text-sm text-destructive">
-              {create.error.message}
-            </p>
+          {effectiveSlug !== '' && !slugValid ? (
+            <p className="text-xs text-destructive">3–48 lowercase letters, numbers, and single dashes.</p>
+          ) : (
+            <p className="text-xs text-muted-foreground">Filled in from the name. You can change it.</p>
           )}
-          <Button type="submit" className="w-full" disabled={!name.trim() || !slugValid || create.isPending}>
-            {create.isPending && <LoaderCircle className="animate-spin" />}
-            Create group
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+        </div>
+      </div>
+
+      {create.isError && (
+        <p role="alert" className="flex gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive">
+          <CircleAlert className="mt-0.5 size-4 shrink-0" />
+          {create.error.message}
+        </p>
+      )}
+      <div>
+        <Button type="submit" size="lg" className="h-11 w-full" disabled={!name.trim() || !slugValid || create.isPending}>
+          {create.isPending && <LoaderCircle className="animate-spin" />}
+          Create group
+        </Button>
+      </div>
+    </form>
   )
 }
 
-function JoinTeamCard() {
+function JoinTeamForm() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -185,38 +251,37 @@ function JoinTeamCard() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Join with an invite code</CardTitle>
-        <CardDescription>You’ll join as a member. You’ll see what is open to the whole group; the rest is granted separately.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form className="space-y-4" onSubmit={submit}>
-          <div className="space-y-1.5">
-            <Label htmlFor="invite-code">Invite code</Label>
-            <Input
-              id="invite-code"
-              value={code}
-              placeholder="XXXX-XXXX-XXXX"
-              autoComplete="off"
-              spellCheck={false}
-              className="font-mono uppercase tracking-wider"
-              onChange={(e) => setCode(e.target.value)}
-              required
-            />
-          </div>
-          {join.isError && (
-            <p role="alert" className="text-sm text-destructive">
-              {join.error.message}
-            </p>
-          )}
-          <Button type="submit" variant="outline" className="w-full" disabled={!code.trim() || join.isPending}>
-            {join.isPending && <LoaderCircle className="animate-spin" />}
-            Join group
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+    <form onSubmit={submit}>
+      <Label htmlFor="invite-code">Invite code</Label>
+      <div className="mt-1.5 flex flex-col gap-2 sm:flex-row">
+        <Input
+          id="invite-code"
+          value={code}
+          placeholder="XXXX-XXXX-XXXX"
+          autoComplete="off"
+          spellCheck={false}
+          autoFocus
+          className="h-11 flex-1 font-mono text-base tracking-[0.2em] uppercase"
+          onChange={(e) => setCode(e.target.value)}
+          required
+        />
+        <Button type="submit" size="lg" className="h-11 sm:min-w-32" disabled={!code.trim() || join.isPending}>
+          {join.isPending && <LoaderCircle className="animate-spin" />}
+          Join group
+        </Button>
+      </div>
+      {join.isError ? (
+        <p role="alert" className="mt-3 flex gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive">
+          <CircleAlert className="mt-0.5 size-4 shrink-0" />
+          {join.error.message}
+        </p>
+      ) : (
+        <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+          You’ll join as a member and see what’s open to the whole group. Courses and projects that aren’t are shared
+          with you separately.
+        </p>
+      )}
+    </form>
   )
 }
 
@@ -225,11 +290,12 @@ function SignedInAs() {
   const { email, name } = useUserIdentity()
   const signOut = useSignOut()
   return (
-    <p className="mt-10 text-sm text-muted-foreground">
-      Signed in as <span className="font-medium text-foreground">{email ?? name}</span>.{' '}
+    <p className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+      <span className="hidden truncate sm:inline">{email ?? name}</span>
+      <span aria-hidden className="hidden text-border sm:inline">|</span>
       <button
         type="button"
-        className="underline underline-offset-4 hover:text-foreground"
+        className="shrink-0 hover:text-foreground"
         disabled={signOut.isPending}
         onClick={() => signOut.mutate()}
       >

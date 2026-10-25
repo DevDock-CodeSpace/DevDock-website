@@ -1,5 +1,5 @@
 import { JaaSMeeting } from '@jitsi/react-sdk'
-import { LoaderCircle } from 'lucide-react'
+import { DockSpinner } from '@/components/DockSpinner'
 import type { JaasToken } from '../api'
 
 type JitsiRoomProps = {
@@ -13,8 +13,9 @@ type JitsiRoomProps = {
 
 function Spinner() {
   return (
-    <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-      <LoaderCircle className="mr-2 size-4 animate-spin" /> Connecting…
+    <div className="flex h-full flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
+      <DockSpinner label={null} />
+      Connecting…
     </div>
   )
 }

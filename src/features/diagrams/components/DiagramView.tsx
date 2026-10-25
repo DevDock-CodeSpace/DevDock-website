@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, ChevronRight, Trash2 } from 'lucide-react'
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useBlocker, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
@@ -14,7 +14,7 @@ import { useOthersTyping } from '@/hooks/use-others-typing'
 import { filesPath } from '@/features/teams/nav'
 import { errorMessage } from '@/lib/errors'
 import { sameJson } from '@/lib/json'
-import { timeAgo } from '@/lib/format'
+import { timeSince } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { Json } from '@/types/database.types'
 import { deleteDiagram, diagramQuery, updateDiagram, type Diagram } from '../api'
@@ -23,7 +23,6 @@ import { parse } from '../editor/model'
 import { ownSave, ownWrite } from '@/lib/realtime'
 
 const AUTOSAVE_MS = 1000
-const MIN_CANVAS_HEIGHT = 480
 
 type SaveStatus = 'saved' | 'pending' | 'saving' | 'error'
 
@@ -202,21 +201,10 @@ export default function DiagramView({ diagram, canWrite }: { diagram: Diagram; c
     }
   }
 
-  // ------------------------------------------------ canvas size / full screen
-  // The canvas fills the rest of the window below the page header.
-  const frame = useRef<HTMLDivElement>(null)
-  const [height, setHeight] = useState(MIN_CANVAS_HEIGHT)
+  // ------------------------------------------------------- full screen
+  // The page is full-bleed (route handle): a slim header, then the editor fills the rest of the
+  // window. Full screen goes one step further and covers the app's sidebar and top bar too.
   const [fullscreen, setFullscreen] = useState(false)
-  useLayoutEffect(() => {
-    const fit = () => {
-      // Page offset (not viewport), minus the layout's bottom padding.
-      const top = (frame.current?.getBoundingClientRect().top ?? 0) + window.scrollY
-      setHeight(Math.max(MIN_CANVAS_HEIGHT, window.innerHeight - top - 32))
-    }
-    fit()
-    window.addEventListener('resize', fit)
-    return () => window.removeEventListener('resize', fit)
-  }, [])
   useEffect(() => {
     if (!fullscreen) return
     const onKeyDown = (event: KeyboardEvent) => {
@@ -228,42 +216,53 @@ export default function DiagramView({ diagram, canWrite }: { diagram: Diagram; c
   }, [fullscreen])
 
   return (
-    <div>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3 text-xs text-muted-foreground">
-          <nav aria-label="Folder path" className="flex min-w-0 items-center gap-1">
-            <Link to={listPath} className="inline-flex shrink-0 items-center gap-1 hover:text-foreground">
-              <ArrowLeft className="size-3.5" /> Files
-            </Link>
-            {path.map((folder) => (
-              <span key={folder.id} className="flex min-w-0 items-center gap-1">
-                <ChevronRight className="size-3 shrink-0" />
-                <Link to={folderLink(folder.id)} className="max-w-32 truncate hover:text-foreground">
-                  {folder.name}
-                </Link>
-              </span>
-            ))}
-          </nav>
-          {/* In a workspace the scope is obvious from the tabs above. */}
-          {!workspaceId && (
-            <>
-              <span aria-hidden>·</span>
-              <DocScope doc={diagram} />
-            </>
-          )}
-          <span aria-hidden>·</span>
+    <div className="flex h-[calc(100svh-3rem)] flex-col">
+      {/* One slim row: back to Files (and the folder) · title · where and when · saved · delete. */}
+      <header className="flex h-12 shrink-0 items-center gap-3 border-b px-3 md:px-4">
+        <nav aria-label="Folder path" className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+          <Link to={listPath} className="inline-flex items-center gap-1 rounded-sm hover:text-foreground">
+            <ArrowLeft className="size-3.5" /> Files
+          </Link>
+          {path.map((folder) => (
+            <span key={folder.id} className="hidden items-center gap-1 sm:flex">
+              <ChevronRight className="size-3 shrink-0" />
+              <Link to={folderLink(folder.id)} className="max-w-28 truncate hover:text-foreground">
+                {folder.name}
+              </Link>
+            </span>
+          ))}
+        </nav>
+        <span aria-hidden className="h-4 w-px shrink-0 bg-border" />
+        {canWrite ? (
+          <input
+            value={title}
+            maxLength={200}
+            aria-label="Title"
+            readOnly={locked}
+            placeholder="Untitled diagram"
+            onChange={(e) => {
+              setTitle(e.target.value)
+              titleRef.current = e.target.value
+              markChanged()
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') e.currentTarget.blur()
+            }}
+            className="min-w-0 flex-1 truncate rounded-sm bg-transparent px-1 text-sm font-semibold outline-none placeholder:text-muted-foreground/50 hover:bg-muted/50 focus:bg-muted/50"
+          />
+        ) : (
+          <h1 className="min-w-0 flex-1 truncate px-1 text-sm font-semibold">{diagram.title}</h1>
+        )}
+        <div className="hidden min-w-0 shrink items-center gap-2 text-xs text-muted-foreground lg:flex">
+          {/* In a workspace the scope is in the breadcrumb above. */}
+          {!workspaceId && <DocScope doc={diagram} />}
           <span className="truncate">
-            {diagram.author?.display_name ?? 'Former member'} · Updated {timeAgo(diagram.updated_at, now)}
+            {diagram.author?.display_name ?? 'Former member'} · Updated {timeSince(diagram.updated_at, now)}
           </span>
-          {!canWrite && (
-            <>
-              <span aria-hidden>·</span>
-              <span className="shrink-0">View only</span>
-            </>
-          )}
+          {!canWrite && <span className="shrink-0 rounded-sm border px-1.5 py-0.5">View only</span>}
         </div>
         {canWrite && (
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1">
             <SaveIndicator status={status} />
             <Button
               variant="ghost"
@@ -276,38 +275,14 @@ export default function DiagramView({ diagram, canWrite }: { diagram: Diagram; c
             </Button>
           </div>
         )}
-      </div>
+      </header>
 
-      {canWrite ? (
-        <input
-          value={title}
-          maxLength={200}
-          aria-label="Title"
-          readOnly={locked}
-          placeholder="Untitled diagram"
-          onChange={(e) => {
-            setTitle(e.target.value)
-            titleRef.current = e.target.value
-            markChanged()
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') e.currentTarget.blur()
-          }}
-          className="mb-4 block w-full bg-transparent text-2xl font-semibold tracking-tight outline-none placeholder:text-muted-foreground/50"
-        />
-      ) : (
-        <h1 className="mb-4 truncate text-2xl font-semibold tracking-tight">{diagram.title}</h1>
+      {lockedBy.length > 0 && (
+        <div className="shrink-0 border-b px-3 py-2 md:px-4">
+          <OthersTypingAlert names={lockedBy} />
+        </div>
       )}
-
-      <OthersTypingAlert names={lockedBy} />
-      <div
-        ref={frame}
-        style={fullscreen ? undefined : { height }}
-        className={cn(
-          'overflow-hidden bg-background',
-          fullscreen ? 'fixed inset-0 z-50' : 'rounded-lg border',
-        )}
-      >
+      <div className={cn('bg-background', fullscreen ? 'fixed inset-0 z-50' : 'min-h-0 flex-1')}>
         <DiagramEditor
           initial={initial}
           readOnly={!canWrite || locked}

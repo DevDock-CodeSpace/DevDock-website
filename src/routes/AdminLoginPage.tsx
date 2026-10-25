@@ -1,12 +1,11 @@
 import { CircleAlert, LoaderCircle } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Link, useLoaderData } from 'react-router'
-import { LogoMark, LogoWordmark } from '@/components/Logo'
-import { ThemeToggle } from '@/components/ThemeToggle'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { rememberedChoice } from '@/features/auth/api'
+import { AuthShell } from '@/features/auth/components/AuthShell'
 import { RememberMe } from '@/features/auth/components/RememberMe'
 import { AuthFlowError, loginErrorMessages } from '@/features/auth/errors'
 import { useSignInWithPassword } from '@/features/auth/hooks'
@@ -32,61 +31,44 @@ export function AdminLoginPage() {
   const message = signIn.isError ? (signIn.error instanceof AuthFlowError ? signIn.error.message : loginErrorMessages.unavailable) : null
 
   return (
-    <div className="relative flex min-h-svh items-center justify-center bg-background px-4">
-      <div className="absolute top-4 right-4">
-        <ThemeToggle />
-      </div>
-
-      <main className="w-full max-w-sm">
-        <div className="mb-8 flex items-center gap-3">
-          <LogoMark className="h-11" />
-          <LogoWordmark className="h-7" />
+    <AuthShell title="Admin sign-in" subtitle="For the admin account. Everyone else signs in with Google.">
+      {message && (
+        <div role="alert" className="mb-6 flex gap-2.5 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive">
+          <CircleAlert className="mt-0.5 size-4 shrink-0" />
+          <span>{message}</span>
         </div>
+      )}
 
-        <h1 className="text-2xl font-semibold tracking-tight">Admin sign-in</h1>
-        <p className="mt-1 text-sm text-muted-foreground">For the admin account. Everyone else signs in with Google.</p>
+      <form className="space-y-4" onSubmit={submit}>
+        <div className="space-y-1.5">
+          <Label htmlFor="admin-email">Email</Label>
+          <Input id="admin-email" type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} className="h-10" />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="admin-password">Password</Label>
+          <Input
+            id="admin-password"
+            type="password"
+            autoComplete="current-password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="h-10"
+          />
+        </div>
+        <RememberMe checked={remember} onChange={setRemember} disabled={busy} />
+        <Button type="submit" size="lg" className="h-11 w-full" disabled={busy || !email.trim() || !password}>
+          {busy && <LoaderCircle className="animate-spin" />}
+          {busy ? 'Signing in…' : 'Sign in'}
+        </Button>
+      </form>
 
-        {message && (
-          <div
-            role="alert"
-            className="mt-6 flex gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive"
-          >
-            <CircleAlert className="mt-0.5 size-4 shrink-0" />
-            <span>{message}</span>
-          </div>
-        )}
-
-        <form className="mt-6 space-y-4" onSubmit={submit}>
-          <div className="space-y-1.5">
-            <Label htmlFor="admin-email">Email</Label>
-            <Input id="admin-email" type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="admin-password">Password</Label>
-            <Input
-              id="admin-password"
-              type="password"
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-          <RememberMe checked={remember} onChange={setRemember} disabled={busy} />
-          <Button type="submit" size="lg" className="h-10 w-full" disabled={busy || !email.trim() || !password}>
-            {busy && <LoaderCircle className="animate-spin" />}
-            {busy ? 'Signing in…' : 'Sign in'}
-          </Button>
-        </form>
-
-        <p className="mt-6 text-xs text-muted-foreground">
-          Not the admin?{' '}
-          <Link to="/login" className="underline underline-offset-4 hover:text-foreground">
-            Sign in with Google
-          </Link>
-          .
-        </p>
-      </main>
-    </div>
+      <p className="mt-8 border-t pt-5 text-xs text-muted-foreground">
+        Not the admin?{' '}
+        <Link to="/login" className="font-medium text-foreground underline-offset-4 hover:underline">
+          Sign in with Google
+        </Link>
+      </p>
+    </AuthShell>
   )
 }

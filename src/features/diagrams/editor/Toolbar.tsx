@@ -1,5 +1,6 @@
 import { useReactFlow, useStore } from '@xyflow/react'
 import {
+  CodeXml,
   Grid3x3,
   Maximize,
   Maximize2,
@@ -8,7 +9,6 @@ import {
   PanelRightOpen,
   Redo2,
   Undo2,
-  Workflow,
   ZoomIn,
   ZoomOut,
   type LucideIcon,
@@ -87,10 +87,24 @@ export function Toolbar({
             onClick={() => onSnapToGrid(!snapToGrid)}
             pressed={snapToGrid}
           />
-          <ToolButton icon={Workflow} label="Import Mermaid" onClick={onImportMermaid} />
         </>
       )}
       <div className="ml-auto flex items-center gap-0.5">
+        {!readOnly && (
+          <>
+            {/* Labelled: an icon alone didn't say what it does. */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="sm" onClick={onImportMermaid} className="h-7 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground">
+                  <CodeXml className="size-3.5" />
+                  Import Mermaid
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Paste a Mermaid flowchart or ER diagram (from ChatGPT, GitHub…) to add it as shapes</TooltipContent>
+            </Tooltip>
+            <Separator orientation="vertical" className="mx-1.5 h-4 data-vertical:self-center" />
+          </>
+        )}
         <ToolButton
           icon={fullscreen ? Minimize2 : Maximize2}
           label={fullscreen ? 'Exit full screen' : 'Full screen'}
