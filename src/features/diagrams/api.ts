@@ -36,31 +36,6 @@ export const teamDiagramsQuery = (teamId: string) =>
     },
   })
 
-/** Workspace → Diagrams: only diagrams assigned to this workspace. */
-export const workspaceDiagramsQuery = (workspaceId: string) =>
-  queryOptions({
-    queryKey: ['diagrams', 'workspace', workspaceId],
-    queryFn: async (): Promise<DiagramSummary[]> => {
-      const { data, error } = await supabase
-        .from('diagrams')
-        .select(SUMMARY)
-        .eq('workspace_id', workspaceId)
-        .order('updated_at', { ascending: false })
-      if (error) throw toDataError('load diagrams', error)
-      return data
-    },
-  })
-
-/**
- * Stands in for a scope's diagrams where the Diagrams tool is off, so a page can read its queries
- * as one batch either way. Answered locally: it never makes a request.
- */
-export const noDiagramsQuery = queryOptions({
-  queryKey: ['diagrams', 'none'],
-  queryFn: (): DiagramSummary[] => [],
-  staleTime: Infinity,
-})
-
 /** null when the diagram doesn't exist or the caller can't read it. */
 export const diagramQuery = (diagramId: string) =>
   queryOptions({

@@ -6,6 +6,7 @@ import {
   Heading2,
   Heading3,
   ImagePlus,
+  Link2,
   List,
   ListOrdered,
   Minus,
@@ -29,6 +30,8 @@ const items: Item[] = [
   { label: 'Code block', hint: '```', icon: Code2, run: (e) => e.chain().focus().setCodeBlock().run() },
   { label: 'Quote', hint: '>', icon: Quote, run: (e) => e.chain().focus().setBlockquote().run() },
   { label: 'Divider', hint: '---', icon: Minus, run: (e) => e.chain().focus().setHorizontalRule().run() },
+  // Typing `[[` opens the picker (FileLinkPicker), so this does the same.
+  { label: 'Link a doc or diagram', hint: '[[', icon: Link2, run: (e) => e.chain().focus().insertContent('[[').run() },
 ]
 
 /**

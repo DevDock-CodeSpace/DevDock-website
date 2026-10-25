@@ -13,11 +13,14 @@ import { useCanEditDocs } from '../hooks'
 export function CreateDocDialog({
   workspaceId,
   folderId,
+  groupWide = false,
   open,
   onOpenChange,
 }: {
   workspaceId?: string
   folderId?: string | null
+  /** Fix the scope to group-wide (Files with the group's own place picked). */
+  groupWide?: boolean
   open?: boolean
   onOpenChange?: (open: boolean) => void
 }) {
@@ -27,7 +30,7 @@ export function CreateDocDialog({
       noun="doc"
       placeholder="Onboarding checklist"
       workspaceId={workspaceId}
-      groupWideOnly={!workspaceId && !!folderId}
+      groupWideOnly={!workspaceId && (groupWide || !!folderId)}
       canWrite={useCanEditDocs()}
       create={(input) => createDocument({ ...input, folderId: folderId ?? null })}
       queryKeys={[['documents', 'team'], ['documents', 'workspace']]}

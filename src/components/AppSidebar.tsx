@@ -26,7 +26,7 @@ import { useUnread } from '@/features/messaging/hooks'
 import { UserMenu } from '@/features/auth/components/UserMenu'
 import { TeamSwitcher } from '@/features/teams/components/TeamSwitcher'
 import { useCurrentTeam } from '@/features/teams/hooks'
-import { getTeamNav, hasTeamIssues, teamPath, workspacePath, type NavItem } from '@/features/teams/nav'
+import { getTeamNav, hasTeamIssues, isNavActive, teamPath, workspacePath, type NavItem } from '@/features/teams/nav'
 import { collectionTypeOrder, workspaceTypeOrder, workspaceTypes } from '@/features/teams/permissions'
 import { useCollectionView } from '@/features/collections/hooks'
 import { rememberCollectionView } from '@/features/collections/view'
@@ -219,7 +219,7 @@ function NavLinkItem({ item, onNavigate, badge = 0 }: { item: NavItem; onNavigat
         asChild
         tooltip={item.title}
         className={activeIcon}
-        isActive={matchPath({ path: item.to, end: item.end ?? false }, pathname) !== null}
+        isActive={isNavActive(item, pathname)}
       >
         <Link to={item.to} onClick={onNavigate}>
           <item.icon />

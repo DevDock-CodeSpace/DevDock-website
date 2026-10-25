@@ -9,6 +9,7 @@ import { common, createLowlight } from 'lowlight'
 import { IMAGE_TYPES } from '@/features/docs/api'
 import { CollapsibleHeadings } from './CollapsibleHeadings'
 import { DocImage } from './DocImage'
+import { FileLink } from './FileLink'
 
 // highlight.js (the same highlighter Dropbox Paper uses), via lowlight; ~35 common languages, auto-detected.
 const lowlight = createLowlight(common)
@@ -43,6 +44,7 @@ export function docExtensions({
     TaskItem.configure({ nested: true }),
     CodeBlockLowlight.configure({ lowlight, defaultLanguage: null }),
     DocImage,
+    FileLink,
     CollapsibleHeadings,
     ...(editable
       ? [

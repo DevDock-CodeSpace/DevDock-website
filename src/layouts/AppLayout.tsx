@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Fragment, type CSSProperties } from 'react'
-import { Link, matchPath, Outlet, useLocation, useParams } from 'react-router'
+import { Link, Outlet, useLocation, useParams } from 'react-router'
 import { AppSidebar } from '@/components/AppSidebar'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { AskDevDockButton } from '@/features/ai/components/AskDevDockButton'
@@ -25,7 +25,7 @@ import { issueQuery } from '@/features/issues/api'
 import { lessonQuery } from '@/features/learning/api'
 import { issueIdentifier } from '@/features/issues/meta'
 import { useCurrentTeam, useCurrentWorkspace } from '@/features/teams/hooks'
-import { getTeamNav, getWorkspaceTabs, teamPath, workspacePath, type NavItem } from '@/features/teams/nav'
+import { getTeamNav, getWorkspaceTabs, isNavActive, teamPath, workspacePath, type NavItem } from '@/features/teams/nav'
 import { workspaceQuery } from '@/features/workspaces/api'
 import { useRealtimeSync } from '@/hooks/use-realtime-sync'
 import { useSidebarWidth } from '@/hooks/use-sidebar-width'
@@ -147,7 +147,7 @@ function useItemCrumb(): Crumb[] {
 /** The current non-index nav item as a crumb, if any. */
 function useSection(items: NavItem[]): Crumb[] {
   const { pathname } = useLocation()
-  const item = items.find((i) => !i.end && matchPath({ path: i.to, end: false }, pathname))
+  const item = items.find((i) => !i.end && isNavActive(i, pathname))
   return item ? [{ label: item.title, to: item.to }] : []
 }
 
