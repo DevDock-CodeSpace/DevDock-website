@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="12 38 256 221">
+<defs>
+<linearGradient id="dd-blue" x1="5%" y1="12%" x2="95%" y2="92%"><stop offset="0" stop-color="#175BFF"/><stop offset=".38" stop-color="#038DFF"/><stop offset=".67" stop-color="#087CF9"/><stop offset="1" stop-color="#3544F4"/></linearGradient>
+<linearGradient id="dd-teal" x1="0%" y1="0%" x2="100%" y2="100%"><stop stop-color="#02D0C4"/><stop offset="1" stop-color="#00BDBD"/></linearGradient>
+<linearGradient id="dd-purple" x1="0%" y1="0%" x2="100%" y2="100%"><stop stop-color="#8A56FC"/><stop offset="1" stop-color="#5334EC"/></linearGradient>
+<linearGradient id="dd-violet" x1="0%" y1="50%" x2="100%" y2="50%"><stop stop-color="#7246F7"/><stop offset=".55" stop-color="#3775FE"/><stop offset="1" stop-color="#01A9FA"/></linearGradient>
+</defs>
+<path fill="url(#dd-blue)" d="M106 39 H163.5 C225 39 267 82 267 148.25 C267 215.5 226 258 165.5 258 H108 C95.35 258 86.75 248.4 86.75 236.25 C86.75 224.6 95.85 215 108.5 215 H154.5 C182.9 215 210.5 194.7 210.5 149.75 C210.5 107.75 183.9 84 154 84 H106 C92.85 84 83.25 74.4 83.25 61.25 C83.25 48.6 92.85 39 106 39 Z"/><circle cx="82.5" cy="125.5" r="27.5" fill="url(#dd-teal)"/><circle cx="131" cy="166" r="25.5" fill="url(#dd-purple)"/><circle cx="50" cy="190" r="37" fill="url(#dd-violet)"/>
+</svg>
