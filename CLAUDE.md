@@ -75,13 +75,14 @@ Exercises is still a placeholder page. Current status and next steps: `docs/STAT
 | Live sessions      | Jitsi Meet via JaaS (8x8) — `@jitsi/react-sdk` embed | Room token minted server-side by the `jaas-token` Edge Function (RS256, `jose`); domain is `8x8.vc`, config from JaaS secrets. Lazy-loaded with the session page |
 | Code               | GitHub App + `repos`            | Group repos linked to projects. A GitHub App connects them (the `github` Edge Function); webhooks and branches come in 9c–9e |
 | Hosting            | Vercel                          | Static SPA; `vercel.json` rewrites every path except `/assets/*` to `index.html` (so a missing chunk is a real 404, not HTML) |
-| Backend deploys    | GitHub Actions (`deploy-supabase.yml`) | Vercel deploys only the SPA. A push to `prod` that changes `supabase/migrations/`, `supabase/functions/` or `config.toml` runs `supabase db push`, then deploys every Edge Function. Secrets: `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`. Function *secrets* (`supabase secrets set`) are still set by hand |
+| Backend deploys    | GitHub Actions (`deploy-supabase.yml`) | Vercel deploys only the SPA. A push that changes `supabase/migrations/`, `supabase/functions/` or `config.toml` runs `supabase db push`, then deploys every Edge Function: `dev` → DevDock Dev, `prod` → live. Secrets: `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD` (live), `SUPABASE_DEV_DB_PASSWORD` (dev). Function *secrets* (`supabase secrets set`) are still set by hand |
 
 ## Commands
 
 ```bash
 npm install
-npm run dev         # Vite dev server
+npm run dev         # Vite dev server against the DevDock Dev project (.env.devdb over .env)
+npm run dev:live    # Vite dev server against the live project (.env): only when you really need live
 npm run typecheck   # tsc -b (app + node configs)
 npm run lint        # oxlint
 npm run build       # typecheck + production build to dist/
@@ -93,9 +94,12 @@ npm run test:idle   # Deno tests for the inactivity sign-out clock (src/lib/inac
 npm run test:reminders  # Deno tests for reminder time labels and the time field's parsing (reminders/when.ts, live/timeOfDay.ts)
 npm run test:mermaid    # Deno tests for the diagram editor's Mermaid import (finding, parsing, layout without overlaps)
 npm run db:types    # regenerate src/types/database.types.ts from the linked project (Supabase CLI)
+npm run seed:dev    # fill an empty DevDock Dev project with test data (scripts/seed-dev.mjs; keychain secrets)
 ```
 
-Supabase CLI (DB work only; the app doesn't need it): `supabase migration new <name>`, `supabase db push [--dry-run]`, `supabase migration list`. On `prod`, migrations and Edge Functions deploy automatically (`.github/workflows/deploy-supabase.yml`); since there is one database, a migration you test while building is usually live long before that. `supabase start` / `db reset` need Docker; nothing else does.
+Supabase CLI (DB work only; the app doesn't need it): `supabase migration new <name>`, `supabase db push [--dry-run]`, `supabase migration list`.
+
+**Two Supabase projects** (since 2026-10-24, `docs/DEV_ENVIRONMENT.md`): **DevDock Dev** (`aktqcsncvbmkbleghipb`, seeded test data only) and the **live** project (`ejqrrxxiatvvdiyxtvid`, real people). Build and test against dev: push a new migration there first with `supabase db push --db-url <dev pooler URL>` (the repo stays *linked* to live, so a bare `supabase db push` hits live), run the app with `npm run dev`, and run browser tests as `dev-admin@devdock.test`. The workflow deploys migrations and functions to dev on a push to `dev` and to live on a push to `prod`. Pushing to live by hand still needs a backup and the owner's OK. Never copy live data into dev. `supabase start` / `db reset` need Docker; nothing else does.
 
 **Request counts** are tested from a separate private repo, `DevDock-CodeSpace/DevDock-request-tests` (two signed-in browser sessions against the live site, a budget per action). `.github/workflows/request-check.yml` starts its quick set after every push to `prod`, the full suite runs weekly, and a summary is emailed. When a change is meant to alter how many requests an action makes, update that repo's `budgets.json`.
 
