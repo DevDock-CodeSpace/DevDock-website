@@ -1,6 +1,6 @@
 import { ConnectionMode, ReactFlow, ReactFlowProvider } from '@xyflow/react'
-import { LoaderCircle } from 'lucide-react'
 import { useDeferredValue, useEffect, useMemo, useState, type KeyboardEvent } from 'react'
+import { DockSpinner } from '@/components/DockSpinner'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -114,7 +114,7 @@ export function MermaidImportDialog({
               {loadFailed ? (
                 <p className="p-3 text-center text-sm text-muted-foreground">The importer couldn’t load. Check your connection and try again.</p>
               ) : !importer ? (
-                <LoaderCircle className="size-4 animate-spin text-muted-foreground" aria-label="Loading" />
+                <DockSpinner className="size-8" label="Loading the importer" />
               ) : result?.ok ? (
                 <div className="absolute inset-0">
                   {/* Every layout has new ids: keyed on one, each new result is fitted to the view again. */}
