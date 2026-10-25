@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, isAuthApiError } from '@supabase/supabase-js'
 import type { Database } from '@/types/database.types'
 import { authStorage } from './auth-storage'
 
@@ -39,7 +39,46 @@ export const supabase = createClient<Database>(supabaseUrl, supabasePublishableK
       removeItem: (key) => authStorage().removeItem(key),
     },
   },
+  global: { fetch: fetchRenewingRefusedToken },
 })
+
+// A stored access token can be refused while the client still thinks it's good (a laptop waking
+// from sleep, another tab renewing the session): every request then fails with 401 and the page
+// shows "Something went wrong" until a reload. So when the database API refuses a signed-in
+// request, renew the session once (shared by everything that failed at the same moment) and retry
+// with the new token. If the server won't renew it either, this browser signs out and
+// watchAuthIdentity sends the person to the login page.
+let renewing: Promise<string | null> | null = null
+
+function renewedAccessToken(): Promise<string | null> {
+  renewing ??= supabase.auth
+    .refreshSession()
+    .then(async ({ data, error }) => {
+      // The server refused to renew it (revoked, signed out elsewhere): sign this browser out, so
+      // watchAuthIdentity sends the person to the login page instead of an error screen. Not when
+      // the network failed: the session may still be good.
+      if (isAuthApiError(error)) await supabase.auth.signOut({ scope: 'local' })
+      return data.session?.access_token ?? null
+    })
+    .catch(() => null)
+    .finally(() => setTimeout(() => (renewing = null), 0))
+  return renewing
+}
+
+async function fetchRenewingRefusedToken(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const response = await fetch(input, init)
+  if (response.status !== 401) return response
+  const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+  if (!url.startsWith(`${supabaseUrl}/rest/v1/`)) return response
+  const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined))
+  // Only a signed-in request (a user's JWT; the publishable key isn't one) can be fixed by renewing.
+  if (!headers.get('Authorization')?.startsWith('Bearer ey')) return response
+  const token = await renewedAccessToken()
+  if (!token) return response
+  console.warn('[auth] The server refused the session token; renewed it and retried.')
+  headers.set('Authorization', `Bearer ${token}`)
+  return fetch(input, { ...init, headers })
+}
 
 /** Catches the two ways a server-only key could be pasted here by mistake. */
 function isPrivilegedKey(key: string): boolean {
