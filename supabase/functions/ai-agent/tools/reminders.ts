@@ -15,7 +15,7 @@ import { formatLocal, localDate, localTimeOfDay, rangeOf, zonedInstant, type Day
 import type { AiExecutionContext, AiToolResult, JsonSchema } from '../agent/types.ts'
 import { loadIssue } from './issues.ts'
 import { defineTool } from './registry.ts'
-import { bestMatches, dbFailure, DENIED, fail, likePattern, ok } from './shared.ts'
+import { bestMatches, dbFailure, DENIED, fail, fold, likePattern, ok } from './shared.ts'
 
 // The limits the reminders table checks (reminders_title_length, reminders_notes_length).
 const TITLE_MAX = 200
@@ -50,6 +50,20 @@ const WRITE_ERRORS = {
   '23514': { code: 'INVALID_ARGUMENTS', message: `Keep the title under ${TITLE_MAX} characters and the notes under ${NOTES_MAX}.` },
   '54000': { code: 'NOT_ALLOWED', message: 'You have the most open reminders allowed in this group (500). Complete or cancel some first.' },
 } as const
+
+// Titles that say nothing about what to remember. A model told "remind me at 3pm" has to fill the
+// required title with something, and it reaches for one of these instead of asking.
+const PLACEHOLDER_TITLES = new Set([
+  'reminder', 'a reminder', 'my reminder', 'new reminder', 'remind me', 'reminder for me',
+  'note', 'a note', 'my note', 'new note', 'untitled', 'no title',
+  'something', 'stuff', 'thing', 'todo', 'to do', 'task', 'alert', 'notification', 'ping', 'ping me',
+])
+
+/** True when the title doesn't say what the note is about. */
+export function isPlaceholderTitle(title: string): boolean {
+  const words = fold(title).replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
+  return words === '' || PLACEHOLDER_TITLES.has(words)
+}
 
 /** What the model needs to talk about a reminder. The id is there to act on it next. */
 function summary(row: ReminderRow, context: AiExecutionContext) {
@@ -271,6 +285,7 @@ export const reminderTools = [
     description:
       'Save a note for the signed-in user. A note may have a time: then it pops up on their screen and reaches their notifications then. Without a time it just stays in their notes. ' +
       'Only for the user themselves. Write the title as what to remember or do ("Review CAP-12", "Deploy staging"). ' +
+      'If the user didn’t say what it is about ("remind me at 3pm"), ask what to remind them of; never invent a title or use a word like "Reminder". ' +
       'If the user wants it to show up at a time, give the time as inMinutes, or a local date and time, or, for a time before a meeting, meetingId (from the meetings tools) with minutesBefore. ' +
       'Never work out a time from a meeting’s startsAt yourself. If the user gave a day but no time, ask what time. ' +
       'If the user gave no time at all, ask whether they want it to show up at a particular time; set withoutTime: true ONLY when their words are about saving or jotting something down ("note that", "jot down", "write down", "save") and do not ask to be reminded. "Remind me" or "alert me" with no time is never withoutTime: ask when. ' +
@@ -290,6 +305,9 @@ export const reminderTools = [
       required: ['title'],
     },
     async execute(args, context) {
+      if (isPlaceholderTitle(args.title)) {
+        return fail('NEEDS_CLARIFICATION', 'Ask the user what the note should say or what to remind them of. Do not make up a title.')
+      }
       const at = await resolveWhen(args, context)
       if (at === null && !args.withoutTime) {
         return fail('NEEDS_CLARIFICATION', 'Ask the user whether this note should show up at a particular time, and when. If they only want it saved, call again with withoutTime: true.')
