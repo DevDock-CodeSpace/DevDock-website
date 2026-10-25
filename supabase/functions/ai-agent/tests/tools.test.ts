@@ -424,6 +424,8 @@ Deno.test({
       await t.step('create_reminder: unclear or impossible times are asked about, never guessed', async () => {
         const ctx = f.context(kumar)
         assertEquals(code(await run('create_reminder', { title: 'x' }, ctx)), 'NEEDS_CLARIFICATION')
+        // No subject ("remind me at 3pm") is asked about too, never filled in.
+        assertEquals(code(await run('create_reminder', { title: 'Reminder', inMinutes: 30 }, ctx)), 'NEEDS_CLARIFICATION')
         assertEquals(code(await run('create_reminder', { title: 'x', date: localDate(new Date(Date.now() + 86_400_000), 'UTC') }, ctx)), 'NEEDS_CLARIFICATION')
         assertEquals(code(await run('create_reminder', { title: 'x', inMinutes: 5, time: '10:00' }, ctx)), 'INVALID_ARGUMENTS')
         assertEquals(code(await run('create_reminder', { title: 'x', time: '9am' }, ctx)), 'INVALID_ARGUMENTS')

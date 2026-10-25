@@ -184,6 +184,9 @@ service role.
   time alone keeps its date; a new reminder with a day but no time is a question, not 9 AM. Past times are refused.
 - **Cancelling a reminder is a `write`, not `destructive`:** it is kept and can be reopened (`update_reminder`,
   `reopen: true`), so it runs without a confirmation card (the owner's choice, 2026-10-18).
+- **A note must say what it is about.** "Remind me at 3pm" leaves the required title to the model, which filled it with
+  "Reminder" instead of asking. `create_reminder` refuses empty or placeholder titles (`isPlaceholderTitle`: "reminder",
+  "note", "todo", "something", …) with `NEEDS_CLARIFICATION`, and the prompt says to ask (2026-10-25).
 
 ### Things the tools deliberately do not do
 
