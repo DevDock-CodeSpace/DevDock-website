@@ -1,20 +1,22 @@
 name: Deploy Supabase
 
 # Vercel deploys only the website (the built SPA). The database migrations and the
-# Edge Functions live on Supabase, so this deploys them after every push to prod
-# that changes them: migrations first (a function may need a new column), then
-# every function (config.toml's verify_jwt settings come along).
+# Edge Functions live on Supabase, so this deploys them after every push that
+# changes them: migrations first (a function may need a new column), then every
+# function (config.toml's verify_jwt settings come along).
 #
-# There is one Supabase project (ejqrrxxiatvvdiyxtvid): local, dev and prod all use it,
-# so a migration usually went live while its feature was being built and the push
-# here has nothing left to apply. It is the safety net for one that was forgotten.
+# Two Supabase projects (docs/DEV_ENVIRONMENT.md):
+#   push to dev  → DevDock Dev (aktqcsncvbmkbleghipb), where a migration is tried first
+#   push to prod → the live project (ejqrrxxiatvvdiyxtvid)
+# Run by hand on any other branch, it deploys to DevDock Dev.
 #
 # Secrets (repo → Settings → Secrets and variables → Actions):
-#   SUPABASE_ACCESS_TOKEN  a personal access token (supabase.com/dashboard/account/tokens)
-#   SUPABASE_DB_PASSWORD   the database password (Project settings → Database)
+#   SUPABASE_ACCESS_TOKEN      a personal access token (supabase.com/dashboard/account/tokens); it reaches both
+#   SUPABASE_DB_PASSWORD       the live project's database password
+#   SUPABASE_DEV_DB_PASSWORD   DevDock Dev's database password
 on:
   push:
-    branches: [prod]
+    branches: [dev, prod]
     paths:
       - 'supabase/migrations/**'
       - 'supabase/functions/**'
@@ -22,9 +24,9 @@ on:
   # By hand (Actions → Deploy Supabase → Run workflow): deploys both.
   workflow_dispatch:
 
-# One deploy at a time, and never cut one off halfway through a migration.
+# One deploy at a time per project, and never cut one off halfway through a migration.
 concurrency:
-  group: deploy-supabase
+  group: deploy-supabase-${{ github.ref_name == 'prod' && 'prod' || 'dev' }}
   cancel-in-progress: false
 
 permissions:
@@ -37,8 +39,10 @@ jobs:
     timeout-minutes: 15
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-      PROJECT_REF: ejqrrxxiatvvdiyxtvid
+      # prod → the live project; everything else → DevDock Dev.
+      SUPABASE_DB_PASSWORD: ${{ github.ref_name == 'prod' && secrets.SUPABASE_DB_PASSWORD || secrets.SUPABASE_DEV_DB_PASSWORD }}
+      PROJECT_REF: ${{ github.ref_name == 'prod' && 'ejqrrxxiatvvdiyxtvid' || 'aktqcsncvbmkbleghipb' }}
+      PASSWORD_SECRET: ${{ github.ref_name == 'prod' && 'SUPABASE_DB_PASSWORD' || 'SUPABASE_DEV_DB_PASSWORD' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -48,7 +52,7 @@ jobs:
         run: |
           missing=""
           [ -n "$SUPABASE_ACCESS_TOKEN" ] || missing="$missing SUPABASE_ACCESS_TOKEN"
-          [ -n "$SUPABASE_DB_PASSWORD" ] || missing="$missing SUPABASE_DB_PASSWORD"
+          [ -n "$SUPABASE_DB_PASSWORD" ] || missing="$missing $PASSWORD_SECRET"
           if [ -n "$missing" ]; then
             echo "::error::Missing repository secrets:$missing (see the top of this workflow)."
             exit 1
@@ -77,6 +81,7 @@ jobs:
         if: steps.changed.outputs.migrations == 'true'
         run: |
           supabase link --project-ref "$PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+          echo "Project: $PROJECT_REF"
           echo "Migrations to apply (none means the database already has them all):"
           supabase db push --linked --password "$SUPABASE_DB_PASSWORD" --skip-vault --dry-run
           supabase db push --linked --password "$SUPABASE_DB_PASSWORD" --skip-vault --yes
