@@ -32,6 +32,7 @@ import { adoptContent } from '../editor/adopt'
 import { docExtensions } from '../editor/extensions'
 import { folderPath } from '../folders'
 import { FormatBubble } from '../editor/FormatBubble'
+import { FileLinkPicker } from '../editor/FileLinkPicker'
 import { InsertMenu } from '../editor/InsertMenu'
 import { docContentClass } from '../editor/styles'
 import { DocScope } from './DocScope'
@@ -270,7 +271,7 @@ export default function DocView({ doc, canEdit, canDelete }: { doc: Doc; canEdit
         <div className="flex min-w-0 items-center gap-3 text-xs text-muted-foreground">
           <nav aria-label="Folder path" className="flex min-w-0 items-center gap-1">
             <Link to={listPath} className="inline-flex shrink-0 items-center gap-1 hover:text-foreground">
-              <ArrowLeft className="size-3.5" /> Docs
+              <ArrowLeft className="size-3.5" /> Files
             </Link>
             {path.map((folder) => (
               <span key={folder.id} className="flex min-w-0 items-center gap-1">
@@ -351,6 +352,7 @@ export default function DocView({ doc, canEdit, canDelete }: { doc: Doc; canEdit
         <>
           <FormatBubble editor={editor} />
           <InsertMenu editor={editor} onPickImage={() => fileInput.current?.click()} />
+          <FileLinkPicker editor={editor} excludeId={doc.id} />
           <DragHandle editor={editor} className="pointer-events-none! hidden md:block">
             {/* mr-7 keeps the grip clear of the heading collapse toggle (like Paper: ⠿ then ▾);
                 the wrapper is click-through (important: the plugin sets pointer-events inline). */}

@@ -37,7 +37,7 @@ export function MoveDocDialog({
   const [target, setTarget] = useState<string | null>(currentFolderId)
   const [pending, setPending] = useState(false)
   const options: { id: string | null; name: string; depth: number }[] = [
-    { id: null, name: 'Docs (top level)', depth: 0 },
+    { id: null, name: 'Top level (not in a folder)', depth: 0 },
     ...folderTree(folders).map((f) => ({ id: f.id, name: f.name, depth: f.depth })),
   ]
 

@@ -12,11 +12,14 @@ import { useCanWriteDiagrams } from '../hooks'
 export function CreateDiagramDialog({
   workspaceId,
   folderId,
+  groupWide = false,
   open,
   onOpenChange,
 }: {
   workspaceId?: string
   folderId?: string | null
+  /** Fix the scope to group-wide (Files with the group's own place picked). */
+  groupWide?: boolean
   open?: boolean
   onOpenChange?: (open: boolean) => void
 }) {
@@ -26,7 +29,7 @@ export function CreateDiagramDialog({
       noun="diagram"
       placeholder="System architecture"
       workspaceId={workspaceId}
-      groupWideOnly={!workspaceId && !!folderId}
+      groupWideOnly={!workspaceId && (groupWide || !!folderId)}
       canWrite={useCanWriteDiagrams()}
       create={(input) => createDiagram({ ...input, folderId: folderId ?? null })}
       queryKeys={[['diagrams', 'team'], ['diagrams', 'workspace']]}

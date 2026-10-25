@@ -11,7 +11,7 @@ import { DocScope } from '@/features/docs/components/DocScope'
 import { folderPath } from '@/features/docs/folders'
 import { useCurrentTeam } from '@/features/teams/hooks'
 import { useOthersTyping } from '@/hooks/use-others-typing'
-import { diagramsPath } from '@/features/teams/nav'
+import { filesPath } from '@/features/teams/nav'
 import { errorMessage } from '@/lib/errors'
 import { sameJson } from '@/lib/json'
 import { timeAgo } from '@/lib/format'
@@ -38,12 +38,12 @@ export default function DiagramView({ diagram, canWrite }: { diagram: Diagram; c
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [now] = useState(Date.now)
-  const listPath = diagramsPath(team.slug, workspaceId)
+  const listPath = filesPath(team.slug, workspaceId)
   // Folders are asked for only when the diagram is in one (most aren't); the path fills in when they arrive.
   const folders = useQuery({ ...foldersQuery(diagram.team_id, diagram.workspace_id), enabled: diagram.folder_id !== null }).data ?? []
   const path = folderPath(diagram.folder_id, folders)
-  const folderLink = (folderId: string | null) => (folderId ? `${listPath}?folder=${folderId}` : listPath)
-  // Back (and after deleting): the folder the diagram is in.
+  const folderLink = (folderId: string | null) => filesPath(team.slug, workspaceId, { folder: folderId })
+  // Back (and after deleting): the folder the diagram is in, in Files.
   const backTo = folderLink(diagram.folder_id)
   const [initial, setInitial] = useState(() => parse(diagram.data))
 
@@ -233,7 +233,7 @@ export default function DiagramView({ diagram, canWrite }: { diagram: Diagram; c
         <div className="flex min-w-0 items-center gap-3 text-xs text-muted-foreground">
           <nav aria-label="Folder path" className="flex min-w-0 items-center gap-1">
             <Link to={listPath} className="inline-flex shrink-0 items-center gap-1 hover:text-foreground">
-              <ArrowLeft className="size-3.5" /> Diagrams
+              <ArrowLeft className="size-3.5" /> Files
             </Link>
             {path.map((folder) => (
               <span key={folder.id} className="flex min-w-0 items-center gap-1">

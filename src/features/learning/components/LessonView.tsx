@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { adoptContent } from '@/features/docs/editor/adopt'
 import { docExtensions } from '@/features/docs/editor/extensions'
 import { FormatBubble } from '@/features/docs/editor/FormatBubble'
+import { FileLinkPicker } from '@/features/docs/editor/FileLinkPicker'
 import { InsertMenu } from '@/features/docs/editor/InsertMenu'
 import { docContentClass } from '@/features/docs/editor/styles'
 import { useCurrentTeam } from '@/features/teams/hooks'
@@ -218,6 +219,7 @@ export default function LessonView({ lesson }: { lesson: Lesson }) {
         <>
           <FormatBubble editor={editor} />
           <InsertMenu editor={editor} />
+          <FileLinkPicker editor={editor} />
         </>
       )}
       {!canManage && !lesson.body ? (

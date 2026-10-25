@@ -77,12 +77,13 @@ export function ShapePanel({
           />
         </div>
       </div>
-      <div className="flex-1 space-y-4 overflow-y-auto p-2 pb-6">
+      {/* Never sideways: every tile fits its column (long names wrap, see Tile). */}
+      <div className="flex-1 space-y-4 overflow-x-hidden overflow-y-auto p-2 pb-6">
         {!searching && recent.length > 0 && (
           <Section title="Recently used">
             {recent.map((item) => (
               // The × is beside the tile, not inside it: a button can't hold another.
-              <div key={itemKey(item)} className="group/recent relative">
+              <div key={itemKey(item)} className="group/recent relative min-w-0">
                 <ItemTile item={item} onAdd={onAdd} />
                 <RemoveRecent item={item} onForget={onForget} />
               </div>
@@ -226,7 +227,8 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section>
       <h3 className="mb-1 px-1 font-mono text-[10px] tracking-wide text-muted-foreground uppercase">{title}</h3>
-      <div className="grid grid-cols-3 gap-0.5">{children}</div>
+      {/* Equal columns that tiles can't widen (minmax(0, 1fr) plus min-w-0 on the tiles). */}
+      <div className="grid grid-cols-3 gap-1">{children}</div>
     </section>
   )
 }
@@ -253,10 +255,12 @@ function Tile({
       onDragStart={onDragStart}
       onClick={() => onAdd(item)}
       title={`${label}: click to add, or drag onto the canvas`}
-      className="flex h-16 cursor-grab flex-col items-center justify-center gap-1.5 rounded-md px-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none active:cursor-grabbing"
+      // One column wide whatever the label: min-w-0 + w-full keep a long name from pushing into the
+      // next tile (or making the panel scroll sideways); it wraps onto a second line instead.
+      className="flex h-[4.5rem] w-full min-w-0 cursor-grab flex-col items-center justify-start gap-1.5 rounded-md px-0.5 pt-2.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none active:cursor-grabbing"
     >
-      <span className="flex h-6 items-center justify-center">{children}</span>
-      <span className="w-full truncate text-center text-[10px] leading-none">{label}</span>
+      <span className="flex h-6 shrink-0 items-center justify-center">{children}</span>
+      <span className="line-clamp-2 w-full text-center text-[10px] leading-tight break-words">{label}</span>
     </button>
   )
 }

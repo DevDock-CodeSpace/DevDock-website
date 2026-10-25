@@ -1,11 +1,11 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { Settings } from 'lucide-react'
 import { useEffect } from 'react'
-import { Link, NavLink, Outlet } from 'react-router'
+import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { AvatarStack } from '@/components/PersonRow'
 import { Button } from '@/components/ui/button'
 import { useCurrentTeam, useCurrentWorkspace } from '@/features/teams/hooks'
-import { getWorkspaceTabs, workspacePath } from '@/features/teams/nav'
+import { getWorkspaceTabs, isNavActive, workspacePath } from '@/features/teams/nav'
 import { workspaceRoleLabel, workspaceTypes } from '@/features/teams/permissions'
 import { workspaceMembersQuery } from '@/features/workspaces/api'
 import { rememberVisit } from '@/features/workspaces/recent'
@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils'
 export function WorkspaceLayout() {
   const { team } = useCurrentTeam()
   const { workspace, workspaceRole, can } = useCurrentWorkspace()
+  const { pathname } = useLocation()
   const members = useSuspenseQuery(workspaceMembersQuery(workspace.id)).data
   const leads = members.filter((m) => m.role === 'lead').flatMap((m) => (m.profile ? [m.profile] : []))
   const { label: typeLabel, icon: TypeIcon } = workspaceTypes[workspace.type]
@@ -82,7 +83,7 @@ export function WorkspaceLayout() {
                   className={({ isActive }) =>
                     cn(
                       'relative flex items-center gap-1.5 whitespace-nowrap px-2.5 py-2.5 text-sm text-muted-foreground transition-colors hover:text-foreground',
-                      isActive &&
+                      (isActive || isNavActive(tab, pathname)) &&
                         'font-medium text-foreground after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full after:bg-brand',
                     )
                   }

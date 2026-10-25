@@ -4,7 +4,7 @@ import { InactivityGuard } from '@/features/auth/components/InactivityGuard'
 import { authCallbackLoader, loginLoader } from '@/features/auth/loaders'
 import { watchAuthIdentity } from '@/features/auth/session'
 import { diagramLoader } from '@/features/diagrams/loaders'
-import { docLoader } from '@/features/docs/loaders'
+import { docLoader, filesLoader, filesShouldRevalidate } from '@/features/docs/loaders'
 import { cycleLoader, issueLoader, issuesLoader } from '@/features/issues/loaders'
 import { lessonLoader } from '@/features/learning/loaders'
 import { liveSessionLoader } from '@/features/live/loaders'
@@ -22,15 +22,11 @@ import { LoginPage } from '@/routes/LoginPage'
 import { NotFoundPage, RouteErrorPage } from '@/routes/NotFoundPage'
 import { OnboardingPage } from '@/routes/OnboardingPage'
 import { PrivacyPage } from '@/routes/PrivacyPage'
-import { TeamDiagramsPage } from '@/routes/team/TeamDiagramsPage'
-import { TeamDocsPage } from '@/routes/team/TeamDocsPage'
 import { TeamIssuesPage } from '@/routes/team/TeamIssuesPage'
 import { TeamLivePage } from '@/routes/team/TeamLivePage'
 import { TeamMembersPage } from '@/routes/team/TeamMembersPage'
 import { TeamSettingsPage } from '@/routes/team/TeamSettingsPage'
 import { TeamWorkspacesPage } from '@/routes/team/TeamWorkspacesPage'
-import { WorkspaceDiagramsPage } from '@/routes/workspace/WorkspaceDiagramsPage'
-import { WorkspaceDocsPage } from '@/routes/workspace/WorkspaceDocsPage'
 import { WorkspaceGitHubPage } from '@/routes/workspace/WorkspaceGitHubPage'
 import { IssueCyclePage } from '@/routes/workspace/IssueCyclePage'
 import { IssueCyclesPage } from '@/routes/workspace/IssueCyclesPage'
@@ -46,6 +42,7 @@ import { WorkspaceOverviewPage } from '@/routes/workspace/WorkspaceOverviewPage'
 import { WorkspaceSettingsPage } from '@/routes/workspace/WorkspaceSettingsPage'
 import { WorkspaceTabPage } from '@/routes/workspace/WorkspaceTabPage'
 import { WorkspaceToolGate } from '@/routes/workspace/WorkspaceToolGate'
+import { DiagramsRedirect } from '@/routes/DiagramsRedirect'
 
 export const router = createBrowserRouter([
   { path: '/', loader: () => redirect('/app') },
@@ -110,10 +107,12 @@ export const router = createBrowserRouter([
               { path: 'messages', handle: FULL_BLEED, element: <MessagesPage /> },
               { path: 'members', element: <TeamMembersPage /> },
               { path: 'settings', element: <TeamSettingsPage /> },
-              // Team → Docs: team-wide docs + docs of every workspace the user can see.
-              { path: 'docs', element: <TeamDocsPage /> },
+              // Team → Files (URL docs): group-wide docs and diagrams + those of every workspace the user can see.
+              // Lazy page; filesLoader starts its queries alongside the chunk.
+              { path: 'docs', loader: filesLoader, shouldRevalidate: filesShouldRevalidate, lazy: async () => ({ Component: (await import('@/routes/team/TeamDocsPage')).TeamDocsPage }) },
               { path: 'docs/:docId', loader: docLoader, element: <DocPage /> },
-              { path: 'diagrams', element: <TeamDiagramsPage /> },
+              // The old Diagrams list opens Files showing diagrams; diagram pages keep their URLs.
+              { path: 'diagrams', element: <DiagramsRedirect /> },
               { path: 'diagrams/:diagramId', loader: diagramLoader, element: <DiagramPage /> },
               // Development groups: issues from every project (the page checks the group type).
               { path: 'issues', element: <TeamIssuesPage /> },
@@ -139,20 +138,20 @@ export const router = createBrowserRouter([
                   { path: 'members', element: <WorkspaceMembersPage /> },
                   { path: 'settings', element: <WorkspaceSettingsPage /> },
                   {
-                    // Only docs assigned to this workspace.
+                    // Files (URL docs): this workspace's docs and diagrams; open when either tool is on.
                     path: 'docs',
-                    element: <WorkspaceToolGate tool="docs" />,
+                    element: <WorkspaceToolGate tool={['docs', 'diagrams']} />,
                     children: [
-                      { index: true, element: <WorkspaceDocsPage /> },
-                      { path: ':docId', loader: docLoader, element: <DocPage /> },
+                      { index: true, loader: filesLoader, shouldRevalidate: filesShouldRevalidate, lazy: async () => ({ Component: (await import('@/routes/workspace/WorkspaceDocsPage')).WorkspaceDocsPage }) },
+                      { element: <WorkspaceToolGate tool="docs" />, children: [{ path: ':docId', loader: docLoader, element: <DocPage /> }] },
                     ],
                   },
                   {
-                    // Only diagrams assigned to this workspace.
+                    // This workspace's diagrams; the list itself is Files.
                     path: 'diagrams',
                     element: <WorkspaceToolGate tool="diagrams" />,
                     children: [
-                      { index: true, element: <WorkspaceDiagramsPage /> },
+                      { index: true, element: <DiagramsRedirect /> },
                       { path: ':diagramId', loader: diagramLoader, element: <DiagramPage /> },
                     ],
                   },

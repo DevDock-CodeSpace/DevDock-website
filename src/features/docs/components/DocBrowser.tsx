@@ -1,5 +1,20 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { ChevronDown, ChevronRight, FileText, Folder, FolderInput, FolderPlus, MoreHorizontal, Plus, Workflow } from 'lucide-react'
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronDown,
+  ChevronRight,
+  FileText,
+  Folder,
+  FolderInput,
+  FolderPlus,
+  MoreHorizontal,
+  Plus,
+  Search,
+  Workflow,
+  X,
+  type LucideIcon,
+} from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
@@ -11,9 +26,9 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useCollectionView } from '@/features/collections/hooks'
 import type { DiagramSummary } from '@/features/diagrams/api'
 import { CreateDiagramDialog } from '@/features/diagrams/components/CreateDiagramDialog'
@@ -43,6 +58,8 @@ import { folderPath, folderSubtree } from '../folders'
 import { useCanWriteDocs } from '../hooks'
 import { useSelection } from '../useSelection'
 import { CreateDocDialog } from './CreateDocDialog'
+import { FileRowActions } from './FileRowActions'
+import { FILE_HEADER, FILE_ROW } from './fileGrid'
 import { MoveDocDialog } from './MoveDocDialog'
 
 /** Hovering a folder this long while dragging opens it (like a file manager), so you can drop deeper. */
@@ -52,16 +69,13 @@ type DocBrowserProps = {
   teamId: string
   /** The scope being browsed: a workspace, or group-wide (null). */
   workspaceId: string | null
-  /** The scope's docs (on the Diagrams page too, unshown: deleting a folder deletes them). */
+  /** The scope's docs (also where the Docs tool is off, unshown: deleting a folder deletes them). */
   docs: DocSummary[]
   /** The scope's diagrams (empty when the Diagrams tool is off there). */
   diagrams: DiagramSummary[]
   folders: DocFolder[]
-  /**
-   * 'docs': the Docs page, docs and diagrams together with an All / Docs / Diagrams filter
-   * (`?show=`). 'diagrams': the Diagrams page, the same folders showing diagrams only.
-   */
-  mode: 'docs' | 'diagrams'
+  /** The Docs tool is on in this scope: docs show, and can be made, here. */
+  docsEnabled: boolean
   /** The Diagrams tool is on in this scope: diagrams show, and can be made, here. */
   diagramsEnabled: boolean
   /** Delete/move docs and diagrams, manage folders, and create diagrams (writers). */
@@ -70,20 +84,26 @@ type DocBrowserProps = {
   canCreate: boolean
   docHref: (doc: DocSummary) => string
   diagramHref: (diagram: DiagramSummary) => string
-  /** Shown when the top level is empty. */
+  /** Shown when the scope has nothing at all. */
   empty: ReactNode
+  /** Beside the search: the place dropdown on the group page. */
+  placeControl?: ReactNode
+  /** The place's name, the first step of the folder path ("Software Fundamentals › Week 1"). */
+  rootLabel?: string
 }
 
-type Show = 'all' | 'docs' | 'diagrams'
+type Sort = { by: 'updated' | 'name'; dir: 'asc' | 'desc' }
 type Row = { kind: 'doc'; item: DocSummary } | { kind: 'diagram'; item: DiagramSummary }
 
 /**
- * Dropbox-style browser for one scope's folders (3 levels deep), which hold docs and diagrams
- * side by side: a breadcrumb path, new docs for editors, and for writers: new diagrams, new
- * folder, rename/delete folders, and moving docs, diagrams and folders like in a file manager:
- * drag onto a folder or the path above (hover a folder to open it), select several with the
- * checkboxes or Ctrl/⌘/Shift-click and drag them together, or use "Move to…". Moves can be
- * undone. The open folder is in the URL (?folder=<id>), and so is the Docs page's filter (?show=).
+ * Files (the UI name; code says docs) for one scope: folders (3 levels deep) holding docs and
+ * diagrams side by side, always shown together (no kind filter: the owner found two filters
+ * confusing). One toolbar (what's here or the folder path, search, one "New" menu) and one
+ * sortable list whose rows line up (fileGrid).
+ * Writers move things like in a file manager: drag onto a folder or the path (hover a folder to
+ * open it), select several (the icon turns into a checkbox; Ctrl/⌘/Shift-click) and drag them
+ * together, or "Move to…"; moves can be undone. The open folder (?folder=) is in the URL; the
+ * search is not (it's a moment's lookup).
  */
 export function DocBrowser({
   teamId,
@@ -91,13 +111,15 @@ export function DocBrowser({
   docs,
   diagrams,
   folders,
-  mode,
+  docsEnabled,
   diagramsEnabled,
   canWrite,
   canCreate,
   docHref,
   diagramHref,
   empty,
+  placeControl,
+  rootLabel = 'Files',
 }: DocBrowserProps) {
   const queryClient = useQueryClient()
   const [params, setParams] = useSearchParams()
@@ -106,21 +128,54 @@ export function DocBrowser({
   // A stale or foreign folder id falls back to the top level.
   const current = folders.find((f) => f.id === requested) ?? null
   const path = folderPath(current?.id ?? null, folders)
-  const rootName = mode === 'diagrams' ? 'Diagrams' : 'Docs'
-  const filtering = mode === 'docs' && diagramsEnabled
-  const requestedShow = params.get('show')
-  const show: Show = mode === 'diagrams' ? 'diagrams' : filtering && (requestedShow === 'docs' || requestedShow === 'diagrams') ? requestedShow : 'all'
-  const showDocs = show !== 'diagrams'
-  const showDiagrams = diagramsEnabled && show !== 'docs'
+  const rootName = rootLabel
   const entries = useMemo(() => ({ docs, diagrams: diagramsEnabled ? diagrams : [] }), [docs, diagrams, diagramsEnabled])
-  const subfolders = folders.filter((f) => f.parent_id === (current?.id ?? null))
-  const inFolder = (folderId: string | null): Row[] =>
-    [
-      ...(showDocs ? docs.filter((d) => d.folder_id === folderId).map((item) => ({ kind: 'doc' as const, item })) : []),
-      ...(showDiagrams ? entries.diagrams.filter((d) => d.folder_id === folderId).map((item) => ({ kind: 'diagram' as const, item })) : []),
-    ].sort((a, b) => b.item.updated_at.localeCompare(a.item.updated_at))
-  const here = inFolder(current?.id ?? null)
+  const [query, setQuery] = useState('')
+  const searching = query.trim() !== ''
+  const [sort, setSort] = useState<Sort>({ by: 'updated', dir: 'desc' })
+
+  /** The scope's docs (where the Docs tool is on) and diagrams, optionally only those directly in one folder. */
+  const rowsOf = (folderId?: string | null): Row[] => [
+    ...(docsEnabled
+      ? docs.filter((d) => folderId === undefined || d.folder_id === folderId).map((item) => ({ kind: 'doc' as const, item }))
+      : []),
+    ...entries.diagrams.filter((d) => folderId === undefined || d.folder_id === folderId).map((item) => ({ kind: 'diagram' as const, item })),
+  ]
+  const needle = query.trim().toLowerCase()
+  const matches = (text: string) => text.toLowerCase().includes(needle)
+  // The list: this folder's own items, or everything in the scope that matches the search. At the
+  // top of a place, loose docs and diagrams come after the folders, under "Not in a folder".
+  const pool = searching ? rowsOf().filter((r) => matches(r.item.title)) : rowsOf(current?.id ?? null)
+  const byName = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: 'base' })
+  const order = sort.dir === 'asc' ? 1 : -1
+  const rows = pool.sort((a, b) => order * (sort.by === 'name' ? byName(a.item.title, b.item.title) : a.item.updated_at.localeCompare(b.item.updated_at)))
+  /**
+   * When a folder last changed, as people mean it: the newest of the folder itself and everything
+   * inside it, subfolders included (renaming a doc deep inside counts).
+   */
+  const folderChanged = useMemo(() => {
+    const latest = new Map<string, string>()
+    const bump = (folderId: string | null, at: string) => {
+      for (let f = folders.find((x) => x.id === folderId); f; f = folders.find((x) => x.id === f?.parent_id)) {
+        if ((latest.get(f.id) ?? '') < at) latest.set(f.id, at)
+      }
+    }
+    for (const f of folders) bump(f.id, f.updated_at)
+    for (const d of docs) bump(d.folder_id, d.updated_at)
+    for (const d of entries.diagrams) bump(d.folder_id, d.updated_at)
+    return latest
+  }, [folders, docs, entries.diagrams])
+  const changedAt = (folder: DocFolder) => folderChanged.get(folder.id) ?? folder.updated_at
+  const shownFolders = (searching ? folders.filter((f) => matches(f.name)) : folders.filter((f) => f.parent_id === (current?.id ?? null))).sort(
+    (a, b) => order * (sort.by === 'name' ? byName(a.name, b.name) : changedAt(a).localeCompare(changedAt(b))),
+  )
+  const looseLabel = !current && !searching && shownFolders.length > 0 && rows.length > 0
   const canNest = (current?.depth ?? 0) < MAX_FOLDER_DEPTH
+  const scopeIsEmpty = folders.length === 0 && rowsOf().length === 0
+  // What's here, for the toolbar: everything at the top level, or inside this folder and its subfolders.
+  const within = current ? folderSubtree(current.id, folders) : null
+  const fileCount = within ? rowsOf().filter((r) => r.item.folder_id !== null && within.has(r.item.folder_id)).length : rowsOf().length
+  const folderCount = within ? within.size - 1 : folders.length
 
   // Who may make a diagram here. At a group's top level the new diagram may go in any workspace the
   // person writes in (the dialog asks); inside a folder or a workspace it's this scope's writers.
@@ -129,7 +184,8 @@ export function DocBrowser({
   const canNewDiagram =
     diagramsEnabled &&
     (workspaceId !== null || current ? canWrite : canWriteIn(null) || workspaces.some((w) => canWriteIn(w.id)))
-  const canNewDoc = mode === 'docs' && canCreate
+  const canNewDoc = docsEnabled && canCreate
+  const canNewFolder = canWrite && canNest && !searching
   const [creating, setCreating] = useState<'doc' | 'diagram' | null>(null)
 
   // What a move or delete can change: the lists and the folders, never an open doc or its images.
@@ -139,18 +195,18 @@ export function DocBrowser({
         queryClient.invalidateQueries({ queryKey }),
       ),
     )
-  const setShow = (next: Show) =>
+  const setParam = (key: string, value: string | null) =>
     setParams((p) => {
-      if (next === 'all') p.delete('show')
-      else p.set('show', next)
+      if (value) p.set(key, value)
+      else p.delete(key)
       return p
     })
-  const open = (folderId: string | null) =>
-    setParams((p) => {
-      if (folderId) p.set('folder', folderId)
-      else p.delete('folder')
-      return p
-    })
+  const open = (folderId: string | null) => {
+    setQuery('')
+    setParam('folder', folderId)
+  }
+  const sortBy = (by: Sort['by']) =>
+    setSort((s) => (s.by === by ? { by, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { by, dir: by === 'name' ? 'asc' : 'desc' }))
 
   // ------------------------------------------------------------ dialogs
   const [naming, setNaming] = useState<{ mode: 'create' } | { mode: 'rename'; folder: DocFolder } | null>(null)
@@ -183,7 +239,7 @@ export function DocBrowser({
 
   // ------------------------------------------------------------ selection
   const rowKey = (row: Row) => (row.kind === 'doc' ? docKey(row.item.id) : diagramKey(row.item.id))
-  const keys = useMemo(() => [...subfolders.map((f) => folderKey(f.id)), ...here.map(rowKey)], [subfolders, here])
+  const keys = useMemo(() => [...shownFolders.map((f) => folderKey(f.id)), ...rows.map(rowKey)], [shownFolders, rows])
   const selection = useSelection(keys)
   useEffect(() => {
     if (selection.count === 0) return
@@ -242,7 +298,7 @@ export function DocBrowser({
   const dragId = useRef(0)
   const startDrag = (event: DragEvent, key: string) => {
     // Dragging something that isn't selected drags just that one and leaves the selection alone, like
-    // Explorer or Finder. (Changing the selection here would insert the "N selected" bar and shift the
+    // Explorer or Finder. (Changing the selection here would insert the selection bar and shift the
     // list under the cursor, which makes the browser cancel the drag.)
     const items = itemsOf(selection.has(key) ? selection.selected : [key])
     event.dataTransfer.setData(DRAG_TYPE, JSON.stringify(items))
@@ -317,258 +373,286 @@ export function DocBrowser({
       dragging.items.diagramIds.map(diagramKey).includes(key) ||
       dragging.items.folderIds.map(folderKey).includes(key))
 
-  /** What a folder holds, counting only the kinds on show. */
-  const count = (folder: DocFolder) => folders.filter((f) => f.parent_id === folder.id).length + inFolder(folder.id).length
+  /** "3 docs · 2 diagrams · 1 folder": what a folder holds directly ("Empty" only when it holds nothing). */
+  const summary = (folder: DocFolder) => {
+    const inside = rowsOf(folder.id)
+    const parts = [
+      [inside.filter((r) => r.kind === 'doc').length, 'doc'],
+      [inside.filter((r) => r.kind === 'diagram').length, 'diagram'],
+      [folders.filter((f) => f.parent_id === folder.id).length, 'folder'],
+    ] as const
+    const text = parts.filter(([n]) => n > 0).map(([n, word]) => plural(n, word))
+    return text.length ? text.join(' · ') : 'Empty'
+  }
+  /** Where a search result lives: "Testing › Week 1", or the top level. */
+  const placeOf = (folderId: string | null) => folderPath(folderId, folders).map((f) => f.name).join(' › ') || rootName
 
-  const checkbox = (key: string, name: string) =>
-    canWrite && (
-      <input
-        type="checkbox"
-        aria-label={`Select ${name}`}
-        checked={selection.has(key)}
-        onChange={() => selection.toggle(key)}
+  const lead = (key: string, Icon: LucideIcon, label: string, iconClass?: string) => (
+    <span className="relative z-10 flex size-7 items-center justify-center">
+      <Icon
         className={cn(
-          'relative z-10 size-4 shrink-0 cursor-pointer accent-[var(--brand)] transition-opacity focus-visible:opacity-100',
-          selection.count > 0 ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+          'size-4 transition-opacity',
+          iconClass,
+          canWrite && (selection.count > 0 ? 'opacity-0' : 'group-hover:opacity-0 [@media(hover:none)]:opacity-0'),
         )}
       />
-    )
+      {canWrite && (
+        <input
+          type="checkbox"
+          aria-label={`Select ${label}`}
+          checked={selection.has(key)}
+          onChange={() => selection.toggle(key)}
+          className={cn(
+            'absolute size-4 cursor-pointer accent-[var(--brand)] transition-opacity focus-visible:opacity-100',
+            selection.count > 0 ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100',
+          )}
+        />
+      )}
+    </span>
+  )
+
+  const newMenu = (canNewDoc ? 1 : 0) + (canNewDiagram ? 1 : 0) + (canNewFolder ? 1 : 0)
+  const sortIcon = (by: Sort['by']) =>
+    sort.by === by ? sort.dir === 'asc' ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" /> : null
 
   return (
     <div>
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
-        <nav aria-label="Folder path" className="flex min-w-0 flex-wrap items-center gap-0.5 text-sm">
-          {[null, ...path].map((folder, i) => {
-            const last = i === path.length
-            return (
-              <span key={folder?.id ?? 'top'} className="flex min-w-0 items-center gap-0.5">
-                {i > 0 && <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />}
-                <button
-                  type="button"
-                  onClick={() => open(folder?.id ?? null)}
-                  aria-current={last ? 'page' : undefined}
-                  className={cn(
-                    'max-w-48 truncate rounded-sm px-1.5 py-0.5 transition-colors hover:bg-muted',
-                    last ? 'font-semibold' : 'text-muted-foreground',
-                    isDropTarget(folder?.id ?? null) && !last && 'bg-brand/10 ring-1 ring-brand',
-                    dragging && !last && blockerFor(folder?.id ?? null) !== null && 'opacity-50',
-                  )}
-                  {...(last ? {} : dropProps(folder?.id ?? null))}
-                >
-                  {folder?.name ?? rootName}
-                </button>
-              </span>
-            )
-          })}
-          <span className="ml-2 font-mono text-xs text-muted-foreground">{subfolders.length + here.length}</span>
-        </nav>
-        {(canWrite || canNewDoc || canNewDiagram || filtering) && (
-          <div className="flex flex-wrap items-center gap-2">
-            {filtering && (
-              <div role="group" aria-label="Show" className="flex items-center rounded-md border p-0.5">
-                {(['all', 'docs', 'diagrams'] as const).map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    aria-pressed={show === option}
-                    onClick={() => setShow(option)}
-                    className={cn(
-                      'h-6 rounded-sm px-2 text-xs transition-colors',
-                      show === option ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground hover:text-foreground',
-                    )}
-                  >
-                    {option === 'all' ? 'All' : option === 'docs' ? 'Docs' : 'Diagrams'}
+      {/* Toolbar: what's on show, search, New. While selecting, the selection's own actions. */}
+      <div className="flex min-h-10 flex-wrap items-center gap-x-4 gap-y-2 border-b">
+        {selection.count > 0 ? (
+          <div role="status" className="flex h-10 flex-1 items-center gap-2 text-sm">
+            <span className="font-medium">{selection.count} selected</span>
+            <Button size="xs" variant="outline" onClick={() => setMoving(itemsOf(selection.selected))}>
+              <FolderInput /> Move to…
+            </Button>
+            {selection.count < keys.length && (
+              <Button size="xs" variant="ghost" onClick={selection.all}>
+                Select all
+              </Button>
+            )}
+            <Button size="xs" variant="ghost" onClick={selection.clear}>
+              Clear
+            </Button>
+            <span className="ml-auto hidden text-xs text-muted-foreground sm:inline">Drag a selected item to move them all</span>
+          </div>
+        ) : (
+          <>
+            {current && !searching ? (
+              // Inside a folder: its path (each step above is a drop target, to move things out).
+              <nav aria-label="Folder path" className="flex h-10 min-w-0 flex-wrap items-center gap-0.5 text-sm">
+                {[null, ...path].map((folder, i) => {
+                  const last = i === path.length
+                  return (
+                    <span key={folder?.id ?? 'top'} className="flex min-w-0 items-center gap-0.5">
+                      {i > 0 && <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />}
+                      <button
+                        type="button"
+                        onClick={() => open(folder?.id ?? null)}
+                        aria-current={last ? 'page' : undefined}
+                        className={cn(
+                          'max-w-48 truncate rounded-sm px-1.5 py-0.5 outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-brand/40',
+                          i === 0 && '-ml-1.5',
+                          last ? 'font-semibold' : 'text-muted-foreground',
+                          isDropTarget(folder?.id ?? null) && !last && 'bg-brand/10 ring-1 ring-brand',
+                          dragging && !last && blockerFor(folder?.id ?? null) !== null && 'opacity-50',
+                        )}
+                        {...(last ? {} : dropProps(folder?.id ?? null))}
+                      >
+                        {folder?.name ?? rootName}
+                      </button>
+                    </span>
+                  )
+                })}
+              </nav>
+            ) : (
+              <p className="flex h-10 items-center font-mono text-xs text-muted-foreground">
+                {searching
+                  ? `${plural(rows.length, 'file')} and ${plural(shownFolders.length, 'folder')} match`
+                  : `${plural(fileCount, 'file')}${folderCount > 0 ? ` · ${plural(folderCount, 'folder')}` : ''}`}
+              </p>
+            )}
+            <div className="ml-auto flex items-center gap-2 pb-1.5 sm:pb-0">
+              {placeControl}
+              <label className="flex h-8 w-44 items-center gap-2 rounded-md border bg-background px-2 text-sm focus-within:ring-2 focus-within:ring-brand/40 sm:w-56">
+                <Search className="size-3.5 shrink-0 text-muted-foreground" />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Escape' && setQuery('')}
+                  placeholder="Search files"
+                  aria-label="Search files"
+                  className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
+                />
+                {searching && (
+                  <button type="button" aria-label="Clear search" onClick={() => setQuery('')} className="text-muted-foreground hover:text-foreground">
+                    <X className="size-3.5" />
                   </button>
-                ))}
-              </div>
-            )}
-            {canWrite && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  {/* span: tooltips need a hoverable element even when the button is disabled */}
-                  <span tabIndex={canNest ? -1 : 0}>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={!canNest}
-                      onClick={() => setNaming({ mode: 'create' })}
-                    >
-                      <FolderPlus /> New folder
-                    </Button>
-                  </span>
-                </TooltipTrigger>
-                {!canNest && <TooltipContent>Folders can be nested {MAX_FOLDER_DEPTH} levels deep</TooltipContent>}
-              </Tooltip>
-            )}
-            {canNewDoc && canNewDiagram ? (
-              <>
+                )}
+              </label>
+              {newMenu > 0 && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button size="sm">
                       <Plus /> New <ChevronDown className="opacity-60" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onSelect={() => setCreating('doc')}>
-                      <FileText /> Doc
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => setCreating('diagram')}>
-                      <Workflow /> Diagram
-                    </DropdownMenuItem>
+                  <DropdownMenuContent align="end" className="w-44">
+                    {canNewDoc && (
+                      <DropdownMenuItem onSelect={() => setCreating('doc')}>
+                        <FileText /> Doc
+                      </DropdownMenuItem>
+                    )}
+                    {canNewDiagram && (
+                      <DropdownMenuItem onSelect={() => setCreating('diagram')}>
+                        <Workflow /> Diagram
+                      </DropdownMenuItem>
+                    )}
+                    {canNewFolder && (canNewDoc || canNewDiagram) && <DropdownMenuSeparator />}
+                    {canNewFolder && (
+                      <DropdownMenuItem onSelect={() => setNaming({ mode: 'create' })}>
+                        <FolderPlus /> Folder
+                      </DropdownMenuItem>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
-                <CreateDocDialog
-                  workspaceId={workspaceId ?? undefined}
-                  folderId={current?.id ?? null}
-                  open={creating === 'doc'}
-                  onOpenChange={(o) => setCreating(o ? 'doc' : null)}
-                />
-                <CreateDiagramDialog
-                  workspaceId={workspaceId ?? undefined}
-                  folderId={current?.id ?? null}
-                  open={creating === 'diagram'}
-                  onOpenChange={(o) => setCreating(o ? 'diagram' : null)}
-                />
-              </>
-            ) : canNewDoc ? (
-              <CreateDocDialog workspaceId={workspaceId ?? undefined} folderId={current?.id ?? null} />
-            ) : canNewDiagram ? (
-              <CreateDiagramDialog workspaceId={workspaceId ?? undefined} folderId={current?.id ?? null} />
-            ) : null}
-          </div>
+              )}
+            </div>
+          </>
         )}
       </div>
 
-      {selection.count > 0 && (
-        <div role="status" className="mb-2 flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 px-3 py-1.5 text-sm">
-          <span className="font-medium">{selection.count} selected</span>
-          <Button size="xs" variant="outline" onClick={() => setMoving(itemsOf(selection.selected))}>
-            <FolderInput /> Move to…
-          </Button>
-          {selection.count < keys.length && (
-            <Button size="xs" variant="ghost" onClick={selection.all}>Select all</Button>
-          )}
-          <Button size="xs" variant="ghost" onClick={selection.clear}>Clear</Button>
-          <span className="ml-auto hidden text-xs text-muted-foreground sm:inline">Drag any selected item to move them all</span>
-        </div>
-      )}
-
-      {subfolders.length === 0 && here.length === 0 ? (
-        <div className="border-y py-10 text-center text-sm text-muted-foreground">
-          {show !== 'all' ? `No ${show} ${current ? 'in this folder' : 'here yet'}.` : current ? 'This folder is empty.' : empty}
+      {shownFolders.length === 0 && rows.length === 0 ? (
+        <div className="flex flex-col items-center gap-2 py-14 text-center text-sm text-muted-foreground">
+          <Folder className="size-8 text-muted-foreground/40" />
+          {searching
+            ? `Nothing matches “${query.trim()}”.`
+            : current
+                ? 'This folder is empty.'
+                : scopeIsEmpty
+                  ? empty
+                  : 'Nothing here.'}
         </div>
       ) : (
-        <ul className={cn('divide-y border-y', canWrite && 'select-none')}>
-          {subfolders.map((folder) => {
-            const key = folderKey(folder.id)
-            return (
-              <li
-                key={folder.id}
-                data-selected={selection.has(key) || undefined}
-                draggable={canWrite}
-                onDragStart={(e) => startDrag(e, key)}
-                onDragEnd={endDrag}
-                {...dropProps(folder.id, true)}
-                className={cn(
-                  'group relative flex h-11 items-center gap-3 px-3 transition-colors hover:bg-muted/50',
-                  selection.has(key) && 'bg-brand/5',
-                  isDragged(key) && 'opacity-40',
-                  dragging && refuses(folder.id) && 'opacity-50',
-                  isDropTarget(folder.id) && 'bg-brand/10 ring-1 ring-brand ring-inset',
-                )}
-              >
-                {checkbox(key, folder.name)}
-                <Folder className="size-4 shrink-0 fill-muted-foreground/15 text-muted-foreground" />
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    if (canWrite && selection.click(key, e)) return
-                    open(folder.id)
-                  }}
-                  className="min-w-0 truncate text-left text-sm font-medium outline-none after:absolute after:inset-0"
+        <div className={cn(canWrite && 'select-none')}>
+          <div className={FILE_HEADER}>
+            <span />
+            <button type="button" onClick={() => sortBy('name')} className="flex items-center gap-1 justify-self-start uppercase outline-none hover:text-foreground focus-visible:text-foreground focus-visible:underline">
+              Name {sortIcon('name')}
+            </button>
+            <span className="hidden md:block">Owner</span>
+            <button type="button" onClick={() => sortBy('updated')} className="flex items-center gap-1 justify-self-end uppercase outline-none hover:text-foreground focus-visible:text-foreground focus-visible:underline">
+              Updated {sortIcon('updated')}
+            </button>
+            <span className="hidden md:block" />
+          </div>
+          <ul>
+            {shownFolders.map((folder) => {
+              const key = folderKey(folder.id)
+              return (
+                <li
+                  key={folder.id}
+                  data-file-row=""
+                  data-selected={selection.has(key) || undefined}
+                  draggable={canWrite && !searching}
+                  onDragStart={(e) => startDrag(e, key)}
+                  onDragEnd={endDrag}
+                  {...dropProps(folder.id, true)}
+                  className={cn(
+                    FILE_ROW,
+                    selection.has(key) && 'bg-brand/5',
+                    isDragged(key) && 'opacity-40',
+                    dragging && refuses(folder.id) && 'opacity-50',
+                    isDropTarget(folder.id) && 'bg-brand/10 ring-1 ring-brand ring-inset',
+                  )}
                 >
-                  {folder.name}
-                </button>
-                <span className="font-mono text-xs text-muted-foreground">{plural(count(folder), 'item')}</span>
-                <span className="flex-1" />
-                <span className="hidden font-mono text-xs text-muted-foreground sm:inline">
-                  {timeAgo(folder.updated_at, now)}
-                </span>
-                {canWrite && (
-                  <RowMenu label={`${folder.name} actions`}>
-                    <DropdownMenuItem onSelect={() => setNaming({ mode: 'rename', folder })}>Rename</DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => setMoving({ docIds: [], diagramIds: [], folderIds: [folder.id] })}>Move to…</DropdownMenuItem>
-                    <DropdownMenuItem variant="destructive" onSelect={() => setDeleting(folder)}>
-                      Delete
-                    </DropdownMenuItem>
-                  </RowMenu>
-                )}
-              </li>
-            )
-          })}
-          {here.map((row) => {
-            const key = rowKey(row)
-            const { item } = row
-            const Icon = row.kind === 'doc' ? FileText : Workflow
-            return (
-              <li
-                key={key}
-                data-selected={selection.has(key) || undefined}
-                draggable={canWrite}
-                onDragStart={(e) => startDrag(e, key)}
-                onDragEnd={endDrag}
-                className={cn(
-                  'group relative flex h-11 items-center gap-3 px-3 transition-colors hover:bg-muted/50',
-                  selection.has(key) && 'bg-brand/5',
-                  isDragged(key) && 'opacity-40',
-                )}
-              >
-                {checkbox(key, item.title)}
-                <Icon className="size-4 shrink-0 text-muted-foreground" aria-label={row.kind === 'doc' ? 'Doc' : 'Diagram'} />
-                <Link
-                  to={row.kind === 'doc' ? docHref(row.item) : diagramHref(row.item)}
-                  draggable={false}
-                  onClick={selectClick(key)}
-                  className="min-w-0 truncate text-sm font-medium outline-none after:absolute after:inset-0"
-                >
-                  {item.title}
-                </Link>
-                <span className="flex-1" />
-                <span className="hidden min-w-0 items-center gap-2 md:flex">
-                  <PersonAvatar profile={item.author} className="size-5" />
-                  <span className="max-w-32 truncate text-xs text-muted-foreground">
-                    {item.author?.display_name ?? 'Former member'}
-                  </span>
-                </span>
-                <span className="hidden w-24 text-right font-mono text-xs text-muted-foreground sm:inline">
-                  {timeAgo(item.updated_at, now)}
-                </span>
-                {canWrite && (
-                  <RowMenu label={`${item.title} actions`}>
-                    <DropdownMenuItem
-                      onSelect={() =>
-                        setMoving(
-                          row.kind === 'doc'
-                            ? { docIds: [item.id], diagramIds: [], folderIds: [] }
-                            : { docIds: [], diagramIds: [item.id], folderIds: [] },
-                        )
-                      }
+                  {lead(key, Folder, folder.name, 'fill-muted-foreground/15 text-muted-foreground')}
+                  <span className="flex min-w-0 flex-col">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        if (canWrite && selection.click(key, e)) return
+                        open(folder.id)
+                      }}
+                      className="min-w-0 truncate text-left text-sm font-medium outline-none after:absolute after:inset-0"
                     >
-                      Move to…
-                    </DropdownMenuItem>
-                  </RowMenu>
-                )}
+                      {folder.name}
+                    </button>
+                    <span className="truncate text-xs text-muted-foreground">
+                      {searching ? `in ${placeOf(folder.parent_id)}` : summary(folder)}
+                    </span>
+                  </span>
+                  <span className="hidden md:block" />
+                  <span className="text-right font-mono text-xs text-muted-foreground" title="Newest change inside">
+                    {timeAgo(changedAt(folder), now)}
+                  </span>
+                  <span className="hidden justify-self-end md:block">
+                    {canWrite && (
+                      <RowMenu label={`${folder.name} actions`}>
+                        <DropdownMenuItem onSelect={() => setNaming({ mode: 'rename', folder })}>Rename</DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => setMoving({ docIds: [], diagramIds: [], folderIds: [folder.id] })}>Move to…</DropdownMenuItem>
+                        <DropdownMenuItem variant="destructive" onSelect={() => setDeleting(folder)}>
+                          Delete
+                        </DropdownMenuItem>
+                      </RowMenu>
+                    )}
+                  </span>
+                </li>
+              )
+            })}
+            {looseLabel && (
+              <li aria-hidden className="flex h-8 items-end border-b px-3 pb-1.5 font-mono text-[11px] tracking-wide text-muted-foreground uppercase">
+                Not in a folder
               </li>
-            )
-          })}
-        </ul>
-      )}
-      {canWrite && subfolders.length + here.length > 0 && selection.count === 0 && (
-        <p className="mt-2 text-xs text-muted-foreground">
-          Tip: drag {mode === 'diagrams' ? 'diagrams' : diagramsEnabled ? 'docs, diagrams' : 'docs'} and folders onto a folder, or onto the path above, to move them. Tick the boxes (or Ctrl/⌘-click, Shift-click) to move several at once.
-        </p>
+            )}
+            {rows.map((row) => {
+              const key = rowKey(row)
+              const { item } = row
+              return (
+                <li
+                  key={key}
+                  data-file-row=""
+                  data-selected={selection.has(key) || undefined}
+                  draggable={canWrite}
+                  onDragStart={(e) => startDrag(e, key)}
+                  onDragEnd={endDrag}
+                  className={cn(FILE_ROW, selection.has(key) && 'bg-brand/5', isDragged(key) && 'opacity-40')}
+                >
+                  {lead(key, row.kind === 'doc' ? FileText : Workflow, item.title, 'text-muted-foreground')}
+                  <span className="flex min-w-0 flex-col">
+                    <Link
+                      to={row.kind === 'doc' ? docHref(row.item) : diagramHref(row.item)}
+                      draggable={false}
+                      onClick={selectClick(key)}
+                      className="min-w-0 truncate text-sm font-medium outline-none after:absolute after:inset-0"
+                    >
+                      {item.title}
+                    </Link>
+                    <span className="truncate text-xs text-muted-foreground">
+                      {row.kind === 'doc' ? 'Doc' : 'Diagram'}
+                      {searching && ` · in ${placeOf(item.folder_id)}`}
+                    </span>
+                  </span>
+                  <span className="hidden min-w-0 items-center gap-2 md:flex">
+                    <PersonAvatar profile={item.author} className="size-5" />
+                    <span className="truncate text-xs text-muted-foreground">{item.author?.display_name ?? 'Former member'}</span>
+                  </span>
+                  <span className="text-right font-mono text-xs text-muted-foreground">{timeAgo(item.updated_at, now)}</span>
+                  <span className="hidden justify-self-end md:block">
+                    {canWrite && <FileRowActions kind={row.kind} item={item} folders={folders} />}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
       )}
 
+      {creating === 'doc' && (
+        <CreateDocDialog workspaceId={workspaceId ?? undefined} folderId={current?.id ?? null} open onOpenChange={(o) => !o && setCreating(null)} />
+      )}
+      {creating === 'diagram' && (
+        <CreateDiagramDialog workspaceId={workspaceId ?? undefined} folderId={current?.id ?? null} open onOpenChange={(o) => !o && setCreating(null)} />
+      )}
       <NameDialog
         key={naming ? (naming.mode === 'rename' ? `rename-${naming.folder.id}` : 'create') : 'name-closed'}
         open={naming !== null}
