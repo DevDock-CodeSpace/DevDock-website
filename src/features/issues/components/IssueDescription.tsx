@@ -7,6 +7,7 @@ import { OthersTypingAlert } from '@/components/OthersTypingAlert'
 import { adoptContent } from '@/features/docs/editor/adopt'
 import { docExtensions } from '@/features/docs/editor/extensions'
 import { FormatBubble } from '@/features/docs/editor/FormatBubble'
+import { FileLinkPicker } from '@/features/docs/editor/FileLinkPicker'
 import { InsertMenu } from '@/features/docs/editor/InsertMenu'
 import { docContentClass } from '@/features/docs/editor/styles'
 import { useOthersTyping } from '@/hooks/use-others-typing'
@@ -161,6 +162,7 @@ export function IssueDescription({ issue }: { issue: IssueDetail }) {
         <>
           <FormatBubble editor={editor} />
           <InsertMenu editor={editor} onPickImage={() => fileInput.current?.click()} />
+          <FileLinkPicker editor={editor} />
           <input
             ref={fileInput}
             type="file"

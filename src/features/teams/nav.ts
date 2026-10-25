@@ -2,6 +2,7 @@ import {
   BookOpen,
   CircleDot,
   FileText,
+  Files,
   GitPullRequest,
   Home,
   LayoutDashboard,
@@ -14,6 +15,7 @@ import {
   Workflow,
   type LucideIcon,
 } from 'lucide-react'
+import { matchPath } from 'react-router'
 import type { TeamType } from '@/features/teams/api'
 import type { WorkspaceModule, WorkspaceType } from '@/features/workspaces/api'
 
@@ -23,19 +25,32 @@ export type NavItem = {
   icon: LucideIcon
   /** Match the path exactly (for index routes). */
   end?: boolean
+  /** Another path that counts as being here (Files: a diagram's page, …/diagrams/<id>). */
+  also?: string
 }
+
+/** Whether `pathname` is on this item (its path, or its `also` path). */
+export const isNavActive = (item: NavItem, pathname: string) =>
+  matchPath({ path: item.to, end: item.end ?? false }, pathname) !== null ||
+  (item.also !== undefined && matchPath({ path: item.also, end: false }, pathname) !== null)
 
 export const teamPath = (slug: string) => `/t/${slug}`
 export const workspacePath = (teamSlug: string, workspaceId: string) => `/t/${teamSlug}/w/${workspaceId}`
 
-/** Docs list, in the team view or inside a workspace. */
+/**
+ * Files (the UI name; code and URLs say docs): the folders of docs and diagrams, in the team view
+ * or inside a workspace; `folder` opens it inside a folder.
+ */
+export const filesPath = (teamSlug: string, workspaceId?: string, options: { folder?: string | null } = {}) =>
+  `${docsPath(teamSlug, workspaceId)}${options.folder ? `?folder=${options.folder}` : ''}`
+/** Docs list, in the team view or inside a workspace (the Files page). */
 export const docsPath = (teamSlug: string, workspaceId?: string) =>
   workspaceId ? `${workspacePath(teamSlug, workspaceId)}/docs` : `${teamPath(teamSlug)}/docs`
 /** One doc, opened from the team view or from inside its workspace. */
 export const docPath = (teamSlug: string, docId: string, workspaceId?: string) =>
   `${docsPath(teamSlug, workspaceId)}/${docId}`
 
-/** Diagrams list, in the team view or inside a workspace. */
+/** Where diagrams' URLs live (`…/diagrams/<id>`); the list itself redirects to Files. */
 export const diagramsPath = (teamSlug: string, workspaceId?: string) =>
   workspaceId ? `${workspacePath(teamSlug, workspaceId)}/diagrams` : `${teamPath(teamSlug)}/diagrams`
 /** One diagram, opened from the team view or from inside its workspace. */
@@ -55,12 +70,20 @@ export const issuePath = (teamSlug: string, workspaceId: string, number: number)
 // ------------------------------------------------------------ team tools
 // Team-wide views of the same data a workspace tab shows. Future rows carry
 // team_id (required) + workspace_id (optional): null = team-wide, X = assigned
-// to workspace X. Team → Docs lists everything the caller can access; a
-// workspace's Docs tab lists only rows with that workspace_id. Workspace-only
+// to workspace X. Team → Files lists everything the caller can access; a
+// workspace's Files tab lists only rows with that workspace_id. Workspace-only
 // tools (Issues, Learning, Exercises, GitHub) have no team view.
+//
+// Docs and diagrams are two tools (workspace_modules) shown as one page, **Files**:
+// the sidebar item and the workspace tab are `docs`'s, and the old Diagrams list
+// redirects there.
 
 export type TeamToolId = Extract<WorkspaceModule, 'docs' | 'diagrams' | 'live'>
-export const TEAM_TOOLS: TeamToolId[] = ['docs', 'diagrams', 'live']
+/** The sidebar's tools: Files (docs and diagrams) and Meetings. */
+export const TEAM_TOOLS: TeamToolId[] = ['docs', 'live']
+
+/** The one page docs and diagrams share: its sidebar item and workspace tab. */
+export const FILES_TAB = { title: 'Files', icon: Files }
 
 export const teamToolDefs: Record<TeamToolId, { item: string; items: string }> = {
   docs: { item: 'doc', items: 'docs' },
@@ -109,8 +132,7 @@ export function getTeamNav(
     tools: [
       ...TEAM_TOOLS.map((id) => ({
         id,
-        title: workspaceTabDefs[id].title,
-        icon: workspaceTabDefs[id].icon,
+        ...(id === 'docs' ? { ...FILES_TAB, also: `${base}/diagrams` } : { title: workspaceTabDefs[id].title, icon: workspaceTabDefs[id].icon }),
         to: `${base}/${id}`,
       })),
       ...(issues
@@ -136,8 +158,8 @@ export const workspaceTabDefs: Record<
   overview: { title: 'Overview', icon: LayoutDashboard },
   learning: { title: 'Learning', icon: BookOpen, hint: 'Modules, lessons and progress' },
   issues: { title: 'Issues', icon: CircleDot, hint: 'Linear-style tasks and bugs' },
-  docs: { title: 'Docs', icon: FileText, hint: 'Pages and notes', soon: 'Docs assigned to this workspace will live here.' },
-  diagrams: { title: 'Diagrams', icon: Workflow, hint: 'Architecture and flow diagrams', soon: 'Diagrams assigned to this workspace will live here.' },
+  docs: { title: 'Docs', icon: FileText, hint: 'Pages and notes, in Files', soon: 'Docs assigned to this workspace will live here.' },
+  diagrams: { title: 'Diagrams', icon: Workflow, hint: 'Architecture and flow diagrams, in Files', soon: 'Diagrams assigned to this workspace will live here.' },
   exercises: { title: 'Exercises', icon: Shapes, hint: 'Practice and submissions', soon: 'Exercises and submissions will live here.' },
   github: { title: 'GitHub', icon: GitPullRequest, hint: 'Linked repositories' },
   live: { title: 'Meetings', icon: Video, hint: 'Video meetings and schedule' },
@@ -170,18 +192,24 @@ export function hasWorkspaceTab(modules: readonly WorkspaceModule[], tab: string
   return (modules as readonly string[]).includes(tab)
 }
 
-/** Overview | …enabled modules… | Members. Overview is the index route. */
+/** Whether the workspace has the Files tab: either of its tools (docs, diagrams) is on. */
+export const hasFiles = (modules: readonly WorkspaceModule[]) => modules.includes('docs') || modules.includes('diagrams')
+
+/**
+ * Overview | …enabled modules… | Members. Overview is the index route. Docs and diagrams
+ * share one tab, Files, in docs's place (shown when either is on).
+ */
 export function getWorkspaceTabs(
   teamSlug: string,
   workspaceId: string,
   modules: readonly WorkspaceModule[],
 ): (NavItem & { id: WorkspaceTabId })[] {
   const base = workspacePath(teamSlug, workspaceId)
-  const ids: WorkspaceTabId[] = ['overview', ...sortModules(modules), 'members']
+  const tools = sortModules(hasFiles(modules) ? [...modules, 'docs'] : modules).filter((m) => m !== 'diagrams')
+  const ids: WorkspaceTabId[] = ['overview', ...tools, 'members']
   return ids.map((id) => ({
     id,
-    title: workspaceTabDefs[id].title,
-    icon: workspaceTabDefs[id].icon,
+    ...(id === 'docs' ? { ...FILES_TAB, also: `${base}/diagrams` } : { title: workspaceTabDefs[id].title, icon: workspaceTabDefs[id].icon }),
     to: id === 'overview' ? base : `${base}/${id}`,
     end: id === 'overview',
   }))

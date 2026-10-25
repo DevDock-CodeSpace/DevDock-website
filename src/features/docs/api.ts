@@ -63,21 +63,6 @@ export const teamDocsQuery = (teamId: string) =>
     },
   })
 
-/** Workspace → Docs: only docs assigned to this workspace. */
-export const workspaceDocsQuery = (workspaceId: string) =>
-  queryOptions({
-    queryKey: ['documents', 'workspace', workspaceId],
-    queryFn: async (): Promise<DocSummary[]> => {
-      const { data, error } = await supabase
-        .from('documents')
-        .select(SUMMARY)
-        .eq('workspace_id', workspaceId)
-        .order('updated_at', { ascending: false })
-      if (error) throw toDataError('load docs', error)
-      return data
-    },
-  })
-
 const FOLDER_COLUMNS = 'id, team_id, workspace_id, parent_id, name, depth, updated_at'
 
 /** Folders of one scope: group-wide (workspaceId null) or one workspace's. */
