@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { ChevronRight, MessageCircle, Plus, Search } from 'lucide-react'
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { DockSpinner } from '@/components/DockSpinner'
 import { Button } from '@/components/ui/button'
@@ -17,13 +17,14 @@ import { ConversationItem } from '@/features/messaging/components/ConversationIt
 import { NewConversationDialog } from '@/features/messaging/components/NewConversationDialog'
 import { useUnread } from '@/features/messaging/hooks'
 import { readLastConversation, rememberConversation } from '@/features/messaging/lastConversation'
+import { conversationView } from '@/features/messaging/screens'
 import { useCollapsedSections } from '@/features/messaging/useCollapsedSections'
 import { conversationTitle, displayName } from '@/features/messaging/names'
 import { ownWrite } from '@/lib/realtime'
 import { cn } from '@/lib/utils'
 
 // The message editor (TipTap) is only needed once a conversation opens, so it loads on demand.
-const ConversationView = lazy(() => import('@/features/messaging/components/ConversationView').then((m) => ({ default: m.ConversationView })))
+const ConversationView = conversationView.Component
 
 export function MessagesPage() {
   const { team, can } = useCurrentTeam()

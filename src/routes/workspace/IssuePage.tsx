@@ -1,12 +1,13 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
-import { lazy, Suspense } from 'react'
+import { Suspense } from 'react'
 import { useParams } from 'react-router'
 import { Skeleton } from '@/components/ui/skeleton'
 import { issueQuery } from '@/features/issues/api'
 import { useCurrentWorkspace } from '@/features/teams/hooks'
+import { issueView } from '@/features/issues/screens'
 
 // The description editor (TipTap) is only downloaded when an issue is opened.
-const IssueView = lazy(() => import('@/features/issues/components/IssueView'))
+const IssueView = issueView.Component
 
 /** One issue at …/w/:workspaceId/issues/:issueNumber (issueLoader has checked it exists here). */
 export function IssuePage() {

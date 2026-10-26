@@ -3,6 +3,7 @@ import { requireUser } from '@/features/auth/loaders'
 import { myTeamsQuery } from '@/features/teams/api'
 import { queryClient } from '@/lib/query-client'
 import { diagramQuery } from './api'
+import { diagramView } from './screens'
 
 /**
  * …/diagrams/:diagramId (team view or inside a workspace): 404 unless the
@@ -13,6 +14,8 @@ export async function diagramLoader({ request, params }: LoaderFunctionArgs) {
   const [memberships, diagram] = await Promise.all([
     queryClient.ensureQueryData(myTeamsQuery(user.id)),
     queryClient.ensureQueryData(diagramQuery(params.diagramId ?? '')),
+    // The editor's code downloads alongside the whiteboard, so the page renders without waiting on it.
+    diagramView.preload(),
   ])
   const team = memberships.find((m) => m.team.slug === params.teamSlug)?.team
   const wrongWorkspace = params.workspaceId !== undefined && diagram?.workspace_id !== params.workspaceId
