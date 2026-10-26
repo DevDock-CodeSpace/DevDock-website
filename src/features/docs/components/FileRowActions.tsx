@@ -35,7 +35,7 @@ export function FileRowActions({
   const [busy, setBusy] = useState(false)
   const loaded = useQuery({ ...foldersQuery(item.team_id, item.workspace_id), enabled: moving && !knownFolders }).data
   const folders = knownFolders ?? loaded ?? []
-  const noun = kind === 'doc' ? 'doc' : 'diagram'
+  const noun = kind === 'doc' ? 'doc' : 'whiteboard'
   const refresh = () => Promise.all(LISTS.map((queryKey) => queryClient.invalidateQueries({ queryKey })))
   const ids = (target: string | null) => ({
     docIds: kind === 'doc' ? [item.id] : [],

@@ -65,7 +65,7 @@ export default function DiagramView({ diagram, canWrite }: { diagram: Diagram; c
     const nextTitle = titleRef.current.trim()
     if (!nextTitle) {
       setStatus('error')
-      throw new Error('Add a title to save this diagram.')
+      throw new Error('Add a title to save this whiteboard.')
     }
     setStatus('saving')
     const data = dataRef.current
@@ -239,7 +239,7 @@ export default function DiagramView({ diagram, canWrite }: { diagram: Diagram; c
             maxLength={200}
             aria-label="Title"
             readOnly={locked}
-            placeholder="Untitled diagram"
+            placeholder="Untitled whiteboard"
             onChange={(e) => {
               setTitle(e.target.value)
               titleRef.current = e.target.value
@@ -267,7 +267,7 @@ export default function DiagramView({ diagram, canWrite }: { diagram: Diagram; c
             <Button
               variant="ghost"
               size="icon-sm"
-              aria-label="Delete diagram"
+              aria-label="Delete whiteboard"
               className="text-muted-foreground hover:text-destructive"
               onClick={() => setConfirmDelete(true)}
             >
@@ -297,7 +297,7 @@ export default function DiagramView({ diagram, canWrite }: { diagram: Diagram; c
         onOpenChange={setConfirmDelete}
         title={`Delete ${diagram.title}?`}
         description="This can’t be undone."
-        confirmLabel="Delete diagram"
+        confirmLabel="Delete whiteboard"
         pending={deleting}
         onConfirm={() => void remove()}
       />

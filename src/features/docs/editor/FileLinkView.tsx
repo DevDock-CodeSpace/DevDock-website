@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { NodeViewWrapper, type ReactNodeViewProps } from '@tiptap/react'
-import { FileText, Lock, Workflow } from 'lucide-react'
+import { FileText, Lock, Presentation } from 'lucide-react'
 import { Link, useParams } from 'react-router'
 import { teamDiagramsQuery } from '@/features/diagrams/api'
 import { teamDocsQuery } from '@/features/docs/api'
@@ -25,7 +25,7 @@ export function FileLinkView({ node, selected }: ReactNodeViewProps) {
   const { workspaceId } = useParams()
   const list = useQuery(kind === 'diagram' ? teamDiagramsQuery(team.id) : teamDocsQuery(team.id))
   const item = list.data?.find((entry) => entry.id === id)
-  const Icon = kind === 'diagram' ? Workflow : FileText
+  const Icon = kind === 'diagram' ? Presentation : FileText
   const ring = selected && 'ring-2 ring-brand/60'
 
   let content
@@ -59,7 +59,7 @@ export function FileLinkView({ node, selected }: ReactNodeViewProps) {
         className={cn(chip, 'border-dashed text-muted-foreground', ring)}
       >
         <Lock className="size-3.5 shrink-0 self-center" />
-        <span>{kind === 'diagram' ? 'Diagram' : 'Doc'} you can’t open</span>
+        <span>{kind === 'diagram' ? 'Whiteboard' : 'Doc'} you can’t open</span>
       </span>
     )
   }

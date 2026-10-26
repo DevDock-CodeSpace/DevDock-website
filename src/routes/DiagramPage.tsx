@@ -19,7 +19,7 @@ export function DiagramPage() {
   const canWrite = useCanWriteDiagrams()(diagram?.workspace_id ?? null)
 
   if (!diagram) {
-    return <p className="py-16 text-center text-sm text-muted-foreground">This diagram doesn’t exist anymore.</p>
+    return <p className="py-16 text-center text-sm text-muted-foreground">This whiteboard doesn’t exist anymore.</p>
   }
   return (
     <Suspense fallback={<DiagramSkeleton />}>

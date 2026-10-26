@@ -17,7 +17,7 @@ export async function diagramLoader({ request, params }: LoaderFunctionArgs) {
   const team = memberships.find((m) => m.team.slug === params.teamSlug)?.team
   const wrongWorkspace = params.workspaceId !== undefined && diagram?.workspace_id !== params.workspaceId
   if (!diagram || !team || diagram.team_id !== team.id || wrongWorkspace) {
-    throw data('Diagram not found, or you don’t have access to it.', { status: 404 })
+    throw data('Whiteboard not found, or you don’t have access to it.', { status: 404 })
   }
   return null
 }

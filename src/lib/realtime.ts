@@ -47,7 +47,7 @@ function sameValue(a: unknown, b: unknown) {
 /**
  * True when every cached list already shows this row as it now is, apart from
  * `updated_at` (which is then copied in, re-sorting lists that are newest first).
- * That is the common case by far: saving a doc's text, a diagram's canvas or an
+ * That is the common case by far: saving a doc's text, a whiteboard's canvas or an
  * issue's description changes nothing a list displays. Unknown (not in any cached
  * list, or any shared column differs, e.g. it moved) means the lists must be asked.
  */
