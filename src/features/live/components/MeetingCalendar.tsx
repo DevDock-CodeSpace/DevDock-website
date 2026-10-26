@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { Link } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -30,6 +30,54 @@ type MeetingCalendarProps = {
 }
 
 const HOUR_PX = 48
+/** Below this the calendar stops shrinking and the page scrolls instead (a very short window). */
+const MIN_HEIGHT = 420
+/** A meeting chip's height in the month grid (text-[11px] + padding + the 2 px gap). */
+const CHIP_PX = 20
+/** The day number's row at the top of a month cell, with the cell's padding. */
+const DAY_HEAD_PX = 30
+
+/**
+ * The calendar fills the window below it exactly, like Teams: no page scroll. It takes the window's
+ * height below its own top, minus the bottom padding of the boxes it sits in (the page area's), and
+ * measures again on every resize.
+ */
+function useFitToWindow(ref: RefObject<HTMLDivElement | null>) {
+  const [height, setHeight] = useState<number>()
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const fit = () => {
+      let below = 0
+      for (let node = el.parentElement; node && node !== document.body; node = node.parentElement) {
+        const style = getComputedStyle(node)
+        below += parseFloat(style.paddingBottom) + parseFloat(style.borderBottomWidth)
+      }
+      const page = document.scrollingElement ?? document.documentElement
+      const top = el.getBoundingClientRect().top + page.scrollTop
+      setHeight(Math.max(MIN_HEIGHT, Math.floor(window.innerHeight - top - below)))
+    }
+    fit()
+    window.addEventListener('resize', fit)
+    return () => window.removeEventListener('resize', fit)
+  }, [ref])
+  return height
+}
+
+/** How many meeting chips fit in one month cell, from the grid's measured height. */
+function useChipsPerCell(ref: RefObject<HTMLDivElement | null>, rows: number) {
+  const [fit, setFit] = useState(3)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const measure = () => setFit(Math.max(1, Math.floor((el.clientHeight / rows - DAY_HEAD_PX) / CHIP_PX)))
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [ref, rows])
+  return fit
+}
 const FIRST_VISIBLE_HOUR = 7
 const hours = Array.from({ length: 24 }, (_, h) => h)
 const weekdayHeader = new Intl.DateTimeFormat(undefined, { weekday: 'short' })
@@ -46,9 +94,12 @@ export function MeetingCalendar({ sessions, now, cursor, mode, onNavigate, href,
       ? monthTitle.format(cursor)
       : `${shortDate.format(days[0])} – ${shortDate.format(days[6])}, ${days[6].getFullYear()}`
 
+  const box = useRef<HTMLDivElement>(null)
+  const height = useFitToWindow(box)
+
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
+    <div ref={box} className="flex flex-col gap-3" style={height ? { height } : undefined}>
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
         <Button variant="outline" size="sm" onClick={() => onNavigate({ date: startOfDay(new Date(now)) })}>
           Today
         </Button>
@@ -130,30 +181,35 @@ function MonthGrid({
   const weeks = monthWeeks(cursor)
   const today = new Date(now)
   const header = weekDays(cursor)
+  const rows = useRef<HTMLDivElement>(null)
+  const fit = useChipsPerCell(rows, weeks.length)
 
   return (
-    <div className="overflow-x-auto">
-      <div className="min-w-[640px] border-t border-l">
-        <div className="grid grid-cols-7">
+    <div className="min-h-0 flex-1 overflow-x-auto">
+      <div className="flex h-full min-w-[640px] flex-col border-t border-l">
+        <div className="grid shrink-0 grid-cols-7">
           {header.map((d) => (
             <div key={d.getDay()} className="border-r border-b px-2 py-1.5 text-xs font-medium text-muted-foreground">
               {weekdayHeader.format(d)}
             </div>
           ))}
         </div>
+        {/* The weeks share whatever height is left, equally (5 or 6 rows). */}
+        <div ref={rows} className="grid min-h-0 flex-1" style={{ gridTemplateRows: `repeat(${weeks.length}, minmax(0, 1fr))` }}>
         {weeks.map((week) => (
-          <div key={toDateKey(week[0])} className="grid grid-cols-7">
+          <div key={toDateKey(week[0])} className="grid min-h-0 grid-cols-7">
             {week.map((day) => {
               const list = byDay.get(toDateKey(day)) ?? []
               const outside = day.getMonth() !== cursor.getMonth()
               const isToday = isSameDay(day, today)
-              const shown = list.slice(0, 3)
+              // As many as fit; when some don't, the last line says how many more.
+              const shown = list.length > fit ? list.slice(0, Math.max(0, fit - 1)) : list
               return (
                 <div
                   key={toDateKey(day)}
                   onClick={onCreate ? () => onCreate(dayStart(day, now)) : undefined}
                   className={cn(
-                    'min-h-28 space-y-0.5 border-r border-b p-1',
+                    'min-h-0 space-y-0.5 overflow-hidden border-r border-b p-1',
                     outside && 'bg-muted/30',
                     onCreate && 'cursor-pointer hover:bg-muted/40',
                   )}
@@ -161,7 +217,7 @@ function MonthGrid({
                   <div className="flex justify-end">
                     <span
                       className={cn(
-                        'flex size-6 items-center justify-center rounded-full font-mono text-xs',
+                        'flex size-5 items-center justify-center rounded-full font-mono text-[11px]',
                         isToday ? 'bg-brand text-white' : outside ? 'text-muted-foreground' : 'text-foreground',
                       )}
                     >
@@ -180,7 +236,7 @@ function MonthGrid({
                       }}
                       className="w-full rounded px-1.5 py-0.5 text-left text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground"
                     >
-                      {list.length - shown.length} more
+                      +{list.length - shown.length} more
                     </button>
                   )}
                 </div>
@@ -188,6 +244,7 @@ function MonthGrid({
             })}
           </div>
         ))}
+        </div>
       </div>
     </div>
   )
@@ -223,13 +280,22 @@ function WeekGrid({ days, byDay, now, href, onCreate }: GridProps & { days: Date
   const today = new Date(now)
   const nowMinutes = today.getHours() * 60 + today.getMinutes()
 
-  // Open scrolled to the morning instead of midnight.
+  // Open scrolled to the morning instead of midnight: once, as soon as the grid has its height
+  // (it's sized to the window after the first render, and scrolling before that does nothing).
   useEffect(() => {
-    scroller.current?.scrollTo({ top: FIRST_VISIBLE_HOUR * HOUR_PX })
+    const el = scroller.current
+    if (!el) return
+    const observer = new ResizeObserver(() => {
+      if (el.clientHeight === 0 || el.scrollHeight <= el.clientHeight) return
+      el.scrollTo({ top: FIRST_VISIBLE_HOUR * HOUR_PX })
+      observer.disconnect()
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
   }, [])
 
   return (
-    <div ref={scroller} className="max-h-[640px] overflow-auto border">
+    <div ref={scroller} className="min-h-0 flex-1 overflow-auto border">
       <div className="min-w-[720px]">
         <div className="sticky top-0 z-20 grid grid-cols-[56px_repeat(7,minmax(0,1fr))] border-b bg-background">
           <div />
