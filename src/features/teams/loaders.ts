@@ -4,7 +4,7 @@ import { myWorkspaceRolesQuery, teamWorkspacesQuery, workspaceQuery } from '@/fe
 import { queryClient } from '@/lib/query-client'
 import { myTeamsQuery } from './api'
 import { lastTeam, rememberTeam } from './last-team'
-import { teamPath } from './nav'
+import { chatPath } from './nav'
 
 /** /app: send the user to onboarding (no teams) or their last/first team. */
 export async function appIndexLoader({ request }: LoaderFunctionArgs) {
@@ -13,7 +13,7 @@ export async function appIndexLoader({ request }: LoaderFunctionArgs) {
   if (memberships.length === 0) throw redirect('/onboarding')
   const last = lastTeam()
   const target = memberships.find((m) => m.team.slug === last) ?? memberships[0]
-  throw redirect(teamPath(target.team.slug))
+  throw redirect(chatPath(target.team.slug))
 }
 
 /** /onboarding: open to everyone signed in (new users, and existing users adding a team). */

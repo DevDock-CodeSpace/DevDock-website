@@ -4,7 +4,6 @@ import {
   FileText,
   Files,
   GitPullRequest,
-  Home,
   LayoutDashboard,
   MessageSquare,
   NotebookPen,
@@ -35,6 +34,8 @@ export const isNavActive = (item: NavItem, pathname: string) =>
   (item.also !== undefined && matchPath({ path: item.also, end: false }, pathname) !== null)
 
 export const teamPath = (slug: string) => `/t/${slug}`
+/** Where a group opens (after signing in, switching or joining): its Chat. */
+export const chatPath = (slug: string) => `${teamPath(slug)}/messages`
 export const workspacePath = (teamSlug: string, workspaceId: string) => `/t/${teamSlug}/w/${workspaceId}`
 
 /**
@@ -110,7 +111,7 @@ export function hasTeamIssues(type: TeamType, workspaces: readonly { type: Works
 }
 
 /**
- * Sidebar team links: Home + team tools on top (plus Issues below Meetings
+ * Sidebar team links: Chat + team tools on top (plus Issues below Meetings
  * when `issues` is set, see hasTeamIssues, then your Reminders), then the
  * workspaces, then Members/Settings.
  */
@@ -118,7 +119,6 @@ export function getTeamNav(
   slug: string,
   issues = false,
 ): {
-  home: NavItem
   tools: (NavItem & { id: TeamToolId | 'issues' })[]
   members: NavItem
   settings: NavItem
@@ -127,7 +127,6 @@ export function getTeamNav(
 } {
   const base = teamPath(slug)
   return {
-    home: { title: 'Home', to: base, icon: Home, end: true },
     messages: { title: 'Chat', to: `${base}/messages`, icon: MessageSquare },
     tools: [
       ...TEAM_TOOLS.map((id) => ({
