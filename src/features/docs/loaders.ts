@@ -5,6 +5,7 @@ import { myTeamsQuery } from '@/features/teams/api'
 import { workspaceQuery } from '@/features/workspaces/api'
 import { queryClient } from '@/lib/query-client'
 import { documentQuery, foldersQuery, teamDocsQuery } from './api'
+import { docView } from './screens'
 
 /**
  * Files only changes its search params as you switch view, place or folder (?view= ?in= ?folder=):
@@ -48,9 +49,11 @@ export async function filesLoader({ request, params }: LoaderFunctionArgs) {
  */
 export async function docLoader({ request, params }: LoaderFunctionArgs) {
   const user = await requireUser(request)
+  // The editor's code downloads alongside the doc, so the page renders without waiting on it.
   const [memberships, doc] = await Promise.all([
     queryClient.ensureQueryData(myTeamsQuery(user.id)),
     queryClient.ensureQueryData(documentQuery(params.docId ?? '')),
+    docView.preload(),
   ])
   const team = memberships.find((m) => m.team.slug === params.teamSlug)?.team
   const wrongWorkspace = params.workspaceId !== undefined && doc?.workspace_id !== params.workspaceId

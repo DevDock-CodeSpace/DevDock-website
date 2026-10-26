@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { CalendarDays, List } from 'lucide-react'
-import { lazy, Suspense, useState, type ReactNode } from 'react'
+import { Suspense, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router'
 import { cn } from '@/lib/utils'
 import { useCollectionView } from '@/features/collections/hooks'
@@ -10,9 +10,10 @@ import { useCanWriteLive } from '../hooks'
 import { toDateKey } from '../recurrence'
 import { LiveSessionList } from './LiveSessionList'
 import { ScheduleSessionDialog } from './ScheduleSessionDialog'
+import { meetingCalendar } from '../screens'
 
 // The calendar is only needed when someone switches to it.
-const MeetingCalendar = lazy(() => import('./MeetingCalendar').then((m) => ({ default: m.MeetingCalendar })))
+const MeetingCalendar = meetingCalendar.Component
 
 type MeetingsViewProps = {
   /** Whose meetings: the list pages through them, the calendar asks for its visible range. */

@@ -1,13 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AtSign, Bell, Bookmark, MessageCircle } from 'lucide-react'
 import { useState } from 'react'
-import { useNavigate } from 'react-router'
+import { useLocation, useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useAuth } from '@/features/auth/hooks'
 import { useCurrentTeam } from '@/features/teams/hooks'
-import { issuePath, remindersPath, teamPath } from '@/features/teams/nav'
+import { issuePath, teamPath } from '@/features/teams/nav'
 import { errorMessage } from '@/lib/errors'
 import { conversationKeys, markAllNotificationsRead, markNotificationRead, notificationsQuery, type Notification } from '../api'
 import { useConversationTitles } from '../hooks'
@@ -18,6 +18,7 @@ export function NotificationBell() {
   const { team } = useCurrentTeam()
   const { user } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const queryClient = useQueryClient()
   const [open, setOpen] = useState(false)
   const notifications = useQuery(notificationsQuery(team.id, user.id)).data ?? []
@@ -40,11 +41,11 @@ export function NotificationBell() {
     }
     setOpen(false)
     if (reminder) {
-      // Its issue when it has one (and it can still be opened), else the reminder in its list.
+      // Its issue when it has one (and it can still be opened), else the Notes panel, here, at that note.
       navigate(
         reminder.issue && reminder.workspace_id
           ? issuePath(team.slug, reminder.workspace_id, reminder.issue.number)
-          : `${remindersPath(team.slug)}?r=${notification.reminder_id}`,
+          : `${location.pathname}?note=${notification.reminder_id}`,
       )
       void refresh()
       return

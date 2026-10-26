@@ -107,7 +107,6 @@ export function AppSidebar({ sidebarWidth }: { sidebarWidth: SidebarWidth }) {
             {nav.tools.map((item) => (
               <NavLinkItem key={item.id} item={item} onNavigate={close} />
             ))}
-            <NavLinkItem item={nav.reminders} onNavigate={close} />
           </SidebarMenu>
         </SidebarGroup>
 

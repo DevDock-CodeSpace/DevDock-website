@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import type { JSONContent } from '@tiptap/core'
 import { EditorContent, useEditor } from '@tiptap/react'
 import { ArrowLeft, ArrowRight, Check, ChevronRight } from 'lucide-react'
-import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { DockSpinner } from '@/components/DockSpinner'
@@ -21,14 +21,15 @@ import { useOthersTyping } from '@/hooks/use-others-typing'
 import { AUTOSAVE_MS, useSaveOnExit } from '@/hooks/use-save-on-exit'
 import { errorMessage } from '@/lib/errors'
 import { sameJson } from '@/lib/json'
+import { preloadable } from '@/lib/preloadable'
 import { cn } from '@/lib/utils'
 import type { Json } from '@/types/database.types'
 import { learningKeys, updateLesson, type Lesson } from '../api'
 import { useLearning, useToggleDone } from '../hooks'
 
 // The Whiteboard tab brings React Flow: it loads when the tab is opened (or hovered), never with the lesson.
-const loadBoard = () => import('./LessonBoard')
-const LessonBoard = lazy(loadBoard)
+const board = preloadable(() => import('./LessonBoard'))
+const LessonBoard = board.Component
 
 function initialContent(body: Json | null): JSONContent | null {
   if (body && typeof body === 'object' && !Array.isArray(body) && body.type === 'doc') return body as JSONContent
@@ -63,7 +64,7 @@ export default function LessonView({ lesson }: { lesson: Lesson }) {
       return next
     }, { replace: true })
   const prefetchBoard = () => {
-    void loadBoard()
+    void board.preload()
     void queryClient.prefetchQuery(lessonBoardQuery(lesson.id))
   }
 

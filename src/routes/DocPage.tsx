@@ -1,12 +1,13 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
-import { lazy, Suspense } from 'react'
+import { Suspense } from 'react'
 import { useParams } from 'react-router'
 import { Skeleton } from '@/components/ui/skeleton'
 import { documentQuery } from '@/features/docs/api'
 import { useCanEditDocs, useCanWriteDocs } from '@/features/docs/hooks'
+import { docView } from '@/features/docs/screens'
 
-// The editor (TipTap + highlight.js) is only downloaded when a doc is opened.
-const DocView = lazy(() => import('@/features/docs/components/DocView'))
+// The editor (TipTap + highlight.js) is only downloaded when a doc is opened (docLoader starts it with the data).
+const DocView = docView.Component
 
 /**
  * One doc, at /t/:teamSlug/docs/:docId (team view) or …/w/:workspaceId/docs/:docId

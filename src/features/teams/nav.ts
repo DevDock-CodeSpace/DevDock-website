@@ -96,7 +96,7 @@ export function isTeamTool(tool: string): tool is TeamToolId {
   return (TEAM_TOOLS as string[]).includes(tool)
 }
 
-/** Your own notes in the group (private, so not a team tool: there is no workspace view). The code and URL say reminders; the UI says Notes. */
+/** The old Notes page's address; it now redirects to the header's Notes panel (`?note=`). The code and URL say reminders; the UI says Notes. */
 export const remindersPath = (slug: string) => `${teamPath(slug)}/reminders`
 
 /** Group-wide issues: every project's issues in one list. */
@@ -138,6 +138,8 @@ export function getTeamNav(
         ? [{ id: 'issues' as const, title: 'Issues', icon: workspaceTabDefs.issues.icon, to: teamIssuesPath(slug) }]
         : []),
     ],
+    // Not in the sidebar: notes live in the header's panel, and this old address redirects there. Kept for
+    // AppLayout's section names, and because dropping it regroups the build's chunks (+7 KB first load).
     reminders: { title: 'Notes', to: remindersPath(slug), icon: Bookmark },
     members: { title: 'Members', to: `${base}/members`, icon: Users },
     settings: { title: 'Settings', to: `${base}/settings`, icon: Settings },

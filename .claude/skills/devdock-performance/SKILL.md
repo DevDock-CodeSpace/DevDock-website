@@ -75,6 +75,15 @@ would make the app slower, **stop and ask the owner before building it** (see "S
 **Bundle**
 - Anything over about 20 KB gzipped that isn't needed to paint the first screen is lazy-loaded
   (`lazy()` or its own route). Import single icons, never whole libraries.
+- **Lazy screens use `preloadable()`** (`lib/preloadable.ts`), never bare `lazy()`: start the code in the
+  route's loader, side by side with its data (`Promise.all([...data, x.preload()])`), or on hover for a
+  panel or tab. Bare `lazy()` suspends on its first render even when the code has arrived, and React
+  then holds the reveal ~300 ms; measured 2026-10-26, that was most of the wait on docs, whiteboards,
+  issues, lessons, Ask DevDock and Notes (e.g. doc 480 → 165 ms). A lazy panel is also mounted closed on
+  hover, so the click only opens it.
+- **A page's loader starts everything the page reads on its first render**, including the blocks
+  further down (the issue page's comments, activity, PRs and branches were three rounds; now one).
+  Measure clicks in-page (pointerdown → painted), not with Playwright's own waits, which add ~400 ms.
 - `npm run build && npm run perf` must pass: first-load JS <= 345 KB gz, CSS <= 30 KB gz, and the editors,
   diagram, video and highlighter must not appear in the first load. The script prints the numbers.
 - New dependencies need the owner's OK (CLAUDE.md); check their cost with the build before proposing one.

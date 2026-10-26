@@ -35,7 +35,7 @@ type ReminderSectionProps = {
   empty?: ReactNode
 }
 
-/** One section of the Notes page: the caller's notes with one status, a page at a time. */
+/** One section of the Notes panel: the caller's notes with one status, a page at a time. */
 export function ReminderSection({ title, status, teamId, userId, now, highlight, auto, empty }: ReminderSectionProps) {
   const query = useInfiniteQuery(remindersPageQuery(teamId, userId, status))
   if (query.isPending) return <div className="h-24 animate-pulse rounded-md bg-muted/40" aria-label={`Loading ${title.toLowerCase()}`} />
@@ -99,6 +99,14 @@ function ReminderRow({ reminder, now, highlighted }: { reminder: Reminder; now: 
     )
 
   const issueId = reminder.issue && reminder.workspace ? issueIdentifier(reminder.workspace.issue_key, reminder.issue.number) : null
+  const when =
+    reminder.status === 'completed' && reminder.completed_at
+      ? `Done ${formatReminderDay(reminder.completed_at, now).toLowerCase()}`
+      : reminder.status === 'cancelled' && reminder.cancelled_at
+        ? `Archived ${formatReminderDay(reminder.cancelled_at, now).toLowerCase()}`
+        : reminder.remind_at
+          ? formatReminderWhen(reminder.remind_at, now)
+          : ''
 
   return (
     <li
@@ -125,42 +133,41 @@ function ReminderRow({ reminder, now, highlighted }: { reminder: Reminder; now: 
         )}
       </button>
 
-      <button type="button" onClick={() => setEditing(true)} className="min-w-0 flex-1 text-left focus-visible:outline-none">
-        <span className={cn('block truncate text-sm font-medium', !pending && 'text-muted-foreground', reminder.status === 'cancelled' && 'line-through')}>
-          {reminder.title}
-        </span>
-        {reminder.notes && <span className="block truncate text-xs text-muted-foreground">{reminder.notes}</span>}
-      </button>
-
-      <span className="hidden min-w-0 shrink items-center gap-2 pt-0.5 text-xs text-muted-foreground sm:flex">
-        {issueId && reminder.issue && reminder.workspace_id && (
-          <Link
-            to={issuePath(team.slug, reminder.workspace_id, reminder.issue.number)}
-            title={reminder.issue.title}
-            className="inline-flex shrink-0 items-center gap-1 font-mono hover:text-foreground"
-          >
-            <CircleCheckBig className="size-3" /> {issueId}
-          </Link>
+      {/* Stacked for the Notes panel's narrow column: title, then text, then a line of details. */}
+      <div className="min-w-0 flex-1">
+        <button type="button" onClick={() => setEditing(true)} className="block w-full text-left focus-visible:outline-none">
+          <span className={cn('line-clamp-2 text-sm font-medium break-words', !pending && 'text-muted-foreground', reminder.status === 'cancelled' && 'line-through')}>
+            {reminder.title}
+          </span>
+          {reminder.notes && <span className="mt-0.5 line-clamp-2 text-xs break-words text-muted-foreground">{reminder.notes}</span>}
+        </button>
+        {(when || issueId || reminder.workspace) && (
+          <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+            {when && (
+              <span
+                className={cn('font-mono', overdue && 'text-destructive')}
+                title={reminder.remind_at ? new Date(reminder.remind_at).toLocaleString() : undefined}
+              >
+                {when}
+              </span>
+            )}
+            {issueId && reminder.issue && reminder.workspace_id && (
+              <Link
+                to={issuePath(team.slug, reminder.workspace_id, reminder.issue.number)}
+                title={reminder.issue.title}
+                className="inline-flex shrink-0 items-center gap-1 font-mono hover:text-foreground"
+              >
+                <CircleCheckBig className="size-3" /> {issueId}
+              </Link>
+            )}
+            {reminder.workspace && reminder.workspace_id && (
+              <Link to={workspacePath(team.slug, reminder.workspace_id)} className="max-w-40 truncate hover:text-foreground">
+                {reminder.workspace.title}
+              </Link>
+            )}
+          </div>
         )}
-        {reminder.workspace && reminder.workspace_id && (
-          <Link to={workspacePath(team.slug, reminder.workspace_id)} className="max-w-40 truncate hover:text-foreground">
-            {reminder.workspace.title}
-          </Link>
-        )}
-      </span>
-
-      <span
-        className={cn('w-36 shrink-0 pt-0.5 text-right font-mono text-xs', overdue ? 'text-destructive' : 'text-muted-foreground')}
-        title={reminder.remind_at ? new Date(reminder.remind_at).toLocaleString() : undefined}
-      >
-        {reminder.status === 'completed' && reminder.completed_at
-          ? `Done ${formatReminderDay(reminder.completed_at, now).toLowerCase()}`
-          : reminder.status === 'cancelled' && reminder.cancelled_at
-            ? `Archived ${formatReminderDay(reminder.cancelled_at, now).toLowerCase()}`
-            : reminder.remind_at
-              ? formatReminderWhen(reminder.remind_at, now)
-              : ''}
-      </span>
+      </div>
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
