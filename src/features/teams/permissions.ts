@@ -1,9 +1,8 @@
 import {
-  BookOpen,
+  Box,
   Code2,
-  FolderKanban,
+  FolderGit2,
   GraduationCap,
-  LayoutGrid,
   Shapes,
   type LucideIcon,
 } from 'lucide-react'
@@ -59,10 +58,10 @@ export const workspaceTypes: Record<
   /** `noun` is what one is called in copy ("New course"), `plural` heads its sidebar section. */
   { label: string; noun: string; plural: string; hint: string; icon: LucideIcon }
 > = {
-  course: { label: 'Course', noun: 'course', plural: 'Courses', hint: 'Lessons, meetings, docs', icon: BookOpen },
-  project: { label: 'Project', noun: 'project', plural: 'Projects', hint: 'Code, docs, and planning', icon: FolderKanban },
+  course: { label: 'Course', noun: 'course', plural: 'Courses', hint: 'Lessons, meetings, docs', icon: GraduationCap },
+  project: { label: 'Project', noun: 'project', plural: 'Projects', hint: 'Code, docs, and planning', icon: FolderGit2 },
   // The 'general' type is called a "space" in the UI (study groups, clubs, anything else).
-  general: { label: 'Space', noun: 'space', plural: 'Spaces', hint: 'Study groups, discussions, anything else', icon: LayoutGrid },
+  general: { label: 'Space', noun: 'space', plural: 'Spaces', hint: 'Study groups, discussions, anything else', icon: Box },
 }
 
 /**
