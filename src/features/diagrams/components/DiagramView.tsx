@@ -29,9 +29,10 @@ type SaveStatus = 'saved' | 'pending' | 'saving' | 'error'
 /**
  * The diagram page body (lazy-loaded with React Flow): title bar + editor.
  * Writers' changes autosave; leaving flushes the save first. Everyone else
- * gets the same canvas read-only.
+ * gets the same canvas read-only. `embedded` (a lesson's Whiteboard tab) drops the
+ * title bar for a slim status line and fills its parent instead of the window.
  */
-export default function DiagramView({ diagram, canWrite }: { diagram: Diagram; canWrite: boolean }) {
+export default function DiagramView({ diagram, canWrite, embedded = false }: { diagram: Diagram; canWrite: boolean; embedded?: boolean }) {
   const { workspaceId } = useParams()
   const { team } = useCurrentTeam()
   const queryClient = useQueryClient()
@@ -124,7 +125,14 @@ export default function DiagramView({ diagram, canWrite }: { diagram: Diagram; c
     [canWrite, markChanged],
   )
 
-  useEffect(() => () => window.clearTimeout(timer.current), [])
+  // Unmounting with unsaved edits (a lesson's tabs switch without changing the page): save them now.
+  useEffect(
+    () => () => {
+      if (version.current !== savedVersion.current) flush().catch((error: unknown) => toast.error(errorMessage(error), { id: 'diagram-save' }))
+      else window.clearTimeout(timer.current)
+    },
+    [flush],
+  )
 
   // A diagram that changed on the server (someone else, another tab) replaces
   // what's shown here, unless there are unsaved edits.
@@ -185,6 +193,8 @@ export default function DiagramView({ diagram, canWrite }: { diagram: Diagram; c
       window.clearTimeout(timer.current)
       ownWrite('diagrams', diagram.id, 15_000)
       await deleteDiagram(diagram.id)
+      // Nothing left to save: leaving mustn't try to save a deleted whiteboard.
+      savedVersion.current = version.current
       toast.success(`${diagram.title} was deleted`)
       // Leave the page before dropping its data (see useExitTeam for why).
       leaving.current = true
@@ -216,8 +226,13 @@ export default function DiagramView({ diagram, canWrite }: { diagram: Diagram; c
   }, [fullscreen])
 
   return (
-    <div className="flex h-[calc(100svh-3rem)] flex-col">
-      {/* One slim row: back to Files (and the folder) · title · where and when · saved · delete. */}
+    <div className={cn('flex flex-col', embedded ? 'h-full' : 'h-[calc(100svh-3rem)]')}>
+      {embedded ? (
+        <div className="flex h-8 shrink-0 items-center justify-end gap-2 border-b px-3 text-xs text-muted-foreground">
+          {canWrite ? <SaveIndicator status={status} /> : <span className="rounded-sm border px-1.5 py-0.5">View only</span>}
+        </div>
+      ) : (
+      /* One slim row: back to Files (and the folder) · title · where and when · saved · delete. */
       <header className="flex h-12 shrink-0 items-center gap-3 border-b px-3 md:px-4">
         <nav aria-label="Folder path" className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
           <Link to={listPath} className="inline-flex items-center gap-1 rounded-sm hover:text-foreground">
@@ -276,6 +291,7 @@ export default function DiagramView({ diagram, canWrite }: { diagram: Diagram; c
           </div>
         )}
       </header>
+      )}
 
       {lockedBy.length > 0 && (
         <div className="shrink-0 border-b px-3 py-2 md:px-4">

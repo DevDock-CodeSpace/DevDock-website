@@ -347,6 +347,7 @@ export type Database = {
           data: Json
           folder_id: string | null
           id: string
+          lesson_id: string | null
           team_id: string
           title: string
           updated_at: string
@@ -358,6 +359,7 @@ export type Database = {
           data?: Json
           folder_id?: string | null
           id?: string
+          lesson_id?: string | null
           team_id: string
           title: string
           updated_at?: string
@@ -369,6 +371,7 @@ export type Database = {
           data?: Json
           folder_id?: string | null
           id?: string
+          lesson_id?: string | null
           team_id?: string
           title?: string
           updated_at?: string
@@ -388,6 +391,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "doc_folders"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "diagrams_lesson_fkey"
+            columns: ["lesson_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "lessons"
+            referencedColumns: ["id", "workspace_id"]
           },
           {
             foreignKeyName: "diagrams_team_id_fkey"

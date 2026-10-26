@@ -180,7 +180,14 @@ const AFFECTS: Record<string, QueryKey[] | ((change: Change) => QueryKey[])> = {
   workspace_pins: [['workspaces', 'pins']],
   documents: (change) => rowQueries(change, DOC_LISTS, (row) => (id(row.id) ? ['documents', id(row.id)] : undefined), [['documents']], true),
   doc_folders: [['documents', 'folders']],
-  diagrams: (change) => rowQueries(change, DIAGRAM_LISTS, (row) => (id(row.id) ? ['diagrams', id(row.id)] : undefined), [['diagrams']], true),
+  diagrams: (change) => {
+    // A lesson's own whiteboard is in no list: refresh just it (and, when one is made, its lesson's lookup),
+    // or every autosave would refetch Files in every tab.
+    const lesson = id(change.new.lesson_id)
+    const board = id(change.new.id)
+    if (lesson && board) return change.eventType === 'UPDATE' ? [['diagrams', board]] : [['diagrams', 'lesson', lesson], ['diagrams', board]]
+    return rowQueries(change, DIAGRAM_LISTS, (row) => (id(row.id) ? ['diagrams', id(row.id)] : undefined), [['diagrams']], true)
+  },
   issues: issueQueries,
   // The group list carries labels, sprints and project repos with each issue (teamIssuesQuery).
   issue_labels: [['issues', 'labels'], ['issues', 'team']],

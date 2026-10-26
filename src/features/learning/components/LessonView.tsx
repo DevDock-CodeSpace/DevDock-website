@@ -2,11 +2,13 @@ import { useQueryClient } from '@tanstack/react-query'
 import type { JSONContent } from '@tiptap/core'
 import { EditorContent, useEditor } from '@tiptap/react'
 import { ArrowLeft, ArrowRight, Check, ChevronRight } from 'lucide-react'
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router'
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Link, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
+import { DockSpinner } from '@/components/DockSpinner'
 import { OthersTypingAlert } from '@/components/OthersTypingAlert'
 import { Button } from '@/components/ui/button'
+import { lessonBoardQuery } from '@/features/diagrams/api'
 import { adoptContent } from '@/features/docs/editor/adopt'
 import { docExtensions } from '@/features/docs/editor/extensions'
 import { FormatBubble } from '@/features/docs/editor/FormatBubble'
@@ -23,6 +25,10 @@ import { cn } from '@/lib/utils'
 import type { Json } from '@/types/database.types'
 import { learningKeys, updateLesson, type Lesson } from '../api'
 import { useLearning, useToggleDone } from '../hooks'
+
+// The Whiteboard tab brings React Flow: it loads when the tab is opened (or hovered), never with the lesson.
+const loadBoard = () => import('./LessonBoard')
+const LessonBoard = lazy(loadBoard)
 
 function initialContent(body: Json | null): JSONContent | null {
   if (body && typeof body === 'object' && !Array.isArray(body) && body.type === 'doc') return body as JSONContent
@@ -46,6 +52,20 @@ export default function LessonView({ lesson }: { lesson: Lesson }) {
   const previous = ordered[position - 1]
   const next = ordered[position + 1]
   const isDone = done.has(lesson.id)
+  // Lesson | Whiteboard, in the URL so a link can open the board.
+  const [params, setParams] = useSearchParams()
+  const onBoard = params.get('tab') === 'whiteboard'
+  const showTab = (tab: 'lesson' | 'whiteboard') =>
+    setParams((current) => {
+      const next = new URLSearchParams(current)
+      if (tab === 'whiteboard') next.set('tab', 'whiteboard')
+      else next.delete('tab')
+      return next
+    }, { replace: true })
+  const prefetchBoard = () => {
+    void loadBoard()
+    void queryClient.prefetchQuery(lessonBoardQuery(lesson.id))
+  }
 
   // ------------------------------------------------------------ saving (managers)
   // Saves run one after another (an older one can't land on top of a newer one), and
@@ -214,6 +234,38 @@ export default function LessonView({ lesson }: { lesson: Lesson }) {
         <h1 className="mb-6 text-3xl leading-tight font-bold tracking-tight">{lesson.title}</h1>
       )}
 
+      <div role="tablist" aria-label="Lesson views" className="mb-6 flex gap-4 border-b">
+        {(['lesson', 'whiteboard'] as const).map((tab) => {
+          const active = (tab === 'whiteboard') === onBoard
+          return (
+            <button
+              key={tab}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => showTab(tab)}
+              onPointerEnter={tab === 'whiteboard' ? prefetchBoard : undefined}
+              onFocus={tab === 'whiteboard' ? prefetchBoard : undefined}
+              className={cn(
+                '-mb-px border-b-2 pb-2 text-sm transition-colors',
+                active ? 'border-brand font-medium text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {tab === 'lesson' ? 'Lesson' : 'Whiteboard'}
+            </button>
+          )
+        })}
+      </div>
+
+      {onBoard && (
+        <div role="tabpanel" aria-label="Whiteboard" className="h-[calc(100svh-19rem)] min-h-[28rem] overflow-hidden rounded-lg border">
+          <Suspense fallback={<div className="flex h-full items-center justify-center"><DockSpinner label="Loading the whiteboard" /></div>}>
+            <LessonBoard lessonId={lesson.id} lessonTitle={lesson.title} teamId={team.id} workspaceId={workspace.id} canManage={canManage} />
+          </Suspense>
+        </div>
+      )}
+      {/* Hidden, not unmounted, on the Whiteboard tab: the text and its unsaved edits stay put. */}
+      <div role="tabpanel" aria-label="Lesson" hidden={onBoard}>
       <OthersTypingAlert names={lockedBy} />
       {editor && canManage && (
         <>
@@ -229,6 +281,7 @@ export default function LessonView({ lesson }: { lesson: Lesson }) {
           <EditorContent editor={editor} />
         </div>
       )}
+      </div>
 
       <div className="mt-12 flex flex-col gap-4 border-t pt-6">
         <Button
