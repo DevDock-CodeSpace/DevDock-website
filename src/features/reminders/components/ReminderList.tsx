@@ -1,5 +1,5 @@
 import { useInfiniteQuery } from '@tanstack/react-query'
-import { Check, Circle, CircleDot, MoreHorizontal, Pencil, RotateCcw, X } from 'lucide-react'
+import { Check, Circle, CircleCheckBig, MoreHorizontal, Pencil, RotateCcw, X } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { toast } from 'sonner'
@@ -139,7 +139,7 @@ function ReminderRow({ reminder, now, highlighted }: { reminder: Reminder; now: 
             title={reminder.issue.title}
             className="inline-flex shrink-0 items-center gap-1 font-mono hover:text-foreground"
           >
-            <CircleDot className="size-3" /> {issueId}
+            <CircleCheckBig className="size-3" /> {issueId}
           </Link>
         )}
         {reminder.workspace && reminder.workspace_id && (

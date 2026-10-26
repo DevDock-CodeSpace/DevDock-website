@@ -1,5 +1,5 @@
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query'
-import { ChevronDown, CircleDot, LoaderCircle, NotebookPen } from 'lucide-react'
+import { Bookmark, ChevronDown, CircleCheckBig, LoaderCircle } from 'lucide-react'
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -135,7 +135,7 @@ export function ReminderDialog({ reminder, defaults, children, open: controlledO
         <DialogTrigger asChild>
           {children ?? (
             <Button size="sm">
-              <NotebookPen /> New note
+              <Bookmark /> New note
             </Button>
           )}
         </DialogTrigger>
@@ -321,7 +321,7 @@ function IssueField({
     >
       <Button type="button" variant="outline" className="w-full justify-between font-normal">
         <span className="flex min-w-0 items-center gap-2">
-          <CircleDot className="size-4 shrink-0 text-muted-foreground" />
+          <CircleCheckBig className="size-4 shrink-0 text-muted-foreground" />
           <span className={label ? 'truncate' : 'truncate text-muted-foreground'}>{label ?? 'No issue'}</span>
         </span>
         <ChevronDown className="size-4 shrink-0 text-muted-foreground" />

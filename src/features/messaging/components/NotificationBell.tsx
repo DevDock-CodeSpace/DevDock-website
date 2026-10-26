@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AtSign, Bell, MessageCircle, NotebookPen } from 'lucide-react'
+import { AtSign, Bell, Bookmark, MessageCircle } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
@@ -87,7 +87,7 @@ export function NotificationBell() {
               const mention = notification.kind === 'mention'
               const reminder = notification.kind === 'reminder'
               const where = displayName(titleOf(notification.conversation_id))
-              const Icon = reminder ? NotebookPen : mention ? AtSign : MessageCircle
+              const Icon = reminder ? Bookmark : mention ? AtSign : MessageCircle
               return (
                 <li key={notification.id}>
                   <button type="button" onClick={() => void go(notification)} className="flex w-full items-start gap-2.5 px-3 py-2 text-left transition-colors hover:bg-muted">

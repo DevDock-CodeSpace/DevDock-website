@@ -99,10 +99,10 @@ export function AppSidebar({ sidebarWidth }: { sidebarWidth: SidebarWidth }) {
         <SidebarTrigger className="-ml-1 shrink-0 translate-x-1.5 text-muted-foreground group-data-[collapsible=icon]:hidden" />
       </SidebarHeader>
 
-      <SidebarContent className="gap-0">
+      {/* Menu icons a touch larger than the 16 px shadcn default (owner's ask); only the sidebar's items. */}
+      <SidebarContent className="gap-0 [&_[data-sidebar=menu-button]_svg]:size-[18px]">
         <SidebarGroup className="pb-0">
           <SidebarMenu>
-            <NavLinkItem item={nav.home} onNavigate={close} />
             <NavLinkItem item={nav.messages} onNavigate={close} badge={unreadMessages} />
             {nav.tools.map((item) => (
               <NavLinkItem key={item.id} item={item} onNavigate={close} />

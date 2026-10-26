@@ -1,8 +1,9 @@
 import { useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
-import { ChevronRight, MessageCircle, Search } from 'lucide-react'
-import { lazy, Suspense, useCallback, useMemo, useState } from 'react'
+import { ChevronRight, MessageCircle, Plus, Search } from 'lucide-react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { DockSpinner } from '@/components/DockSpinner'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useAuth } from '@/features/auth/hooks'
 import { teamMembersQuery } from '@/features/teams/api'
@@ -15,6 +16,7 @@ import {
 import { ConversationItem } from '@/features/messaging/components/ConversationItem'
 import { NewConversationDialog } from '@/features/messaging/components/NewConversationDialog'
 import { useUnread } from '@/features/messaging/hooks'
+import { readLastConversation, rememberConversation } from '@/features/messaging/lastConversation'
 import { useCollapsedSections } from '@/features/messaging/useCollapsedSections'
 import { conversationTitle, displayName } from '@/features/messaging/names'
 import { ownWrite } from '@/lib/realtime'
@@ -35,7 +37,10 @@ export function MessagesPage() {
   const [search, setSearch] = useState('')
   // The open conversation (and a message to scroll to) live in the URL, so links to a message work.
   const [params, setParams] = useSearchParams()
-  const selectedId = params.get('c') ?? undefined
+  // The link's conversation, else the one you last had open here (never one picked for you, like #general).
+  const [lastId] = useState(() => readLastConversation(team.id))
+  const selectedId = params.get('c') ?? lastId ?? undefined
+  const [newOpen, setNewOpen] = useState(false)
   const targetMessageId = params.get('m') ?? undefined
   const select = useCallback(
     (conversationId: string, messageId?: string) =>
@@ -69,7 +74,12 @@ export function MessagesPage() {
     { kind: 'dm', label: 'Direct messages', items: visible.filter((conversation) => conversation.kind === 'dm') },
     { kind: 'group', label: 'Groups', items: visible.filter((conversation) => conversation.kind === 'group') },
   ].filter((section) => section.items.length > 0)
-  const selected = conversations.find((conversation) => conversation.id === selectedId) ?? visible[0] ?? conversations[0]
+  const selected = conversations.find((conversation) => conversation.id === selectedId)
+  useEffect(() => {
+    if (selected) rememberConversation(team.id, selected.id)
+  }, [selected, team.id])
+  // Nobody to talk to yet (a new account or a new member): explain how to start, not just "pick one".
+  const firstTime = !conversations.some((conversation) => conversation.kind !== 'channel')
 
   return (
     <div className="flex h-[calc(100svh-3rem)] min-h-96 flex-col overflow-hidden bg-background lg:flex-row">
@@ -79,7 +89,7 @@ export function MessagesPage() {
             <h1 className="text-sm font-semibold">Chat</h1>
             <p className="truncate text-xs text-muted-foreground">{team.name}</p>
           </div>
-          <NewConversationDialog teamId={team.id} people={people} canCreateChannel={can.isAdmin} onCreated={(id) => {
+          <NewConversationDialog teamId={team.id} people={people} canCreateChannel={can.isAdmin} open={newOpen} onOpenChange={setNewOpen} onCreated={(id) => {
               select(id)
               // The list, who is in what, and the unread counts; not every open conversation's messages. Its own echo is dropped.
               for (const table of ['conversations', 'conversation_members']) ownWrite(table, id)
@@ -166,8 +176,29 @@ export function MessagesPage() {
             />
           </Suspense>
         ) : (
-          <div className="flex h-full items-center justify-center p-8 text-center text-sm text-muted-foreground">
-            <div><MessageCircle className="mx-auto mb-2 size-8" /><p>Select a conversation to start messaging.</p></div>
+          <div className="flex h-full items-center justify-center p-8 text-center">
+            {firstTime ? (
+              <div className="max-w-sm">
+                <MessageCircle className="mx-auto mb-3 size-8 text-muted-foreground" />
+                <h2 className="text-base font-semibold">Start a conversation</h2>
+                <ol className="mt-3 space-y-1.5 text-left text-sm text-muted-foreground">
+                  <li>1. Press <span className="font-medium text-foreground">New conversation</span> (or the + above the list).</li>
+                  <li>2. Pick one person for a direct message, or several for a group.</li>
+                  <li>3. Write your message. Only the people in it can read it.</li>
+                </ol>
+                <p className="mt-3 text-left text-sm text-muted-foreground">
+                  <span className="font-medium text-foreground">#general</span> is for everyone in {team.name}.
+                </p>
+                <Button className="mt-5" onClick={() => setNewOpen(true)}>
+                  <Plus /> New conversation
+                </Button>
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground">
+                <MessageCircle className="mx-auto mb-2 size-8" />
+                <p>Pick a conversation on the left, or press + to start one.</p>
+              </div>
+            )}
           </div>
         )}
       </section>
