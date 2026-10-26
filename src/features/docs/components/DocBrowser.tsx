@@ -29,6 +29,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { useAuth } from '@/features/auth/hooks'
 import { useCollectionView } from '@/features/collections/hooks'
 import type { DiagramSummary } from '@/features/diagrams/api'
 import { CreateDiagramDialog } from '@/features/diagrams/components/CreateDiagramDialog'
@@ -56,11 +57,15 @@ import {
 } from '../dragDrop'
 import { folderPath, folderSubtree } from '../folders'
 import { useCanWriteDocs } from '../hooks'
+import type { FileAccess } from '../sharing'
 import { useSelection } from '../useSelection'
+import { AccessChoice } from './AccessChoice'
 import { CreateDocDialog } from './CreateDocDialog'
 import { FileRowActions } from './FileRowActions'
 import { FILE_HEADER, FILE_ROW } from './fileGrid'
 import { MoveDocDialog } from './MoveDocDialog'
+import { RestrictedMark } from './RestrictedMark'
+import { ShareDialog } from './ShareDialog'
 
 /** Hovering a folder this long while dragging opens it (like a file manager), so you can drop deeper. */
 const SPRING_LOAD_MS = 800
@@ -206,7 +211,11 @@ export function DocBrowser({
     setSort((s) => (s.by === by ? { by, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { by, dir: by === 'name' ? 'asc' : 'desc' }))
 
   // ------------------------------------------------------------ dialogs
+  const { user } = useAuth()
   const [naming, setNaming] = useState<{ mode: 'create' } | { mode: 'rename'; folder: DocFolder } | null>(null)
+  // Who can open a new folder (chosen in the New folder dialog), and the folder being shared.
+  const [folderAccess, setFolderAccess] = useState<FileAccess>('place')
+  const [sharingFolder, setSharingFolder] = useState<DocFolder | null>(null)
   const [moving, setMoving] = useState<DragItems | null>(null)
   const [deleting, setDeleting] = useState<DocFolder | null>(null)
   const [busy, setBusy] = useState(false)
@@ -505,7 +514,7 @@ export function DocBrowser({
                     )}
                     {canNewFolder && (canNewDoc || canNewDiagram) && <DropdownMenuSeparator />}
                     {canNewFolder && (
-                      <DropdownMenuItem onSelect={() => setNaming({ mode: 'create' })}>
+                      <DropdownMenuItem onSelect={() => { setFolderAccess('place'); setNaming({ mode: 'create' }) }}>
                         <FolderPlus /> Folder
                       </DropdownMenuItem>
                     )}
@@ -573,7 +582,8 @@ export function DocBrowser({
                     >
                       {folder.name}
                     </button>
-                    <span className="truncate text-xs text-muted-foreground">
+                    <span className="flex min-w-0 items-center gap-1 truncate text-xs text-muted-foreground">
+                      {folder.access === 'restricted' && <RestrictedMark />}
                       {searching ? `in ${placeOf(folder.parent_id)}` : summary(folder)}
                     </span>
                   </span>
@@ -584,6 +594,7 @@ export function DocBrowser({
                   <span className="hidden justify-self-end md:block">
                     {canWrite && (
                       <RowMenu label={`${folder.name} actions`}>
+                        <DropdownMenuItem onSelect={() => setSharingFolder(folder)}>Share…</DropdownMenuItem>
                         <DropdownMenuItem onSelect={() => setNaming({ mode: 'rename', folder })}>Rename</DropdownMenuItem>
                         <DropdownMenuItem onSelect={() => setMoving({ docIds: [], diagramIds: [], folderIds: [folder.id] })}>Move to…</DropdownMenuItem>
                         <DropdownMenuItem variant="destructive" onSelect={() => setDeleting(folder)}>
@@ -623,7 +634,8 @@ export function DocBrowser({
                     >
                       {item.title}
                     </Link>
-                    <span className="truncate text-xs text-muted-foreground">
+                    <span className="flex min-w-0 items-center gap-1 truncate text-xs text-muted-foreground">
+                      {item.access === 'restricted' && <RestrictedMark />}
                       {row.kind === 'doc' ? 'Doc' : 'Whiteboard'}
                       {searching && ` · in ${placeOf(item.folder_id)}`}
                     </span>
@@ -634,7 +646,7 @@ export function DocBrowser({
                   </span>
                   <span className="text-right font-mono text-xs text-muted-foreground">{timeAgo(item.updated_at, now)}</span>
                   <span className="hidden justify-self-end md:block">
-                    {canWrite && <FileRowActions kind={row.kind} item={item} folders={folders} />}
+                    {(canWrite || item.created_by === user.id) && <FileRowActions kind={row.kind} item={item} folders={folders} canWrite={canWrite} />}
                   </span>
                 </li>
               )
@@ -664,10 +676,15 @@ export function DocBrowser({
         placeholder="Week 1"
         onSubmit={async (name) => {
           if (naming?.mode === 'rename') await renameFolder(naming.folder.id, name)
-          else await createFolder({ teamId, workspaceId, parentId: current?.id ?? null, name })
+          else await createFolder({ teamId, workspaceId, parentId: current?.id ?? null, name, access: folderAccess })
           await refresh()
         }}
-      />
+      >
+        {naming?.mode === 'create' && <AccessChoice value={folderAccess} onChange={setFolderAccess} placeName={rootName} />}
+      </NameDialog>
+      {sharingFolder && (
+        <ShareDialog kind="folder" item={{ ...sharingFolder, title: sharingFolder.name }} open onOpenChange={(o) => !o && setSharingFolder(null)} />
+      )}
       <MoveDocDialog
         key={moving ? `move-${[...moving.docIds, ...moving.diagramIds, ...moving.folderIds].join(',')}` : 'move-closed'}
         open={moving !== null}

@@ -9,7 +9,7 @@ import { cycleLoader, issueLoader, issuesLoader } from '@/features/issues/loader
 import { lessonLoader } from '@/features/learning/loaders'
 import { liveSessionLoader } from '@/features/live/loaders'
 import { githubCallbackLoader } from '@/features/repos/loaders'
-import { appIndexLoader, onboardingLoader, teamLoader, workspaceLoader } from '@/features/teams/loaders'
+import { appIndexLoader, onboardingLoader, teamLoader, teamStartLoader, workspaceLoader } from '@/features/teams/loaders'
 import { AppLayout } from '@/layouts/AppLayout'
 import { APP_ROUTE_ID, appLoader } from '@/layouts/app-loader'
 import { queryClient } from '@/lib/query-client'
@@ -108,6 +108,8 @@ export const router = createBrowserRouter([
               { index: true, element: <TeamWorkspacesPage /> },
               // The open conversation's view (TipTap composer) starts downloading with the page, so it renders at once.
               { path: 'messages', handle: FULL_BLEED, loader: () => { void conversationView.preload(); return null }, element: <MessagesPage /> },
+              // Where the group opens (after sign-in, or switching group or collection): its loader redirects.
+              { path: 'start', loader: teamStartLoader },
               { path: 'members', element: <TeamMembersPage /> },
               { path: 'settings', element: <TeamSettingsPage /> },
               // Team → Files (URL docs): group-wide docs and diagrams + those of every workspace the user can see.

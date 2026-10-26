@@ -36,6 +36,7 @@ import { FileLinkPicker } from '../editor/FileLinkPicker'
 import { InsertMenu } from '../editor/InsertMenu'
 import { docContentClass } from '../editor/styles'
 import { DocScope } from './DocScope'
+import { ShareButton } from './ShareButton'
 
 const AUTOSAVE_MS = 800
 
@@ -290,9 +291,11 @@ export default function DocView({ doc, canEdit, canDelete }: { doc: Doc; canEdit
             </>
           )}
         </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {canEdit && <SaveIndicator status={status} />}
+          <ShareButton kind="doc" item={doc} />
         {canEdit && (
-          <div className="flex shrink-0 items-center gap-2">
-            <SaveIndicator status={status} />
+          <>
             {canDelete && (
               <Button
                 variant="ghost"
@@ -304,8 +307,9 @@ export default function DocView({ doc, canEdit, canDelete }: { doc: Doc; canEdit
                 <Trash2 />
               </Button>
             )}
-          </div>
+          </>
         )}
+        </div>
       </div>
 
       {canEdit ? (

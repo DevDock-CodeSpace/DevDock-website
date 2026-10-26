@@ -198,6 +198,8 @@ const AFFECTS: Record<string, QueryKey[] | ((change: Change) => QueryKey[])> = {
   issue_views: [['issues', 'views'], ['issues', 'pins']],
   issue_pins: [['issues', 'pins']],
   issue_pull_requests: [['issues', 'pull-requests']],
+  // Shared with someone, or unshared: their Files (docs, whiteboards, folders) and the Share dialog.
+  file_shares: [['documents'], ['diagrams'], ['file-shares']],
   issue_branches: [['issues', 'branches']],
   repos: [['repos', 'team'], ['repos', 'workspace'], ['issues', 'team']],
   workspace_repos: [['repos', 'team'], ['repos', 'workspace'], ['issues', 'team']],

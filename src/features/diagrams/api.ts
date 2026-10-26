@@ -1,5 +1,6 @@
 import { queryOptions } from '@tanstack/react-query'
 import type { DocSummary } from '@/features/docs/api'
+import type { FileAccess } from '@/features/docs/sharing'
 import { requireAffected, toDataError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
 import type { Json } from '@/types/database.types'
@@ -11,11 +12,15 @@ import type { Json } from '@/types/database.types'
 /** The same shape as a doc summary, so the doc browser, list and scope components render diagrams too. */
 export type DiagramSummary = DocSummary
 /** `data` is the editor JSON ({ nodes, edges }); parsed by the editor. */
-export type Diagram = DiagramSummary & { data: Json }
+export type Diagram = DiagramSummary & {
+  data: Json
+  /** The caller's level on it (public.access_level): 1 view, 2 edit (shared as an editor), 3 the usual role rules. */
+  access_level: number
+}
 
 // `data` is left out of lists; it can be large.
 const SUMMARY =
-  'id, team_id, workspace_id, folder_id, title, created_at, updated_at, author:profiles!diagrams_created_by_fkey(display_name, avatar_url), workspace:workspaces!diagrams_workspace_team_fkey(id, title, type)'
+  'id, team_id, workspace_id, folder_id, title, created_at, updated_at, access, created_by, author:profiles!diagrams_created_by_fkey(display_name, avatar_url), workspace:workspaces!diagrams_workspace_team_fkey(id, title, type)'
 
 const writeErrors = { '42501': 'You don’t have permission to change whiteboards here.' }
 
@@ -45,9 +50,11 @@ export const diagramQuery = (diagramId: string) =>
     queryFn: async (): Promise<Diagram | null> => {
       const { data, error } = await supabase
         .from('diagrams')
-        .select(`${SUMMARY}, data`)
+        .select(`${SUMMARY}, data, access_level`)
         .eq('id', diagramId)
         .maybeSingle()
+        // access_level is a computed column (public.access_level); the generated types can't see it.
+        .overrideTypes<Diagram, { merge: false }>()
       if (error) throw toDataError('load the whiteboard', error)
       return data
     },
@@ -62,6 +69,7 @@ export async function createDiagram(input: {
   title: string
   /** Create it inside this folder (same scope). */
   folderId?: string | null
+  access?: FileAccess
 }): Promise<{ id: string }> {
   const { data, error } = await supabase
     .from('diagrams')
@@ -70,6 +78,7 @@ export async function createDiagram(input: {
       workspace_id: input.workspaceId,
       title: input.title.trim(),
       folder_id: input.folderId ?? null,
+      access: input.access ?? 'place',
     })
     .select('id')
     .single()
