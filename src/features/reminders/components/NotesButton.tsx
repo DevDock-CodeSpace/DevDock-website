@@ -1,11 +1,16 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { Bookmark } from 'lucide-react'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { useAuth } from '@/features/auth/hooks'
+import { useCurrentTeam } from '@/features/teams/hooks'
+import { remindersPageQuery } from '../api'
 
-// The panel (and the notes it lists) loads the first time it is opened, so the header carries only this button.
-const NotesPanel = lazy(() => import('./NotesPanel'))
+// The panel (and the notes it lists) loads only when wanted, so the header carries only this button.
+const loadPanel = () => import('./NotesPanel')
+const NotesPanel = lazy(loadPanel)
 
 /** How long a note opened from its notification stays outlined. */
 const HIGHLIGHT_MS = 2500
@@ -21,6 +26,18 @@ export function NotesButton() {
   const [highlight, setHighlight] = useState<string | null>(null)
   const [params, setParams] = useSearchParams()
   const asked = params.get('note')
+  const queryClient = useQueryClient()
+  const { team } = useCurrentTeam()
+  const { user } = useAuth()
+  // Pointing at the button loads the panel's code and its first two lists and mounts it (closed), so
+  // the click only opens it. Mounting on the click itself made the first open wait ~0.8 s for the lazy
+  // component to be revealed, with everything already downloaded. Cached afterwards: further hovers cost nothing.
+  const warmUp = () => {
+    setLoaded(true)
+    void loadPanel()
+    void queryClient.prefetchInfiniteQuery(remindersPageQuery(team.id, user.id, 'pending'))
+    void queryClient.prefetchInfiniteQuery(remindersPageQuery(team.id, user.id, 'completed'))
+  }
 
   // A new ?note= opens the panel straight away (set while rendering, not in an effect)…
   const [handled, setHandled] = useState<string | null>(null)
@@ -51,6 +68,8 @@ export function NotesButton() {
             size="sm"
             className="text-muted-foreground"
             aria-label="Notes"
+            onPointerEnter={warmUp}
+            onFocus={warmUp}
             onClick={() => {
               setLoaded(true)
               setOpen(true)
