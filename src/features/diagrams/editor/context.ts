@@ -19,6 +19,6 @@ export const DiagramEditorContext = createContext<DiagramEditorContextValue | nu
 
 export function useDiagramEditor() {
   const context = useContext(DiagramEditorContext)
-  if (!context) throw new Error('useDiagramEditor must be used inside the diagram editor.')
+  if (!context) throw new Error('useDiagramEditor must be used inside the whiteboard editor.')
   return context
 }

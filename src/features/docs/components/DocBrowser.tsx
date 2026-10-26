@@ -11,7 +11,7 @@ import {
   MoreHorizontal,
   Plus,
   Search,
-  Workflow,
+  Presentation,
   X,
   type LucideIcon,
 } from 'lucide-react'
@@ -370,7 +370,7 @@ export function DocBrowser({
       dragging.items.diagramIds.map(diagramKey).includes(key) ||
       dragging.items.folderIds.map(folderKey).includes(key))
 
-  /** "3 docs · 2 diagrams · 1 folder": what a folder holds directly ("Empty" only when it holds nothing). */
+  /** "3 docs · 2 whiteboards · 1 folder": what a folder holds directly ("Empty" only when it holds nothing). */
   const summary = (folder: DocFolder) => {
     const inside = rowsOf(folder.id)
     const parts = [
@@ -500,7 +500,7 @@ export function DocBrowser({
                     )}
                     {canNewDiagram && (
                       <DropdownMenuItem onSelect={() => setCreating('diagram')}>
-                        <Workflow /> Diagram
+                        <Presentation /> Whiteboard
                       </DropdownMenuItem>
                     )}
                     {canNewFolder && (canNewDoc || canNewDiagram) && <DropdownMenuSeparator />}
@@ -613,7 +613,7 @@ export function DocBrowser({
                   onDragEnd={endDrag}
                   className={cn(FILE_ROW, selection.has(key) && 'bg-brand/5', isDragged(key) && 'opacity-40')}
                 >
-                  {lead(key, row.kind === 'doc' ? FileText : Workflow, item.title, 'text-muted-foreground')}
+                  {lead(key, row.kind === 'doc' ? FileText : Presentation, item.title, 'text-muted-foreground')}
                   <span className="flex min-w-0 flex-col">
                     <Link
                       to={row.kind === 'doc' ? docHref(row.item) : diagramHref(row.item)}
@@ -624,7 +624,7 @@ export function DocBrowser({
                       {item.title}
                     </Link>
                     <span className="truncate text-xs text-muted-foreground">
-                      {row.kind === 'doc' ? 'Doc' : 'Diagram'}
+                      {row.kind === 'doc' ? 'Doc' : 'Whiteboard'}
                       {searching && ` · in ${placeOf(item.folder_id)}`}
                     </span>
                   </span>
@@ -657,7 +657,7 @@ export function DocBrowser({
         description={
           naming?.mode === 'rename'
             ? 'Everyone who can see what’s inside sees the new name.'
-            : `In ${current?.name ?? rootName}. Folders hold docs and diagrams, and can be nested ${MAX_FOLDER_DEPTH} levels deep.`
+            : `In ${current?.name ?? rootName}. Folders hold docs and whiteboards, and can be nested ${MAX_FOLDER_DEPTH} levels deep.`
         }
         initialName={naming?.mode === 'rename' ? naming.folder.name : ''}
         submitLabel={naming?.mode === 'rename' ? 'Rename' : 'Create folder'}
@@ -691,7 +691,7 @@ export function DocBrowser({
                 [
                   [toDelete.size - 1, 'folder'] as const,
                   [docsToDelete.length, 'doc'] as const,
-                  [diagramsToDelete.length, 'diagram'] as const,
+                  [diagramsToDelete.length, 'whiteboard'] as const,
                 ]
                   .filter(([n]) => n > 0)
                   .map(([n, word]) => plural(n, word)),
