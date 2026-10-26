@@ -120,14 +120,13 @@ export const router = createBrowserRouter([
               // Group → Live: video sessions (Jitsi via JaaS) for the group and its workspaces.
               { path: 'live', element: <TeamLivePage /> },
               { path: 'live/:sessionId', loader: liveSessionLoader, lazy: async () => ({ Component: (await import('@/routes/LiveSessionPage')).LiveSessionPage }) },
-              // Your own reminders in this group (private; not a workspace tool).
-              // Loader and page are separate lazy chunks, fetched side by side on the first visit.
+              // Notes live in the header's panel; the old page's address (bookmarks, older notifications)
+              // opens it on Chat, at the note it named.
               {
                 path: 'reminders',
-                lazy: {
-                  loader: async () => (await import('@/features/reminders/loaders')).remindersLoader,
-                  Component: async () => (await import('@/routes/team/RemindersPage')).RemindersPage,
-                },
+                loader: ({ params, request }) =>
+                  // The path is spelled out: importing nav.ts here regroups the main chunk (+6 KB first load).
+                  redirect(`/t/${params.teamSlug ?? ''}/messages?note=${new URL(request.url).searchParams.get('r') ?? 'open'}`),
               },
               {
                 // Visible to team owners/admins and workspace members (workspaceLoader + RLS).

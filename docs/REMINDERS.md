@@ -10,8 +10,8 @@ Built 2026-10-18, with Ask DevDock tools (see [Ask DevDock](#ask-devdock)).
 
 | Question | Decision | Why |
 |---|---|---|
-| Where it lives | A sidebar item under the group tools (`/t/:teamSlug/reminders`), not a workspace tab and not in `TEAM_TOOLS` | Team tools are shared views of the same data at two levels; reminders are private and have no workspace view |
-| Collection view | Not narrowed: the page shows all of your reminders in the group | Personal, like Messages. A reminder about a workspace in another collection is still yours |
+| Where it lives | Only the header's **Notes** panel (`NotesButton` → lazy `NotesPanel`): no sidebar item and no page since 2026-10-26 (owner's choice: a whole page was too much for a note). `/t/:teamSlug/reminders` redirects to Chat with the panel open (`?note=`) | Notes are quick and personal; the panel is one click from anywhere and keeps your place |
+| Collection view | Not narrowed: the panel shows all of your notes in the group | Personal, like Messages. A reminder about a workspace in another collection is still yours |
 | Who can read them | Only the owner. Group owners and admins can't | They're notes to self |
 | Delete | No delete; cancel instead. Leaving the group deletes your reminders in it | Keeps the history; nothing dangling after you leave |
 | Editing a reminder that already fired | Moving it to a later time lets it fire again (a snooze). Other edits don't re-fire it | Snoozing is the common need; nothing extra to track |
@@ -83,7 +83,7 @@ The function is `security definer` with `execute` revoked from every client role
 `notificationsQuery` embeds `reminder:reminders(title, workspace_id, issue:issues(number))`, in the same single request as before. A reminder notification shows its title and "Reminder · <when>". Clicking it marks it read and opens:
 
 1. the issue (`…/w/:workspaceId/issues/:number`) when the reminder has one the person can still open;
-2. otherwise `…/reminders?r=<id>`, which outlines that row for a moment.
+2. otherwise the Notes panel, on the page you're on (`?note=<id>`, read and dropped by `NotesButton`), which outlines that note for a moment.
 
 The bell is not a toast: a reminder that fires while you're looking raises the badge count (Realtime refetches the bell). Browser or system notifications are not built.
 
