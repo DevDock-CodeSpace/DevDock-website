@@ -143,7 +143,7 @@ supabase/
 - **Routes.**
   - Public: `/login`, `/admin-login` (the admin account's password sign-in; both lazy routes drawn by `AuthShell`: a showcase of the app on the left on wide screens, made of plain markup, and the sign-in column), `/auth/callback`, `/privacy` (privacy policy for Google's consent screen; keep it matching what the app stores).
   - Authenticated (under route id `app`):
-    - `/app` redirects to the last-used team's **Chat** (`chatPath`), or to `/onboarding` when the user has none. Switching group (`TeamSwitcher`), creating or joining one and leaving one land on Chat too; picking a collection opens its workspace list. There is no Home item in the sidebar (owner's choice, 2026-10-25): the workspace list at `/t/:teamSlug` is reached from the sidebar's section titles ("Projects · 5").
+    - `/app` redirects to the last-used team's **start** page (`/t/:teamSlug/start`, `teamStartLoader`), or to `/onboarding` when the user has none. The start route picks the page (`landingPath` in `features/teams/landing.ts`, owner's rule 2026-10-26): when the collection in view (else the group) is **learning**, the course you last opened, on its Learning tab, else the first course; otherwise, or with no course, **Chat**. Switching group or collection (`TeamSwitcher`), creating or joining a group and leaving one all go through it. It reads the shell's cached workspace list (`teamContentsQuery`), so it adds no request. There is no Home item in the sidebar (owner's choice, 2026-10-25): the workspace list at `/t/:teamSlug` is reached from the sidebar's section titles ("Projects · 5").
     - `/onboarding`
     - `/github/callback` (back from installing the GitHub App).
     - `/t/:teamSlug` (the team's workspaces), plus `members` and `settings`.

@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuth, useSignOut, useUserIdentity } from '@/features/auth/hooks'
 import { createTeam, joinTeam, myTeamsQuery, SLUG_PATTERN, type TeamType } from '@/features/teams/api'
-import { chatPath } from '@/features/teams/nav'
+import { startPath } from '@/features/teams/landing'
 import { teamTypes } from '@/features/teams/permissions'
 import { slugify } from '@/features/teams/slug'
 import { cn } from '@/lib/utils'
@@ -136,7 +136,7 @@ function CreateTeamForm() {
     mutationFn: () => createTeam({ name, slug: effectiveSlug, type }),
     onSuccess: async (team) => {
       await queryClient.invalidateQueries({ queryKey: ['teams'] })
-      navigate(chatPath(team.slug))
+      navigate(startPath(team.slug))
     },
   })
 
@@ -241,7 +241,7 @@ function JoinTeamForm() {
       await queryClient.invalidateQueries({ queryKey: ['teams'] })
       const memberships = await queryClient.fetchQuery(myTeamsQuery(user.id))
       const joined = memberships.find((m) => m.team.id === teamId)
-      navigate(joined ? chatPath(joined.team.slug) : '/app')
+      navigate(joined ? startPath(joined.team.slug) : '/app')
     },
   })
 

@@ -93,6 +93,8 @@ const teamContents = (teamId: string) => ({
     return { workspaces, collections }
   },
 })
+/** The raw entry behind both queries below, for loaders: `ensureQueryData` returns it without `select`. */
+export const teamContentsQuery = (teamId: string) => teamContents(teamId)
 const pickWorkspaces = (contents: TeamContents) => contents.workspaces
 const pickCollections = (contents: TeamContents) => contents.collections
 
