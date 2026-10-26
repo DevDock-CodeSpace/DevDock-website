@@ -1,7 +1,8 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
-import { ChevronRight, Pin, Plus } from 'lucide-react'
+import { ChevronRight, Pin } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { Link, matchPath, useLocation, useParams } from 'react-router'
+import { AddIcon, CourseIcon, ProjectIcon, SpaceIcon } from '@/components/fluent-icons'
 import { TruncatedText } from '@/components/TruncatedText'
 import { cn } from '@/lib/utils'
 import {
@@ -37,6 +38,8 @@ import { pickSidebarItems } from '@/features/workspaces/recent'
 
 // Active item: accent background (from shadcn) + DevDock-blue icon.
 const activeIcon = 'data-active:[&_svg]:text-brand'
+// Teams' (Fluent) icons for the workspace types, here only; the rest of the app keeps lucide's.
+const typeIcon = { course: CourseIcon, project: ProjectIcon, general: SpaceIcon }
 
 /**
  * The sidebar is the hierarchy: team → its workspaces, grouped by workspace
@@ -132,7 +135,7 @@ export function AppSidebar({ sidebarWidth }: { sidebarWidth: SidebarWidth }) {
               <SidebarMenu>
                 {shown.map((workspace) => {
                   const to = workspacePath(team.slug, workspace.id)
-                  const Icon = workspaceTypes[workspace.type].icon
+                  const Icon = typeIcon[workspace.type]
                   const pinned = isPinned(workspace.id)
                   return (
                     <SidebarMenuItem key={workspace.id}>
@@ -183,7 +186,7 @@ export function AppSidebar({ sidebarWidth }: { sidebarWidth: SidebarWidth }) {
                   <CreateWorkspaceDialog
                     trigger={
                       <SidebarMenuButton tooltip="New" className="text-muted-foreground">
-                        <Plus />
+                        <AddIcon />
                         <span>New</span>
                       </SidebarMenuButton>
                     }

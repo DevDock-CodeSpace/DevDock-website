@@ -5,23 +5,23 @@ import {
   Files,
   GitPullRequest,
   LayoutDashboard,
-  MessageSquare,
-  NotebookPen,
-  Settings,
   Shapes,
   Users,
   Video,
   Presentation,
   type LucideIcon,
 } from 'lucide-react'
+import type { ComponentType } from 'react'
 import { matchPath } from 'react-router'
+import { ChatIcon, FilesIcon, IssuesIcon, MeetingsIcon, MembersIcon, NotesIcon, SettingsIcon } from '@/components/fluent-icons'
 import type { TeamType } from '@/features/teams/api'
 import type { WorkspaceModule, WorkspaceType } from '@/features/workspaces/api'
 
 export type NavItem = {
   title: string
   to: string
-  icon: LucideIcon
+  /** A lucide icon, or one of the sidebar's Fluent icons (components/fluent-icons). */
+  icon: ComponentType<{ className?: string }>
   /** Match the path exactly (for index routes). */
   end?: boolean
   /** Another path that counts as being here (Files: a diagram's page, …/diagrams/<id>). */
@@ -110,6 +110,8 @@ export function hasTeamIssues(type: TeamType, workspaces: readonly { type: Works
   return type === 'development' || workspaces.some((w) => w.type === 'project')
 }
 
+const SIDEBAR_TOOL_ICONS: Record<TeamToolId, NavItem['icon']> = { docs: FilesIcon, diagrams: FilesIcon, live: MeetingsIcon }
+
 /**
  * Sidebar team links: Chat + team tools on top (plus Issues below Meetings
  * when `issues` is set, see hasTeamIssues, then your Reminders), then the
@@ -127,20 +129,22 @@ export function getTeamNav(
 } {
   const base = teamPath(slug)
   return {
-    messages: { title: 'Chat', to: `${base}/messages`, icon: MessageSquare },
+    messages: { title: 'Chat', to: `${base}/messages`, icon: ChatIcon },
     tools: [
       ...TEAM_TOOLS.map((id) => ({
         id,
-        ...(id === 'docs' ? { ...FILES_TAB, also: `${base}/diagrams` } : { title: workspaceTabDefs[id].title, icon: workspaceTabDefs[id].icon }),
+        ...(id === 'docs' ? { ...FILES_TAB, also: `${base}/diagrams` } : { title: workspaceTabDefs[id].title }),
+        // The sidebar uses Teams' (Fluent) icons; the workspace tabs keep lucide's.
+        icon: SIDEBAR_TOOL_ICONS[id],
         to: `${base}/${id}`,
       })),
       ...(issues
-        ? [{ id: 'issues' as const, title: 'Issues', icon: workspaceTabDefs.issues.icon, to: teamIssuesPath(slug) }]
+        ? [{ id: 'issues' as const, title: 'Issues', icon: IssuesIcon, to: teamIssuesPath(slug) }]
         : []),
     ],
-    reminders: { title: 'Notes', to: remindersPath(slug), icon: NotebookPen },
-    members: { title: 'Members', to: `${base}/members`, icon: Users },
-    settings: { title: 'Settings', to: `${base}/settings`, icon: Settings },
+    reminders: { title: 'Notes', to: remindersPath(slug), icon: NotesIcon },
+    members: { title: 'Members', to: `${base}/members`, icon: MembersIcon },
+    settings: { title: 'Settings', to: `${base}/settings`, icon: SettingsIcon },
   }
 }
 
