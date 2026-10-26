@@ -1,12 +1,13 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { Bookmark } from 'lucide-react'
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useAuth } from '@/features/auth/hooks'
 import { useCurrentTeam } from '@/features/teams/hooks'
 import { remindersPageQuery } from '../api'
+import { onOpenNotes } from '../openNotes'
 
 // The panel (and the notes it lists) loads only when wanted, so the header carries only this button.
 const loadPanel = () => import('./NotesPanel')
@@ -24,6 +25,8 @@ export function NotesButton() {
   const [open, setOpen] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const [highlight, setHighlight] = useState<string | null>(null)
+  // Opened by DevDock (a note's time came) rather than by a click: see NotesPanel's `quiet`.
+  const [quiet, setQuiet] = useState(false)
   const [params, setParams] = useSearchParams()
   const asked = params.get('note')
   const queryClient = useQueryClient()
@@ -45,6 +48,7 @@ export function NotesButton() {
     setHandled(asked)
     setLoaded(true)
     setOpen(true)
+    setQuiet(false)
     setHighlight(asked === 'open' ? null : asked)
   }
   // …and the parameter is then taken out of the address.
@@ -52,6 +56,23 @@ export function NotesButton() {
     if (!asked) return
     setParams((current) => { const next = new URLSearchParams(current); next.delete('note'); return next }, { replace: true })
   }, [asked, setParams])
+
+  // A note's time came (NotePopups), or another part of the app asked for the panel.
+  const isOpen = useRef(open)
+  useEffect(() => {
+    isOpen.current = open
+  }, [open])
+  useEffect(
+    () =>
+      onOpenNotes(({ noteId, quiet: byDevDock }) => {
+        // Already open by a click: keep it as it is, just point at the note.
+        if (!isOpen.current) setQuiet(Boolean(byDevDock))
+        setLoaded(true)
+        setOpen(true)
+        setHighlight(noteId ?? null)
+      }),
+    [],
+  )
 
   useEffect(() => {
     if (!highlight) return
@@ -72,6 +93,7 @@ export function NotesButton() {
             onFocus={warmUp}
             onClick={() => {
               setLoaded(true)
+              setQuiet(false)
               setOpen(true)
             }}
           >
@@ -83,7 +105,7 @@ export function NotesButton() {
       </Tooltip>
       {loaded && (
         <Suspense fallback={null}>
-          <NotesPanel open={open} onOpenChange={setOpen} highlight={highlight} />
+          <NotesPanel open={open} onOpenChange={setOpen} highlight={highlight} quiet={quiet} />
         </Suspense>
       )}
     </>

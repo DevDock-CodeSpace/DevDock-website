@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { CircleUserRound, GitBranch, Gauge, IterationCw } from 'lucide-react'
+import { ChevronRight, CircleUserRound, GitBranch, Gauge, IterationCw } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { PersonAvatar } from '@/components/PersonRow'
@@ -14,6 +14,7 @@ import { cycleTitle } from '../cycles'
 import { ESTIMATE_HOURS, hoursLabel, isClosed, issueBranchName, issueIdentifier, priorityLabel, statusLabel } from '../meta'
 import { useRowNav, type MenuKind } from '../nav-context'
 import { AssigneePicker } from './AssigneePicker'
+import type { RowNest } from './IssueList'
 import { CyclePicker } from './CyclePicker'
 import { DueDatePicker } from './DueDatePicker'
 import { LabelChip } from './LabelChip'
@@ -58,11 +59,14 @@ const NONE = 'none'
 export function IssueRowView({
   issue,
   subIssues,
+  nest,
   source,
   children,
 }: {
   issue: Issue
   subIssues?: { done: number; total: number }
+  /** In a nested list: indented by depth, with an arrow that opens its sub-issues. */
+  nest?: RowNest
   source: IssueRowSource
   /** Extra menus anchored in the row (the project list's shortcut-only menus). */
   children?: ReactNode
@@ -97,7 +101,23 @@ export function IssueRowView({
         'group relative flex h-10 items-center gap-2 px-3 text-sm hover:bg-muted/50 has-[a:focus-visible]:bg-muted/50',
         nav.active && 'bg-muted/60 before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-brand',
       )}
+      style={nest?.depth ? { paddingLeft: `${0.75 + nest.depth * 1.5}rem` } : undefined}
     >
+      {nest &&
+        (nest.onToggle ? (
+          <button
+            type="button"
+            className={cn(iconButton, 'text-muted-foreground')}
+            aria-expanded={nest.open}
+            aria-label={nest.open ? 'Hide sub-issues' : 'Show sub-issues'}
+            title={nest.open ? 'Hide sub-issues' : 'Show sub-issues'}
+            onClick={nest.onToggle}
+          >
+            <ChevronRight className={cn('size-3.5 transition-transform', nest.open && 'rotate-90')} />
+          </button>
+        ) : (
+          <span className="size-6 shrink-0" aria-hidden />
+        ))}
       <PriorityPicker value={issue.priority} onChange={(priority) => update({ priority })} {...nav.menuFor('priority')}>
         <button type="button" className={iconButton} aria-label={`Priority: ${priorityLabel[issue.priority]}`}>
           <PriorityIcon priority={issue.priority} />

@@ -6,10 +6,12 @@ import { useAuth } from '@/features/auth/hooks'
 import { useCollectionView } from '@/features/collections/hooks'
 import { teamIssuesQuery, type TeamIssue } from '@/features/issues/api'
 import { IssueList } from '@/features/issues/components/IssueList'
+import { NestToggle } from '@/features/issues/components/NestToggle'
 import { TeamIssueRow } from '@/features/issues/components/TeamIssueRow'
 import { applyFilters, ISSUE_TABS, NO_FILTERS, readTab } from '@/features/issues/filters'
 import { useUpdateTeamIssue } from '@/features/issues/hooks'
 import { isClosed } from '@/features/issues/meta'
+import { useNested } from '@/features/issues/useNested'
 import { useCurrentTeam } from '@/features/teams/hooks'
 import { hasTeamIssues, teamIssuesPath } from '@/features/teams/nav'
 import { cn } from '@/lib/utils'
@@ -30,6 +32,7 @@ export function TeamIssuesPage() {
   const all = useSuspenseQuery(teamIssuesQuery(team.id)).data.filter((issue) => inView(issue.workspace.id))
   const where = collection ? collection.name : team.name
   const [params, setParams] = useSearchParams()
+  const [nested, setNested] = useNested()
   const update = useUpdateTeamIssue(team.id)
 
   if (!hasTeamIssues(collection?.type ?? team.type, workspaces)) {
@@ -108,6 +111,7 @@ export function TeamIssuesPage() {
           <span className="font-mono text-xs text-muted-foreground">
             {open} open · {issues.length}
           </span>
+          <NestToggle nested={nested} onChange={setNested} />
         </div>
       </div>
 
@@ -122,10 +126,12 @@ export function TeamIssuesPage() {
       ) : (
         <IssueList
           issues={issues}
-          row={(issue, subIssues) => (
+          nested={nested}
+          row={(issue, subIssues, nest) => (
             <TeamIssueRow
               issue={issue}
               subIssues={subIssues}
+              nest={nest}
               teamSlug={team.slug}
               userId={user.id}
               showProject={projects.length > 1}

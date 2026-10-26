@@ -101,6 +101,55 @@ export function MessageItem({ message, conversationId, teamId, teamSlug, people,
   })
   const toggle = (emoji: string) => react.mutate({ emoji, active: reactions.some((reaction) => reaction.user_id === currentUserId && reaction.emoji === emoji) })
 
+  const actions =
+    !deleted && !sending && !editing ? (
+      <div
+        className={cn(
+          // Right beside the bubble, as in WhatsApp: left of yours, right of everyone else's.
+          // Touch screens can't hover, so there it is always shown, under the bubble.
+          'z-10 w-fit whitespace-nowrap',
+          '[@media(hover:hover)]:absolute [@media(hover:hover)]:top-1/2 [@media(hover:hover)]:-translate-y-1/2',
+          mine ? '[@media(hover:hover)]:right-full [@media(hover:hover)]:mr-1.5 [@media(hover:none)]:ml-auto' : '[@media(hover:hover)]:left-full [@media(hover:hover)]:ml-1.5',
+          '[@media(hover:none)]:mt-1',
+          'flex items-center rounded-md border bg-background p-0.5 shadow-sm',
+          // Shown on hover or keyboard focus.
+          'opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-focus-within:opacity-100 [@media(hover:hover)]:group-hover:opacity-100',
+          pickerOpen && '[@media(hover:hover)]:opacity-100',
+        )}
+      >
+        <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="ghost" size="icon-xs" className={toolbarButton} aria-label="Add reaction" title="Add reaction"><SmilePlus /></Button>
+          </PopoverTrigger>
+          <PopoverContent align={mine ? 'start' : 'end'} className="w-auto flex-row gap-0.5 p-1">
+            {MESSAGE_REACTIONS.map((emoji) => (
+              <button
+                key={emoji}
+                type="button"
+                aria-label={`Toggle ${emoji} reaction`}
+                className="flex size-8 items-center justify-center rounded text-base hover:bg-muted"
+                onClick={() => {
+                  toggle(emoji)
+                  setPickerOpen(false)
+                }}
+              >
+                {emoji}
+              </button>
+            ))}
+          </PopoverContent>
+        </Popover>
+        <ToolbarButton label="Reply in thread" onClick={() => setThreadOpen((open) => !open)}><MessageSquare /></ToolbarButton>
+        <ToolbarButton label="Copy link to message" onClick={copyLink}><Link2 /></ToolbarButton>
+        <ToolbarButton label={pinned ? 'Unpin message' : 'Pin message'} onClick={() => pin.mutate()} active={pinned}><Pin className={pinned ? 'fill-current' : undefined} /></ToolbarButton>
+        {mine && (
+          <>
+            <ToolbarButton label="Edit message" onClick={() => setEditing(true)}><Pencil /></ToolbarButton>
+            <ToolbarButton label="Delete message" onClick={() => remove.mutate()} disabled={remove.isPending}><Trash2 /></ToolbarButton>
+          </>
+        )}
+      </div>
+    ) : null
+
   return (
     <article
       id={`message-${message.id}`}
@@ -120,7 +169,7 @@ export function MessageItem({ message, conversationId, teamId, teamSlug, people,
           )}
         </div>
       )}
-      <div className={cn('min-w-0', editing || threadOpen ? 'flex-1' : 'max-w-[75%]', mine && 'flex flex-col items-end')} title={compact && !showAuthor ? formatFullDate(message.created_at) : undefined}>
+      <div className={cn('min-w-0', editing || threadOpen ? 'flex-1' : 'max-w-[75%] [@media(hover:hover)]:max-w-[min(75%,calc(100%-11.5rem))]', mine && 'flex flex-col items-end')} title={compact && !showAuthor ? formatFullDate(message.created_at) : undefined}>
         {!compact && (
           <div className={cn('flex flex-wrap items-baseline gap-x-2 px-1 pb-0.5', mine && 'justify-end')}>
             {showAuthor && <span className="text-sm font-semibold">{name}</span>}
@@ -140,16 +189,24 @@ export function MessageItem({ message, conversationId, teamId, teamSlug, people,
         {filesOnly && !editing ? null : editing ? (
           <div className="self-stretch"><MessageEditor body={message.body} saving={edit.isPending} onSave={(content, body) => edit.mutate({ content, body })} onCancel={() => setEditing(false)} /></div>
         ) : (
-          // A chat bubble, as in Teams or WhatsApp: yours tinted, everyone else's grey.
-          <div className={cn('w-fit max-w-full rounded-2xl px-3 py-1.5', mine ? 'bg-brand/15 dark:bg-brand/30' : 'bg-muted', deleted && 'bg-transparent ring-1 ring-border')}>
-            {deleted ? (
-              <p className="text-sm text-muted-foreground italic">This message was deleted.</p>
-            ) : (
-              <MessageBody body={message.body} fallback={message.content} mentionNames={mentionNames} />
-            )}
+          // A chat bubble, as in Teams or WhatsApp: yours tinted, everyone else's grey. Its actions sit beside it.
+          <div className="relative w-fit max-w-full">
+            <div className={cn('rounded-2xl px-3 py-1.5', mine ? 'bg-brand/15 dark:bg-brand/30' : 'bg-muted', deleted && 'bg-transparent ring-1 ring-border')}>
+              {deleted ? (
+                <p className="text-sm text-muted-foreground italic">This message was deleted.</p>
+              ) : (
+                <MessageBody body={message.body} fallback={message.content} mentionNames={mentionNames} />
+              )}
+            </div>
+            {actions}
           </div>
         )}
-        {!deleted && attachments.length > 0 && <div className={cn('mt-1.5 flex flex-wrap gap-1.5', mine && 'justify-end')}>{attachments.map((attachment) => <AttachmentItem key={attachment.id} attachment={attachment} previewUrl={imageUrls?.[attachment.storage_path]} previewLoading={imagesLoading && !imageUrls?.[attachment.storage_path]} />)}</div>}
+        {!deleted && attachments.length > 0 && (
+          <div className={cn('relative flex w-fit max-w-full flex-wrap gap-1.5', !filesOnly && 'mt-1.5', mine && 'justify-end')}>
+            {attachments.map((attachment) => <AttachmentItem key={attachment.id} attachment={attachment} previewUrl={imageUrls?.[attachment.storage_path]} previewLoading={imagesLoading && !imageUrls?.[attachment.storage_path]} />)}
+            {filesOnly && actions}
+          </div>
+        )}
         {!deleted && !sending && pills.length > 0 && (
           <div className={cn('mt-1.5 flex flex-wrap items-center gap-1', mine && 'justify-end')}>
             {pills.map((pill) => (
@@ -180,50 +237,6 @@ export function MessageItem({ message, conversationId, teamId, teamSlug, people,
         {threadOpen && !deleted && <div className="self-stretch"><ThreadReplyBox conversationId={conversationId} teamId={teamId} teamSlug={teamSlug} parentId={message.id} replies={replies} people={people} participants={participants} currentUserId={currentUserId} /></div>}
       </div>
 
-      {!deleted && !sending && !editing && (
-        <div
-          className={cn(
-            // On the side away from the text, so it never covers what you're reading.
-            'absolute -top-3.5 z-10',
-            mine ? 'left-4' : 'right-4',
-            'flex items-center rounded-md border bg-background p-0.5 shadow-sm',
-            // Shown on hover or keyboard focus; always shown on touch screens, which can't hover.
-            'opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-focus-within:opacity-100 [@media(hover:hover)]:group-hover:opacity-100',
-            pickerOpen && '[@media(hover:hover)]:opacity-100',
-          )}
-        >
-          <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="ghost" size="icon-xs" className={toolbarButton} aria-label="Add reaction" title="Add reaction"><SmilePlus /></Button>
-            </PopoverTrigger>
-            <PopoverContent align={mine ? 'start' : 'end'} className="w-auto flex-row gap-0.5 p-1">
-              {MESSAGE_REACTIONS.map((emoji) => (
-                <button
-                  key={emoji}
-                  type="button"
-                  aria-label={`Toggle ${emoji} reaction`}
-                  className="flex size-8 items-center justify-center rounded text-base hover:bg-muted"
-                  onClick={() => {
-                    toggle(emoji)
-                    setPickerOpen(false)
-                  }}
-                >
-                  {emoji}
-                </button>
-              ))}
-            </PopoverContent>
-          </Popover>
-          <ToolbarButton label="Reply in thread" onClick={() => setThreadOpen((open) => !open)}><MessageSquare /></ToolbarButton>
-          <ToolbarButton label="Copy link to message" onClick={copyLink}><Link2 /></ToolbarButton>
-          <ToolbarButton label={pinned ? 'Unpin message' : 'Pin message'} onClick={() => pin.mutate()} active={pinned}><Pin className={pinned ? 'fill-current' : undefined} /></ToolbarButton>
-          {mine && (
-            <>
-              <ToolbarButton label="Edit message" onClick={() => setEditing(true)}><Pencil /></ToolbarButton>
-              <ToolbarButton label="Delete message" onClick={() => remove.mutate()} disabled={remove.isPending}><Trash2 /></ToolbarButton>
-            </>
-          )}
-        </div>
-      )}
     </article>
   )
 }

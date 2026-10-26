@@ -12,12 +12,14 @@ import { PinButton } from '@/features/issues/components/PinButton'
 import { PanelToggle, SidePanelLayout } from '@/features/issues/components/SidePanel'
 import { ViewActions } from '@/features/issues/components/ViewActions'
 import { ViewInsights } from '@/features/issues/components/ViewInsights'
+import { NestToggle } from '@/features/issues/components/NestToggle'
 import { ViewToggle } from '@/features/issues/components/ViewToggle'
 import { currentCycle } from '@/features/issues/cycles'
 import { applyFilters, hasFilters, ISSUE_TABS, readTab } from '@/features/issues/filters'
 import { personOf } from '@/features/issues/views'
 import { useIssueContext, useIssueFilters, useIssueView } from '@/features/issues/hooks'
 import { isClosed } from '@/features/issues/meta'
+import { useNested } from '@/features/issues/useNested'
 import { usePanelOpen } from '@/features/issues/usePanelOpen'
 import { useActiveView } from '@/features/issues/viewsHooks'
 import { useCurrentTeam } from '@/features/teams/hooks'
@@ -34,6 +36,7 @@ export function WorkspaceIssuesPage() {
   const { workspace, cycles, userId, members } = useIssueContext()
   const { missing, view: openView, state: viewState } = useActiveView()
   const [panelOpen, setPanelOpen] = usePanelOpen()
+  const [nested, setNested] = useNested()
   const all = useSuspenseQuery(workspaceIssuesQuery(workspace.id)).data
   const [params] = useSearchParams()
   const [view, setView] = useIssueView()
@@ -74,6 +77,7 @@ export function WorkspaceIssuesPage() {
           <>
             <PinButton />
             <PanelToggle open={panelOpen} onChange={setPanelOpen} />
+            {view === 'list' && <NestToggle nested={nested} onChange={setNested} />}
             <ViewToggle view={view} onChange={setView} />
             <Button size="sm" onClick={() => setCreating('todo')}>
               <Plus /> New issue
@@ -106,6 +110,7 @@ export function WorkspaceIssuesPage() {
         <IssueCollection
           issues={issues}
           view={view}
+          nested={nested}
           empty={empty}
           creating={creating}
           onCreatingChange={setCreating}

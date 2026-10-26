@@ -3,7 +3,10 @@ import { CalendarDays, List } from 'lucide-react'
 import { Suspense, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/features/auth/hooks'
 import { useCollectionView } from '@/features/collections/hooks'
+import { calendarNotesQuery } from '@/features/reminders/api'
+import { useCurrentTeam } from '@/features/teams/hooks'
 import { meetingsRangeQuery, type LiveSession, type MeetingsScope } from '../api'
 import { readCursor, visibleRange, type CalendarMode } from '../calendarView'
 import { useCanWriteLive } from '../hooks'
@@ -38,6 +41,8 @@ export function MeetingsView({ scope, now, href, showScope, workspaceId, empty, 
   // Only the collection being looked at (everything, in a group without collections).
   const { workspaces } = useCollectionView()
   const canWrite = useCanWriteLive()
+  const { team } = useCurrentTeam()
+  const { user } = useAuth()
   const [params, setParams] = useSearchParams()
   const [creating, setCreating] = useState<Date | null>(null)
 
@@ -50,6 +55,8 @@ export function MeetingsView({ scope, now, href, showScope, workspaceId, empty, 
   const range = visibleRange(cursor, mode)
   // Only while the calendar is showing; the list fetches its own pages.
   const calendar = useQuery({ ...meetingsRangeQuery(scope, range.from, range.to), enabled: view === 'calendar' })
+  // Your own notes with a time, as tags on their days (fetched beside the meetings, not after them).
+  const notes = useQuery({ ...calendarNotesQuery(team.id, user.id, range.from, range.to, workspaceId ?? null), enabled: view === 'calendar' })
 
   const canSchedule = workspaceId
     ? canWrite(workspaceId)
@@ -102,6 +109,7 @@ export function MeetingsView({ scope, now, href, showScope, workspaceId, empty, 
         <Suspense fallback={<div className="h-96 animate-pulse rounded-md bg-muted/40" />}>
         <MeetingCalendar
           sessions={calendar.data ?? []}
+          notes={notes.data ?? []}
           now={now}
           cursor={cursor}
           mode={mode}
