@@ -1,19 +1,18 @@
 import { useQuery } from '@tanstack/react-query'
 import { Paperclip } from 'lucide-react'
 import { useState } from 'react'
-import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { teamDiagramsQuery } from '@/features/diagrams/api'
 import { teamDocsQuery } from '@/features/docs/api'
 import { teamIssuesQuery } from '@/features/issues/api'
 import { teamLiveSessionsQuery } from '@/features/live/api'
 import { diagramPath, docPath, issuePath, liveSessionPath } from '@/features/teams/nav'
-import { MESSAGE_ATTACHMENT_MAX_BYTES, MESSAGE_ATTACHMENT_TYPES } from '../api'
+import { MESSAGE_ATTACHMENT_TYPES } from '../api'
 
 /** A DevDock page to share: shown as a link in the message (`href` is a path within the app). */
 export type ResourceLink = { label: string; href: string }
 
-export function ResourceAttachmentMenu({ teamId, teamSlug, onFiles, onLinks }: { teamId: string; teamSlug: string; onFiles: (files: File[]) => void; onLinks: (links: ResourceLink[]) => void }) {
+export function ResourceAttachmentMenu({ teamId, teamSlug, onFiles, onLinks }: { teamId: string; teamSlug: string; onFiles: (files: File[]) => boolean; onLinks: (links: ResourceLink[]) => void }) {
   const [open, setOpen] = useState(false)
   const [category, setCategory] = useState<'Docs' | 'Diagrams' | 'Meetings' | 'Issues'>('Docs')
   const [selected, setSelected] = useState<{ id: string; label: string; href: string }[]>([])
@@ -22,13 +21,7 @@ export function ResourceAttachmentMenu({ teamId, teamSlug, onFiles, onLinks }: {
   const live = useQuery({ ...teamLiveSessionsQuery(teamId), enabled: open }).data ?? []
   const issues = useQuery({ ...teamIssuesQuery(teamId), enabled: open }).data ?? []
   const addFiles = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files ?? [])
-    if (files.length > 5 || files.some((file) => file.size > MESSAGE_ATTACHMENT_MAX_BYTES || !(MESSAGE_ATTACHMENT_TYPES as readonly string[]).includes(file.type))) {
-      toast.error('Choose up to five supported files, each no larger than 10 MB.')
-    } else {
-      onFiles(files)
-      setOpen(false)
-    }
+    if (onFiles(Array.from(event.target.files ?? []))) setOpen(false)
     event.target.value = ''
   }
   const resources = category === 'Docs'
