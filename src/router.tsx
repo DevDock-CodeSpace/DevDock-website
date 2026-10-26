@@ -42,6 +42,8 @@ import { WorkspaceSettingsPage } from '@/routes/workspace/WorkspaceSettingsPage'
 import { WorkspaceTabPage } from '@/routes/workspace/WorkspaceTabPage'
 import { WorkspaceToolGate } from '@/routes/workspace/WorkspaceToolGate'
 import { DiagramsRedirect } from '@/routes/DiagramsRedirect'
+import { meetingCalendar } from '@/features/live/screens'
+import { conversationView } from '@/features/messaging/screens'
 
 export const router = createBrowserRouter([
   { path: '/', loader: () => redirect('/app') },
@@ -104,7 +106,8 @@ export const router = createBrowserRouter([
             errorElement: <RouteErrorPage inline />,
             children: [
               { index: true, element: <TeamWorkspacesPage /> },
-              { path: 'messages', handle: FULL_BLEED, element: <MessagesPage /> },
+              // The open conversation's view (TipTap composer) starts downloading with the page, so it renders at once.
+              { path: 'messages', handle: FULL_BLEED, loader: () => { void conversationView.preload(); return null }, element: <MessagesPage /> },
               { path: 'members', element: <TeamMembersPage /> },
               { path: 'settings', element: <TeamSettingsPage /> },
               // Team → Files (URL docs): group-wide docs and diagrams + those of every workspace the user can see.
@@ -118,7 +121,8 @@ export const router = createBrowserRouter([
               // Development groups: issues from every project (the page checks the group type).
               { path: 'issues', element: <TeamIssuesPage /> },
               // Group → Live: video sessions (Jitsi via JaaS) for the group and its workspaces.
-              { path: 'live', element: <TeamLivePage /> },
+              // The calendar (the default view) loads with the page, so it renders without waiting on its code.
+              { path: 'live', loader: () => meetingCalendar.preload().then(() => null), element: <TeamLivePage /> },
               { path: 'live/:sessionId', loader: liveSessionLoader, lazy: async () => ({ Component: (await import('@/routes/LiveSessionPage')).LiveSessionPage }) },
               // Notes live in the header's panel; the old page's address (bookmarks, older notifications)
               // opens it on Chat, at the note it named.
@@ -183,7 +187,7 @@ export const router = createBrowserRouter([
                     path: 'live',
                     element: <WorkspaceToolGate tool="live" />,
                     children: [
-                      { index: true, element: <WorkspaceLivePage /> },
+                      { index: true, loader: () => meetingCalendar.preload().then(() => null), element: <WorkspaceLivePage /> },
                       { path: ':sessionId', loader: liveSessionLoader, lazy: async () => ({ Component: (await import('@/routes/LiveSessionPage')).LiveSessionPage }) },
                     ],
                   },

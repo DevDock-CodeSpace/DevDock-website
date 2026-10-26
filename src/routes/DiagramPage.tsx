@@ -1,12 +1,13 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
-import { lazy, Suspense } from 'react'
+import { Suspense } from 'react'
 import { useParams } from 'react-router'
 import { Skeleton } from '@/components/ui/skeleton'
 import { diagramQuery } from '@/features/diagrams/api'
 import { useCanWriteDiagrams } from '@/features/diagrams/hooks'
+import { diagramView } from '@/features/diagrams/screens'
 
 // The editor (React Flow) is only downloaded when a diagram is opened.
-const DiagramView = lazy(() => import('@/features/diagrams/components/DiagramView'))
+const DiagramView = diagramView.Component
 
 /**
  * One diagram, at /t/:teamSlug/diagrams/:diagramId (team view) or

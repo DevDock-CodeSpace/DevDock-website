@@ -1,12 +1,14 @@
 import { Sparkles } from 'lucide-react'
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useCurrentTeam } from '@/features/teams/hooks'
+import { preloadable } from '@/lib/preloadable'
 
 // The panel (and everything it needs) loads the first time it is opened, so
 // the header carries only this button.
-const AskDevDockPanel = lazy(() => import('./AskDevDockPanel'))
+const panel = preloadable(() => import('./AskDevDockPanel'))
+const AskDevDockPanel = panel.Component
 
 const isMac = typeof navigator !== 'undefined' && /mac|iphone|ipad/i.test(navigator.platform)
 
@@ -19,6 +21,10 @@ export function AskDevDockButton() {
   const [open, setOpen] = useState(false)
   // Stays true once opened, so closing keeps the conversation.
   const [loaded, setLoaded] = useState(false)
+  const warmUp = () => {
+    setLoaded(true)
+    void panel.preload()
+  }
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -41,6 +47,9 @@ export function AskDevDockButton() {
             size="sm"
             className="text-muted-foreground"
             aria-label="Ask DevDock"
+            // Pointing at the button loads the panel and mounts it closed, so the click only opens it.
+            onPointerEnter={warmUp}
+            onFocus={warmUp}
             onClick={() => {
               setLoaded(true)
               setOpen(true)
