@@ -1,19 +1,21 @@
 import { data, redirect, type LoaderFunctionArgs } from 'react-router'
 import { requireUser } from '@/features/auth/loaders'
-import { myWorkspaceRolesQuery, teamWorkspacesQuery, workspaceQuery } from '@/features/workspaces/api'
+import { availableCollections, pickCollection, readCollectionView } from '@/features/collections/view'
+import { myWorkspaceRolesQuery, teamContentsQuery, teamWorkspacesQuery, workspaceQuery } from '@/features/workspaces/api'
+import { readRecentVisits } from '@/features/workspaces/recent'
 import { queryClient } from '@/lib/query-client'
 import { myTeamsQuery } from './api'
 import { lastTeam, rememberTeam } from './last-team'
-import { chatPath } from './nav'
+import { landingPath, startPath } from './landing'
 
-/** /app: send the user to onboarding (no teams) or their last/first team. */
+/** /app: send the user to onboarding (no teams) or where their last/first team opens (`teamStartLoader`). */
 export async function appIndexLoader({ request }: LoaderFunctionArgs) {
   const user = await requireUser(request)
   const memberships = await queryClient.fetchQuery(myTeamsQuery(user.id))
   if (memberships.length === 0) throw redirect('/onboarding')
   const last = lastTeam()
   const target = memberships.find((m) => m.team.slug === last) ?? memberships[0]
-  throw redirect(chatPath(target.team.slug))
+  throw redirect(startPath(target.team.slug))
 }
 
 /** /onboarding: open to everyone signed in (new users, and existing users adding a team). */
@@ -50,4 +52,20 @@ export async function workspaceLoader({ request, params }: LoaderFunctionArgs) {
     throw data('Workspace not found, or you don’t have access to it.', { status: 404 })
   }
   return null
+}
+
+/**
+ * /t/:teamSlug/start: where a group opens, after signing in or switching group or collection
+ * (`landingPath`). It reads the same cached workspace list the sidebar does, so it costs no extra request.
+ */
+export async function teamStartLoader({ request, params }: LoaderFunctionArgs) {
+  const user = await requireUser(request)
+  const memberships = await queryClient.ensureQueryData(myTeamsQuery(user.id))
+  const membership = memberships.find((m) => m.team.slug === params.teamSlug)
+  if (!membership) throw data('Group not found, or you’re not a member.', { status: 404 })
+  const { team } = membership
+  const { workspaces, collections } = await queryClient.ensureQueryData(teamContentsQuery(team.id))
+  const isAdmin = membership.role === 'owner' || membership.role === 'admin'
+  const collection = pickCollection(availableCollections(collections, workspaces, user.id, isAdmin), readCollectionView(team.id), user.id)
+  throw redirect(landingPath(team.slug, team.type, collection, workspaces, readRecentVisits(team.id)))
 }
