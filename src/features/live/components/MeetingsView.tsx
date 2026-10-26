@@ -30,7 +30,7 @@ type MeetingsViewProps = {
 
 /**
  * The Meetings page body: a List / Calendar switch (kept in the URL as
- * ?view=calendar&mode=week&date=YYYY-MM-DD) and, for people who may schedule
+ * ?view=list|calendar&mode=week&date=YYYY-MM-DD; calendar month by default, list on phones) and, for people who may schedule
  * here, a "New meeting" button plus click-to-create on the calendar.
  */
 export function MeetingsView({ scope, now, href, showScope, workspaceId, empty, lead }: MeetingsViewProps) {
@@ -40,7 +40,10 @@ export function MeetingsView({ scope, now, href, showScope, workspaceId, empty, 
   const [params, setParams] = useSearchParams()
   const [creating, setCreating] = useState<Date | null>(null)
 
-  const view = params.get('view') === 'calendar' ? 'calendar' : 'list'
+  // Opens on the calendar's month (owner's choice); a phone is too narrow for seven columns, so
+  // there the list comes first. Either way the choice is in the URL.
+  const [narrow] = useState(() => window.matchMedia('(max-width: 639px)').matches)
+  const view = (params.get('view') ?? (narrow ? 'list' : 'calendar')) === 'list' ? 'list' : 'calendar'
   const mode: CalendarMode = params.get('mode') === 'week' ? 'week' : 'month'
   const cursor = readCursor(params.get('date'), now)
   const range = visibleRange(cursor, mode)
@@ -80,7 +83,7 @@ export function MeetingsView({ scope, now, href, showScope, workspaceId, empty, 
                 key={value}
                 type="button"
                 aria-pressed={view === value}
-                onClick={() => update({ view: value === 'list' ? null : value })}
+                onClick={() => update({ view: value })}
                 className={cn(
                   'flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium transition-colors',
                   view === value ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground',
