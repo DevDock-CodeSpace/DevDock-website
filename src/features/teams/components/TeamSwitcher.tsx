@@ -22,7 +22,7 @@ import { availableCollections, pickCollection, readCollectionView, rememberColle
 import { teamCollectionsQuery, teamWorkspacesQuery } from '@/features/workspaces/api'
 import { teamLogoUrl, type Team } from '../api'
 import { useCurrentTeam, useMyTeams } from '../hooks'
-import { teamPath } from '../nav'
+import { chatPath, teamPath } from '../nav'
 import { teamPermissions, teamRoleLabel, teamTypes } from '../permissions'
 
 /**
@@ -44,7 +44,8 @@ export function TeamSwitcher() {
   const open = (slug: string, teamId: string, collectionId?: string) => {
     if (collectionId) rememberCollectionView(teamId, collectionId)
     if (isMobile) setOpenMobile(false)
-    navigate(teamPath(slug))
+    // A group opens on its Chat; a collection on its list of workspaces (Chat isn't narrowed by collection).
+    navigate(collectionId ? teamPath(slug) : chatPath(slug))
   }
 
   // Collapsed to icons there is no room for the menu and the sidebar button side by side: the logo

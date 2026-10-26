@@ -12,9 +12,14 @@ import type { TeamMember } from '@/features/teams/api'
 import { errorMessage } from '@/lib/errors'
 import { createChannel, createDirectConversation, createGroupConversation, findExistingGroup, type ConversationKind } from '../api'
 
-export function NewConversationDialog({ teamId, people, canCreateChannel, onCreated }: { teamId: string; people: TeamMember[]; canCreateChannel: boolean; onCreated: (id: string) => void }) {
+export function NewConversationDialog({ teamId, people, canCreateChannel, onCreated, open: openProp, onOpenChange }: { teamId: string; people: TeamMember[]; canCreateChannel: boolean; onCreated: (id: string) => void; /** Optional: opened from outside too (Chat's first-time instructions). */ open?: boolean; onOpenChange?: (open: boolean) => void }) {
   const { user } = useAuth()
-  const [open, setOpen] = useState(false)
+  const [ownOpen, setOwnOpen] = useState(false)
+  const open = openProp ?? ownOpen
+  const setOpen = (next: boolean) => {
+    setOwnOpen(next)
+    onOpenChange?.(next)
+  }
   const [kind, setKind] = useState<ConversationKind>('dm')
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')

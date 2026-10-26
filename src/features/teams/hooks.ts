@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router'
 import { useAuth } from '@/features/auth/hooks'
 import { myWorkspaceRolesQuery, workspaceQuery } from '@/features/workspaces/api'
 import { myTeamsQuery } from './api'
-import { teamPath } from './nav'
+import { chatPath } from './nav'
 import { teamPermissions, workspacePermissions } from './permissions'
 
 /**
@@ -53,7 +53,7 @@ export function useExitTeam() {
   return async (teamId: string) => {
     const cached = queryClient.getQueryData(myTeamsQuery(user.id).queryKey) ?? []
     const next = cached.find((m) => m.team.id !== teamId)
-    await navigate(next ? teamPath(next.team.slug) : '/onboarding', { replace: true })
+    await navigate(next ? chatPath(next.team.slug) : '/onboarding', { replace: true })
     queryClient.removeQueries({ queryKey: ['workspaces', 'team', teamId] })
     await queryClient.invalidateQueries({ queryKey: ['teams'] })
   }

@@ -1,4 +1,4 @@
-import { CalendarDays, Check, CircleDot, FileText, GitPullRequest, Video, Presentation, type LucideIcon } from 'lucide-react'
+import { CalendarDays, Check, CircleCheckBig, FileText, GitPullRequest, Presentation, Video, type LucideIcon } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { LogoMark, LogoWordmark } from '@/components/Logo'
@@ -8,10 +8,10 @@ import { cn } from '@/lib/utils'
 type Tool = 'issues' | 'docs' | 'diagrams' | 'meetings'
 
 const TOOLS: { id: Tool; label: string; icon: LucideIcon }[] = [
-  { id: 'issues', label: 'Issues & sprints', icon: CircleDot },
+  { id: 'issues', label: 'Issues & sprints', icon: CircleCheckBig },
   { id: 'docs', label: 'Docs', icon: FileText },
   { id: 'diagrams', label: 'Whiteboards', icon: Presentation },
-  { id: 'meetings', label: 'Meetings', icon: Video },
+  { id: 'meetings', label: 'Meetings', icon: CalendarDays },
 ]
 
 /** How long each tool stays in the showcase before the next one, unless someone picks one. */
