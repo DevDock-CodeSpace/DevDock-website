@@ -1,10 +1,12 @@
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react'
 import { Bold, Code, Italic, List, ListOrdered, Paperclip, Send, SquareCode, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { toast } from 'sonner'
 import { PersonAvatar } from '@/components/PersonRow'
 import { Button } from '@/components/ui/button'
 import type { TeamMember } from '@/features/teams/api'
 import type { Json } from '@/types/database.types'
+import { MESSAGE_ATTACHMENT_MAX_BYTES, MESSAGE_ATTACHMENT_TYPES } from '../api'
 import { composerEditorClass, emptyDoc, messageExtensions, parseDraft } from '../editor'
 import type { SendInput } from '../hooks'
 import { ResourceAttachmentMenu, type ResourceLink } from './ResourceAttachmentMenu'
@@ -27,6 +29,14 @@ type Props = {
 
 const draftKey = (draftId: string) => `devdock-message-draft:${draftId}`
 const mentionToken = (text: string) => text.match(/(?:^|\s)@([^\s@]*)$/)
+const MAX_FILES = 5
+
+/** A pasted screenshot arrives as "image.png": give it a name that says what and when. */
+function nameScreenshot(file: File): File {
+  if (!file.type.startsWith('image/') || (file.name && file.name !== 'image.png')) return file
+  const stamp = new Date().toLocaleString(undefined, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).replace(/[/:]/g, '-').replace(',', '')
+  return new File([file], `Screenshot ${stamp}.${file.type.split('/')[1]}`, { type: file.type })
+}
 
 export function MessageComposer({ draftId, teamId, teamSlug, placeholder, compact = false, currentUserId, participants, onSend, onTyping }: Props) {
   const [files, setFiles] = useState<File[]>([])
@@ -34,6 +44,25 @@ export function MessageComposer({ draftId, teamId, teamSlug, placeholder, compac
   const [query, setQuery] = useState<string | null>(null)
   const [empty, setEmpty] = useState(true)
   const submitRef = useRef<() => void>(() => {})
+  // From the picker, a paste or a drop: up to five supported files of at most 10 MB, added to what's there.
+  const addFiles = (incoming: File[]): boolean => {
+    if (incoming.length === 0) return false
+    if (incoming.some((file) => !(MESSAGE_ATTACHMENT_TYPES as readonly string[]).includes(file.type))) {
+      toast.error('That file type can’t be attached. Images, PDFs, text and Office files can.')
+      return false
+    }
+    if (incoming.some((file) => file.size > MESSAGE_ATTACHMENT_MAX_BYTES)) {
+      toast.error('Each file can be at most 10 MB.')
+      return false
+    }
+    if (files.length + incoming.length > MAX_FILES) {
+      toast.error(`Up to ${MAX_FILES} files per message.`)
+      return false
+    }
+    setFiles([...files, ...incoming.map(nameScreenshot)])
+    return true
+  }
+  const addFilesRef = useRef(addFiles)
 
   const editor = useEditor({
     extensions: messageExtensions(placeholder),
@@ -46,6 +75,20 @@ export function MessageComposer({ draftId, teamId, teamSlug, placeholder, compac
     })(),
     editorProps: {
       attributes: { class: composerEditorClass, 'aria-label': placeholder },
+      // A pasted or dropped screenshot (or file) becomes an attachment instead of going into the text.
+      handlePaste: (_view, event) => {
+        const pasted = Array.from(event.clipboardData?.files ?? [])
+        if (pasted.length === 0) return false
+        addFilesRef.current(pasted)
+        return true
+      },
+      handleDrop: (_view, event) => {
+        const dropped = Array.from((event as DragEvent).dataTransfer?.files ?? [])
+        if (dropped.length === 0) return false
+        event.preventDefault()
+        addFilesRef.current(dropped)
+        return true
+      },
       handleKeyDown: (view, event) => {
         if (event.key !== 'Enter' || event.shiftKey || event.isComposing) return false
         // Inside a list or code block Enter makes a new line; Ctrl/⌘+Enter always sends.
@@ -107,6 +150,7 @@ export function MessageComposer({ draftId, teamId, teamSlug, placeholder, compac
   }
   useEffect(() => {
     submitRef.current = submit
+    addFilesRef.current = addFiles
   })
 
   const candidates = query === null ? [] : participants.filter((person) => person.user_id !== currentUserId && (person.profile?.display_name ?? 'member').toLowerCase().includes(query))
@@ -143,11 +187,20 @@ export function MessageComposer({ draftId, teamId, teamSlug, placeholder, compac
             ))}
           </div>
         )}
-        <div className="rounded-lg border bg-background transition-shadow focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/30">
+        <div
+          className="rounded-lg border bg-background transition-shadow focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/30"
+          onDragOver={(event) => { if (event.dataTransfer.types.includes('Files')) event.preventDefault() }}
+          onDrop={(event) => {
+            // The text area handles its own drops; this catches the rest of the box.
+            if (event.defaultPrevented || event.dataTransfer.files.length === 0) return
+            event.preventDefault()
+            addFiles(Array.from(event.dataTransfer.files))
+          }}
+        >
           {files.length > 0 && (
             <div className="flex flex-wrap gap-1.5 border-b px-2.5 py-2">
-              {files.map((file) => (
-                <span key={`${file.name}-${file.size}`} className="flex max-w-56 items-center gap-1.5 rounded-md border bg-muted/50 py-1 pr-1 pl-2 text-xs">
+              {files.map((file, index) => (
+                <span key={`${index}-${file.name}-${file.size}`} className="flex max-w-56 items-center gap-1.5 rounded-md border bg-muted/50 py-1 pr-1 pl-2 text-xs">
                   <Paperclip className="size-3 shrink-0 text-muted-foreground" />
                   <span className="truncate">{file.name}</span>
                   <button type="button" className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label={`Remove ${file.name}`} onClick={() => setFiles((current) => current.filter((item) => item !== file))}><X className="size-3" /></button>
@@ -169,7 +222,7 @@ export function MessageComposer({ draftId, teamId, teamSlug, placeholder, compac
               </>
             )}
             <div className="ml-auto flex items-center gap-1">
-              <ResourceAttachmentMenu teamId={teamId} teamSlug={teamSlug} onFiles={setFiles} onLinks={insertLinks} />
+              <ResourceAttachmentMenu teamId={teamId} teamSlug={teamSlug} onFiles={addFiles} onLinks={insertLinks} />
               <Button type="submit" size="icon-sm" aria-label="Send message" disabled={empty && files.length === 0}>
                 <Send />
               </Button>

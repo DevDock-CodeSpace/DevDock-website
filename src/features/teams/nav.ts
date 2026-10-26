@@ -128,7 +128,7 @@ export function getTeamNav(
   const base = teamPath(slug)
   return {
     home: { title: 'Home', to: base, icon: Home, end: true },
-    messages: { title: 'Messages', to: `${base}/messages`, icon: MessageSquare },
+    messages: { title: 'Chat', to: `${base}/messages`, icon: MessageSquare },
     tools: [
       ...TEAM_TOOLS.map((id) => ({
         id,
