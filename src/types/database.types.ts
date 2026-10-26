@@ -342,33 +342,39 @@ export type Database = {
       }
       diagrams: {
         Row: {
+          access: Database["public"]["Enums"]["file_access"]
           created_at: string
           created_by: string | null
           data: Json
           folder_id: string | null
           id: string
+          lesson_id: string | null
           team_id: string
           title: string
           updated_at: string
           workspace_id: string | null
         }
         Insert: {
+          access?: Database["public"]["Enums"]["file_access"]
           created_at?: string
           created_by?: string | null
           data?: Json
           folder_id?: string | null
           id?: string
+          lesson_id?: string | null
           team_id: string
           title: string
           updated_at?: string
           workspace_id?: string | null
         }
         Update: {
+          access?: Database["public"]["Enums"]["file_access"]
           created_at?: string
           created_by?: string | null
           data?: Json
           folder_id?: string | null
           id?: string
+          lesson_id?: string | null
           team_id?: string
           title?: string
           updated_at?: string
@@ -390,6 +396,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "diagrams_lesson_fkey"
+            columns: ["lesson_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "lessons"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
             foreignKeyName: "diagrams_team_id_fkey"
             columns: ["team_id"]
             isOneToOne: false
@@ -407,6 +420,7 @@ export type Database = {
       }
       doc_folders: {
         Row: {
+          access: Database["public"]["Enums"]["file_access"]
           created_at: string
           created_by: string | null
           depth: number
@@ -418,6 +432,7 @@ export type Database = {
           workspace_id: string | null
         }
         Insert: {
+          access?: Database["public"]["Enums"]["file_access"]
           created_at?: string
           created_by?: string | null
           depth: number
@@ -429,6 +444,7 @@ export type Database = {
           workspace_id?: string | null
         }
         Update: {
+          access?: Database["public"]["Enums"]["file_access"]
           created_at?: string
           created_by?: string | null
           depth?: number
@@ -472,6 +488,7 @@ export type Database = {
       }
       documents: {
         Row: {
+          access: Database["public"]["Enums"]["file_access"]
           body: Json | null
           content: string
           created_at: string
@@ -484,6 +501,7 @@ export type Database = {
           workspace_id: string | null
         }
         Insert: {
+          access?: Database["public"]["Enums"]["file_access"]
           body?: Json | null
           content?: string
           created_at?: string
@@ -496,6 +514,7 @@ export type Database = {
           workspace_id?: string | null
         }
         Update: {
+          access?: Database["public"]["Enums"]["file_access"]
           body?: Json | null
           content?: string
           created_at?: string
@@ -535,6 +554,78 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "workspaces"
             referencedColumns: ["id", "team_id"]
+          },
+        ]
+      }
+      file_shares: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          diagram_id: string | null
+          document_id: string | null
+          folder_id: string | null
+          id: string
+          role: string
+          team_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          diagram_id?: string | null
+          document_id?: string | null
+          folder_id?: string | null
+          id?: string
+          role?: string
+          team_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          diagram_id?: string | null
+          document_id?: string | null
+          folder_id?: string | null
+          id?: string
+          role?: string
+          team_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "file_shares_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "file_shares_diagram_id_fkey"
+            columns: ["diagram_id"]
+            isOneToOne: false
+            referencedRelation: "diagrams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "file_shares_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "file_shares_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "doc_folders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "file_shares_member_fkey"
+            columns: ["team_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["team_id", "user_id"]
           },
         ]
       }
@@ -2448,6 +2539,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      access_level:
+        | {
+            Args: { d: Database["public"]["Tables"]["diagrams"]["Row"] }
+            Returns: {
+              error: true
+            } & "Could not choose the best candidate function between: public.access_level(d => documents), public.access_level(d => diagrams). Try renaming the parameters or the function itself in the database so function overloading can be resolved"
+          }
+        | {
+            Args: { d: Database["public"]["Tables"]["documents"]["Row"] }
+            Returns: {
+              error: true
+            } & "Could not choose the best candidate function between: public.access_level(d => documents), public.access_level(d => diagrams). Try renaming the parameters or the function itself in the database so function overloading can be resolved"
+          }
       add_group_member: {
         Args: {
           p_conversation_id: string
@@ -2691,6 +2795,7 @@ export type Database = {
       }
     }
     Enums: {
+      file_access: "place" | "restricted"
       issue_status:
         | "backlog"
         | "todo"
@@ -2840,6 +2945,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      file_access: ["place", "restricted"],
       issue_status: [
         "backlog",
         "todo",

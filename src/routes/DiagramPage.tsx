@@ -1,12 +1,13 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
-import { lazy, Suspense } from 'react'
+import { Suspense } from 'react'
 import { useParams } from 'react-router'
 import { Skeleton } from '@/components/ui/skeleton'
 import { diagramQuery } from '@/features/diagrams/api'
 import { useCanWriteDiagrams } from '@/features/diagrams/hooks'
+import { diagramView } from '@/features/diagrams/screens'
 
 // The editor (React Flow) is only downloaded when a diagram is opened.
-const DiagramView = lazy(() => import('@/features/diagrams/components/DiagramView'))
+const DiagramView = diagramView.Component
 
 /**
  * One diagram, at /t/:teamSlug/diagrams/:diagramId (team view) or
@@ -16,10 +17,12 @@ const DiagramView = lazy(() => import('@/features/diagrams/components/DiagramVie
 export function DiagramPage() {
   const { diagramId = '' } = useParams()
   const diagram = useSuspenseQuery(diagramQuery(diagramId)).data
-  const canWrite = useCanWriteDiagrams()(diagram?.workspace_id ?? null)
+  // The role rules, narrowed by how it's shared (a viewer of a restricted whiteboard only looks).
+  const level = diagram?.access_level ?? 0
+  const canWrite = (useCanWriteDiagrams()(diagram?.workspace_id ?? null) && level === 3) || level === 2
 
   if (!diagram) {
-    return <p className="py-16 text-center text-sm text-muted-foreground">This diagram doesn’t exist anymore.</p>
+    return <p className="py-16 text-center text-sm text-muted-foreground">This whiteboard doesn’t exist anymore.</p>
   }
   return (
     <Suspense fallback={<DiagramSkeleton />}>

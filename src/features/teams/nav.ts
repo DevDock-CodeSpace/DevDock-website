@@ -1,18 +1,17 @@
 import {
+  Bookmark,
   BookOpen,
-  CircleDot,
-  FileText,
+  CalendarDays,
+  CircleCheckBig,
   Files,
+  FileText,
   GitPullRequest,
-  Home,
   LayoutDashboard,
   MessageSquare,
-  NotebookPen,
+  Presentation,
   Settings,
   Shapes,
   Users,
-  Video,
-  Workflow,
   type LucideIcon,
 } from 'lucide-react'
 import { matchPath } from 'react-router'
@@ -35,6 +34,8 @@ export const isNavActive = (item: NavItem, pathname: string) =>
   (item.also !== undefined && matchPath({ path: item.also, end: false }, pathname) !== null)
 
 export const teamPath = (slug: string) => `/t/${slug}`
+/** Where a group opens (after signing in, switching or joining): its Chat. */
+export const chatPath = (slug: string) => `${teamPath(slug)}/messages`
 export const workspacePath = (teamSlug: string, workspaceId: string) => `/t/${teamSlug}/w/${workspaceId}`
 
 /**
@@ -87,7 +88,7 @@ export const FILES_TAB = { title: 'Files', icon: Files }
 
 export const teamToolDefs: Record<TeamToolId, { item: string; items: string }> = {
   docs: { item: 'doc', items: 'docs' },
-  diagrams: { item: 'diagram', items: 'diagrams' },
+  diagrams: { item: 'whiteboard', items: 'whiteboards' },
   live: { item: 'meeting', items: 'meetings' },
 }
 
@@ -95,7 +96,7 @@ export function isTeamTool(tool: string): tool is TeamToolId {
   return (TEAM_TOOLS as string[]).includes(tool)
 }
 
-/** Your own notes in the group (private, so not a team tool: there is no workspace view). The code and URL say reminders; the UI says Notes. */
+/** The old Notes page's address; it now redirects to the header's Notes panel (`?note=`). The code and URL say reminders; the UI says Notes. */
 export const remindersPath = (slug: string) => `${teamPath(slug)}/reminders`
 
 /** Group-wide issues: every project's issues in one list. */
@@ -110,7 +111,7 @@ export function hasTeamIssues(type: TeamType, workspaces: readonly { type: Works
 }
 
 /**
- * Sidebar team links: Home + team tools on top (plus Issues below Meetings
+ * Sidebar team links: Chat + team tools on top (plus Issues below Meetings
  * when `issues` is set, see hasTeamIssues, then your Reminders), then the
  * workspaces, then Members/Settings.
  */
@@ -118,7 +119,6 @@ export function getTeamNav(
   slug: string,
   issues = false,
 ): {
-  home: NavItem
   tools: (NavItem & { id: TeamToolId | 'issues' })[]
   members: NavItem
   settings: NavItem
@@ -127,8 +127,7 @@ export function getTeamNav(
 } {
   const base = teamPath(slug)
   return {
-    home: { title: 'Home', to: base, icon: Home, end: true },
-    messages: { title: 'Messages', to: `${base}/messages`, icon: MessageSquare },
+    messages: { title: 'Chat', to: `${base}/messages`, icon: MessageSquare },
     tools: [
       ...TEAM_TOOLS.map((id) => ({
         id,
@@ -139,7 +138,9 @@ export function getTeamNav(
         ? [{ id: 'issues' as const, title: 'Issues', icon: workspaceTabDefs.issues.icon, to: teamIssuesPath(slug) }]
         : []),
     ],
-    reminders: { title: 'Notes', to: remindersPath(slug), icon: NotebookPen },
+    // Not in the sidebar: notes live in the header's panel, and this old address redirects there. Kept for
+    // AppLayout's section names, and because dropping it regroups the build's chunks (+7 KB first load).
+    reminders: { title: 'Notes', to: remindersPath(slug), icon: Bookmark },
     members: { title: 'Members', to: `${base}/members`, icon: Users },
     settings: { title: 'Settings', to: `${base}/settings`, icon: Settings },
   }
@@ -157,12 +158,12 @@ export const workspaceTabDefs: Record<
 > = {
   overview: { title: 'Overview', icon: LayoutDashboard },
   learning: { title: 'Learning', icon: BookOpen, hint: 'Modules, lessons and progress' },
-  issues: { title: 'Issues', icon: CircleDot, hint: 'Linear-style tasks and bugs' },
+  issues: { title: 'Issues', icon: CircleCheckBig, hint: 'Linear-style tasks and bugs' },
   docs: { title: 'Docs', icon: FileText, hint: 'Pages and notes, in Files', soon: 'Docs assigned to this workspace will live here.' },
-  diagrams: { title: 'Diagrams', icon: Workflow, hint: 'Architecture and flow diagrams, in Files', soon: 'Diagrams assigned to this workspace will live here.' },
+  diagrams: { title: 'Whiteboards', icon: Presentation, hint: 'Draw freely or with shapes: lessons, architecture, schemas. In Files', soon: 'Whiteboards assigned to this workspace will live here.' },
   exercises: { title: 'Exercises', icon: Shapes, hint: 'Practice and submissions', soon: 'Exercises and submissions will live here.' },
   github: { title: 'GitHub', icon: GitPullRequest, hint: 'Linked repositories' },
-  live: { title: 'Meetings', icon: Video, hint: 'Video meetings and schedule' },
+  live: { title: 'Meetings', icon: CalendarDays, hint: 'Video meetings and schedule' },
   members: { title: 'Members', icon: Users },
 }
 

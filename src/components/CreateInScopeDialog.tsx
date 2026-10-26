@@ -18,6 +18,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useCurrentTeam } from '@/features/teams/hooks'
 import { workspaceTypes } from '@/features/teams/permissions'
 import { useCollectionView } from '@/features/collections/hooks'
+import { AccessChoice } from '@/features/docs/components/AccessChoice'
+import type { FileAccess } from '@/features/docs/sharing'
 import { ownWrite } from '@/lib/realtime'
 
 const TEAM_WIDE = 'team'
@@ -32,7 +34,7 @@ type CreateInScopeDialogProps = {
   groupWideOnly?: boolean
   /** Who may create in a scope (null = team-wide). Mirrors RLS; UI only. */
   canWrite: (workspaceId: string | null) => boolean
-  create: (input: { teamId: string; workspaceId: string | null; title: string }) => Promise<{ id: string }>
+  create: (input: { teamId: string; workspaceId: string | null; title: string; access: FileAccess }) => Promise<{ id: string }>
   /** The lists the new item shows up in, refetched after creating. */
   queryKeys: readonly (readonly string[])[]
   /** The table it is inserted into, so its own live-update echo isn't refetched as well. */
@@ -85,10 +87,12 @@ export function CreateInScopeDialog({
   }
   const [title, setTitle] = useState('')
   const [scope, setScope] = useState(options[0] ?? TEAM_WIDE)
+  const [access, setAccess] = useState<FileAccess>('place')
+  const placeName = scope === TEAM_WIDE ? 'the group' : (workspaces.find((w) => w.id === scope)?.title ?? 'this workspace')
 
   const create = useMutation({
     mutationFn: async () => {
-      const made = await createItem({ teamId: team.id, workspaceId: scope === TEAM_WIDE ? null : scope, title })
+      const made = await createItem({ teamId: team.id, workspaceId: scope === TEAM_WIDE ? null : scope, title, access })
       ownWrite(table, made.id)
       return made
     },
@@ -114,6 +118,7 @@ export function CreateInScopeDialog({
         if (!next) {
           setTitle('')
           setScope(options[0])
+          setAccess('place')
           create.reset()
         }
       }}
@@ -130,9 +135,7 @@ export function CreateInScopeDialog({
           <DialogHeader>
             <DialogTitle>New {noun}</DialogTitle>
             <DialogDescription>
-              {workspaceId
-                ? 'Visible to everyone in this workspace and to group owners/admins.'
-                : `Group-wide ${noun}s are visible to the whole group. Workspace ${noun}s only to that workspace (and group owners/admins).`}
+              {workspaceId ? `A new ${noun} in this workspace.` : `Pick where the ${noun} belongs and who can open it.`}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-1.5">
@@ -179,6 +182,7 @@ export function CreateInScopeDialog({
               <p className="text-xs text-muted-foreground">This can’t be changed later.</p>
             </div>
           )}
+          <AccessChoice value={access} onChange={setAccess} placeName={placeName} />
           {create.isError && (
             <p role="alert" className="text-sm text-destructive">
               {create.error.message}

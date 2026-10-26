@@ -1,11 +1,12 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
-import { lazy, Suspense } from 'react'
+import { Suspense } from 'react'
 import { useParams } from 'react-router'
 import { Skeleton } from '@/components/ui/skeleton'
 import { lessonQuery } from '@/features/learning/api'
+import { lessonView } from '@/features/learning/screens'
 
 // The editor (TipTap) is only downloaded when a lesson is opened.
-const LessonView = lazy(() => import('@/features/learning/components/LessonView'))
+const LessonView = lessonView.Component
 
 /** One lesson at …/w/:workspaceId/learning/:lessonId (lessonLoader has checked it's in this workspace). */
 export function LessonPage() {

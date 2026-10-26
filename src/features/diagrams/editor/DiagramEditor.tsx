@@ -22,17 +22,21 @@ import { cn } from '@/lib/utils'
 import { DiagramEditorContext } from './context'
 import { edgeTypes, flowStyle, nodeTypes } from './flowTypes'
 import { GuideLines } from './GuideLines'
+import { HIGHLIGHTER_SIZE, PEN_SIZES } from './ink'
+import { InkLayer, type DrawTool } from './InkLayer'
 import { snapToGuides, type Guides } from './guides'
 import { findMermaid } from './mermaid/detect'
 import { importSummary, skippedSummary } from './mermaid/summary'
 import { MermaidImportDialog, type ImportedDiagram } from './MermaidImportDialog'
 import {
   createEdge,
+  createInk,
   createNode,
   normalizeOrder,
   parse,
   serialize,
   withDescendants,
+  type ColorKey,
   type ConnectorData,
   type DiagramContent,
   type DiagramEdge,
@@ -50,6 +54,7 @@ const GRID = 16
 const PROPERTIES_KEY = 'devdock-diagram-properties'
 const SNAP_KEY = 'devdock-diagram-snap'
 const FINE_GRID_KEY = 'devdock-diagram-fine-grid'
+const INK_KEY = 'devdock-whiteboard-ink'
 const PASTE_OFFSET = 24
 /** Starts what the editor puts on the clipboard, so a paste can tell its own content from any other text. */
 const CLIP_MARKER = 'devdock-diagram/v1\n'
@@ -136,6 +141,46 @@ function Editor({ initial, readOnly, onChange, fullscreen, onFullscreen }: Diagr
       // Storage unavailable (private mode): the choice lasts for this visit only.
     }
   }
+  // ---- drawing: the tool in hand, and the pen's and highlighter's color and the pen's size (remembered here)
+  const [tool, setToolState] = useState<'select' | DrawTool>('select')
+  const [ink, setInkState] = useState<{ pen: ColorKey; highlighter: ColorKey; size: number }>(() => {
+    try {
+      const saved = JSON.parse(readStored(INK_KEY) ?? 'null') as { pen?: ColorKey; highlighter?: ColorKey; size?: number } | null
+      return {
+        pen: saved?.pen ?? 'default',
+        highlighter: saved?.highlighter ?? 'amber',
+        size: PEN_SIZES.includes(saved?.size as (typeof PEN_SIZES)[number]) ? (saved?.size as number) : PEN_SIZES[1],
+      }
+    } catch {
+      return { pen: 'default', highlighter: 'amber', size: PEN_SIZES[1] }
+    }
+  })
+  const setInk = (patch: Partial<typeof ink>) => {
+    const next = { ...ink, ...patch }
+    setInkState(next)
+    store(INK_KEY, JSON.stringify(next))
+  }
+  const drawing = tool !== 'select'
+  const setTool = (next: 'select' | DrawTool) => {
+    setToolState(next)
+    // Drawing starts from a clean slate: nothing stays selected under the pen.
+    if (next !== 'select') {
+      setNodes((ns) => (ns.some((n) => n.selected) ? ns.map((n) => (n.selected ? { ...n, selected: false } : n)) : ns))
+      setEdges((es) => (es.some((e) => e.selected) ? es.map((e) => (e.selected ? { ...e, selected: false } : e)) : es))
+      setEditingId(null)
+    }
+  }
+  const addStroke = (points: number[][], pressure: boolean) => {
+    if (tool !== 'pen' && tool !== 'highlighter') return
+    snapshot()
+    const size = tool === 'pen' ? ink.size : HIGHLIGHTER_SIZE
+    setNodes((ns) => [...ns, createInk(points, tool, size, pressure, ink[tool])])
+  }
+  const eraseStrokes = (ids: string[]) => {
+    const gone = new Set(ids)
+    setNodes((ns) => ns.filter((n) => !gone.has(n.id)))
+  }
+
   const canvas = useRef<HTMLDivElement>(null)
   // The panel's "Recently used" (this browser only).
   const [recent, setRecent] = useState(readRecent)
@@ -391,7 +436,7 @@ function Editor({ initial, readOnly, onChange, fullscreen, onFullscreen }: Diagr
       insert([node])
       setRecent((list) => withRecent(list, item))
     },
-    [flow, findContainer, insert, snapToGrid],
+    [flow, findContainer, insert, snapToGrid, setRecent],
   )
 
   const onDrop = useCallback(
@@ -702,6 +747,11 @@ function Editor({ initial, readOnly, onChange, fullscreen, onFullscreen }: Diagr
         setNodes((ns) =>
           ns.map((n) => (ids.has(n.id) ? { ...n, position: { x: n.position.x + dx, y: n.position.y + dy } } : n)),
         )
+      } else if (!mod && !event.altKey && (key === 'v' || key === 'p' || key === 'h' || key === 'e')) {
+        event.preventDefault()
+        setTool(key === 'v' ? 'select' : key === 'p' ? 'pen' : key === 'h' ? 'highlighter' : 'eraser')
+      } else if (key === 'escape' && drawing) {
+        setTool('select')
       } else if (key === 'escape') {
         setNodes((ns) => ns.map((n) => (n.selected ? { ...n, selected: false } : n)))
         setEdges((es) => es.map((e) => (e.selected ? { ...e, selected: false } : e)))
@@ -769,6 +819,12 @@ function Editor({ initial, readOnly, onChange, fullscreen, onFullscreen }: Diagr
           snapToGrid={snapToGrid}
           onSnapToGrid={setSnapToGrid}
           onImportMermaid={() => setMermaidOpen(true)}
+          tool={tool}
+          onTool={setTool}
+          inkColor={tool === 'highlighter' ? ink.highlighter : ink.pen}
+          onInkColor={(color) => setInk(tool === 'highlighter' ? { highlighter: color } : { pen: color })}
+          penSize={ink.size}
+          onPenSize={(size) => setInk({ size })}
         />
         {!readOnly && <MermaidImportDialog open={mermaidOpen} onOpenChange={setMermaidOpen} onImport={addImported} />}
         <div className="flex min-h-0 flex-1">
@@ -809,7 +865,7 @@ function Editor({ initial, readOnly, onChange, fullscreen, onFullscreen }: Diagr
               connectionLineType={ConnectionLineType.SmoothStep}
               connectionRadius={28}
               // Lucid-style navigation: drag on empty canvas selects, space/middle-drag or scroll pans.
-              selectionOnDrag={!readOnly}
+              selectionOnDrag={!readOnly && !drawing}
               selectionMode={SelectionMode.Partial}
               panOnDrag={readOnly ? true : [1, 2]}
               panOnScroll
@@ -820,9 +876,9 @@ function Editor({ initial, readOnly, onChange, fullscreen, onFullscreen }: Diagr
               maxZoom={4}
               fitView
               fitViewOptions={{ padding: 0.2, maxZoom: 1 }}
-              nodesDraggable={!readOnly}
-              nodesConnectable={!readOnly}
-              elementsSelectable={!readOnly}
+              nodesDraggable={!readOnly && !drawing}
+              nodesConnectable={!readOnly && !drawing}
+              elementsSelectable={!readOnly && !drawing}
               edgesReconnectable={!readOnly}
               deleteKeyCode={readOnly ? null : ['Backspace', 'Delete']}
               multiSelectionKeyCode={['Meta', 'Control', 'Shift']}
@@ -859,10 +915,24 @@ function Editor({ initial, readOnly, onChange, fullscreen, onFullscreen }: Diagr
                 <Background variant={BackgroundVariant.Dots} gap={GRID} size={1.2} color="var(--border)" />
               )}
               <GuideLines guides={guides} />
+              {!readOnly && drawing && (
+                <InkLayer
+                  tool={tool}
+                  color={tool === 'highlighter' ? ink.highlighter : ink.pen}
+                  size={tool === 'highlighter' ? HIGHLIGHTER_SIZE : ink.size}
+                  onStroke={addStroke}
+                  onEraseStart={snapshot}
+                  onErase={eraseStrokes}
+                />
+              )}
             </ReactFlow>
             {nodes.length === 0 && (
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-muted-foreground">
-                {readOnly ? 'This diagram is empty.' : 'Drag shapes and icons from the left, click one to add it, or paste Mermaid code.'}
+                {readOnly
+                  ? 'This whiteboard is empty.'
+                  : drawing
+                    ? 'Draw anywhere. Press V or Esc to go back to selecting.'
+                    : 'Draw with the pen (P), drag shapes from the left, or paste Mermaid code.'}
               </div>
             )}
           </div>

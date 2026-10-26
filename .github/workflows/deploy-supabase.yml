@@ -73,7 +73,35 @@ jobs:
           echo "$files" | grep -q '^supabase/migrations/' && echo "migrations=true" >> "$GITHUB_OUTPUT" || echo "migrations=false" >> "$GITHUB_OUTPUT"
           echo "$files" | grep -qE '^supabase/(functions/|config\.toml$)' && echo "functions=true" >> "$GITHUB_OUTPUT" || echo "functions=false" >> "$GITHUB_OUTPUT"
 
-      - uses: supabase/setup-cli@v1
+      # The CLI is downloaded from GitHub Releases, which sometimes answers 504 for a minute or two.
+      # On 2026-10-26 that failed the prod deploy before any migration ran, while Vercel had already
+      # shipped the site that needed them. So: three tries, waiting longer before each.
+      - name: Install the Supabase CLI
+        id: cli1
+        continue-on-error: true
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.117.0
+
+      - name: Wait before trying again
+        if: steps.cli1.outcome == 'failure'
+        run: sleep 30
+
+      - name: Install the Supabase CLI (second try)
+        id: cli2
+        if: steps.cli1.outcome == 'failure'
+        continue-on-error: true
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.117.0
+
+      - name: Wait longer before the last try
+        if: steps.cli2.outcome == 'failure'
+        run: sleep 120
+
+      - name: Install the Supabase CLI (last try)
+        if: steps.cli2.outcome == 'failure'
+        uses: supabase/setup-cli@v1
         with:
           version: 2.117.0
 

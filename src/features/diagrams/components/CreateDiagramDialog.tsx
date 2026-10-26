@@ -26,7 +26,7 @@ export function CreateDiagramDialog({
   const { team } = useCurrentTeam()
   return (
     <CreateInScopeDialog
-      noun="diagram"
+      noun="whiteboard"
       placeholder="System architecture"
       workspaceId={workspaceId}
       groupWideOnly={!workspaceId && (groupWide || !!folderId)}

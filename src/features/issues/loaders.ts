@@ -3,8 +3,18 @@ import { requireUser } from '@/features/auth/loaders'
 import { queryClient } from '@/lib/query-client'
 import { workspaceReposQuery } from '@/features/repos/api'
 import { workspaceMembersQuery, workspaceQuery } from '@/features/workspaces/api'
-import { cyclesQuery, issueQuery, labelsQuery, workspaceIssuesQuery } from './api'
+import {
+  activityQuery,
+  commentsQuery,
+  cyclesQuery,
+  issueBranchesQuery,
+  issueQuery,
+  labelsQuery,
+  pullRequestsQuery,
+  workspaceIssuesQuery,
+} from './api'
 import { workspaceViewsQuery } from './viewsApi'
+import { issueView } from './screens'
 
 /**
  * …/w/:workspaceId/issues/:issueNumber: 404 unless the number is valid and the
@@ -15,8 +25,17 @@ export async function issueLoader({ request, params }: LoaderFunctionArgs) {
   await requireUser(request)
   const number = Number(params.issueNumber)
   if (!Number.isInteger(number) || number < 1) throw data('Issue not found.', { status: 404 })
-  const issue = await queryClient.ensureQueryData(issueQuery(params.workspaceId ?? '', number))
+  // The page's code downloads alongside the issue, so it renders without waiting on it.
+  const [issue] = await Promise.all([queryClient.ensureQueryData(issueQuery(params.workspaceId ?? '', number)), issueView.preload()])
   if (!issue) throw data('Issue not found, or you don’t have access to it.', { status: 404 })
+  // Everything the page reads next, side by side (it was three rounds: the issue, then comments and
+  // activity, then the Development block's PRs and branches, each starting when the one before rendered).
+  await Promise.all([
+    queryClient.prefetchQuery(commentsQuery(issue.id)),
+    queryClient.prefetchQuery(activityQuery(issue.id)),
+    queryClient.prefetchQuery(pullRequestsQuery(issue.id)),
+    queryClient.prefetchQuery(issueBranchesQuery(issue.id)),
+  ])
   return null
 }
 

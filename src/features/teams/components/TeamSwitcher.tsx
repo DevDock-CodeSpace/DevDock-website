@@ -22,7 +22,7 @@ import { availableCollections, pickCollection, readCollectionView, rememberColle
 import { teamCollectionsQuery, teamWorkspacesQuery } from '@/features/workspaces/api'
 import { teamLogoUrl, type Team } from '../api'
 import { useCurrentTeam, useMyTeams } from '../hooks'
-import { teamPath } from '../nav'
+import { startPath } from '../landing'
 import { teamPermissions, teamRoleLabel, teamTypes } from '../permissions'
 
 /**
@@ -44,7 +44,8 @@ export function TeamSwitcher() {
   const open = (slug: string, teamId: string, collectionId?: string) => {
     if (collectionId) rememberCollectionView(teamId, collectionId)
     if (isMobile) setOpenMobile(false)
-    navigate(teamPath(slug))
+    // Through the start route: a learning collection or group opens your course, the rest open Chat.
+    navigate(startPath(slug))
   }
 
   // Collapsed to icons there is no room for the menu and the sidebar button side by side: the logo

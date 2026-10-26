@@ -99,6 +99,19 @@ export const swatchClass: Classes = {
   violet: 'bg-violet-500',
 }
 
+/** Fill of a drawn stroke (its outline is a filled shape). `default` is the text color, so ink reads in both themes. */
+export const inkClass: Classes = {
+  default: 'fill-foreground',
+  blue: 'fill-blue-500',
+  teal: 'fill-teal-500',
+  green: 'fill-green-500',
+  amber: 'fill-amber-400',
+  orange: 'fill-orange-500',
+  red: 'fill-red-500',
+  pink: 'fill-pink-500',
+  violet: 'fill-violet-500',
+}
+
 export const COLOR_KEYS: ColorKey[] = ['default', 'blue', 'teal', 'green', 'amber', 'orange', 'red', 'pink', 'violet']
 export const FILL_KEYS: FillKey[] = ['none', ...COLOR_KEYS]
 

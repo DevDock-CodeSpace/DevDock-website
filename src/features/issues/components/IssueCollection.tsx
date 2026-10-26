@@ -14,6 +14,8 @@ import { ShortcutsDialog } from './ShortcutsDialog'
 type IssueCollectionProps = {
   issues: Issue[]
   view: 'list' | 'board'
+  /** List only: sub-issues under their parent. */
+  nested?: boolean
   /** Shown instead of the list when there are no issues to show. */
   empty: ReactNode
   /** New issues start in this cycle (a cycle's page). */
@@ -33,6 +35,7 @@ type IssueCollectionProps = {
 export function IssueCollection({
   issues,
   view,
+  nested,
   empty,
   cycleId,
   shortcuts,
@@ -78,7 +81,7 @@ export function IssueCollection({
       ) : view === 'board' ? (
         <IssueBoard issues={issues} onCreate={setCreating} />
       ) : (
-        <IssueList issues={issues} onCreate={setCreating} />
+        <IssueList issues={issues} onCreate={setCreating} nested={nested} />
       )}
       {/* Keyed so its fields reset to where it was opened from. */}
       <CreateIssueDialog

@@ -18,7 +18,7 @@ const NOT_LIVE: ((key: readonly unknown[]) => boolean)[] = [
   (key) => key[0] === 'teams' && key.includes('invites'),
   (key) => key[0] === 'repos' && (key[1] === 'installations' || key[1] === 'github' || key[1] === 'branches'),
   (key) => key[0] === 'documents' && key[1] === 'image',
-  (key) => key[0] === 'messaging' && key[1] === 'search',
+  (key) => key[0] === 'messaging' && (key[1] === 'search' || key[1] === 'image-urls'),
   // Reads issues, whose events don't reach this key.
   (key) => key[0] === 'reminders' && key[1] === 'issue-options',
 ]

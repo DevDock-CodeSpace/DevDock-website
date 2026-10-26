@@ -1,8 +1,9 @@
 import { useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
-import { MessageCircle, Search } from 'lucide-react'
-import { lazy, Suspense, useCallback, useMemo, useState } from 'react'
+import { ChevronRight, MessageCircle, Plus, Search } from 'lucide-react'
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { DockSpinner } from '@/components/DockSpinner'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useAuth } from '@/features/auth/hooks'
 import { teamMembersQuery } from '@/features/teams/api'
@@ -15,11 +16,15 @@ import {
 import { ConversationItem } from '@/features/messaging/components/ConversationItem'
 import { NewConversationDialog } from '@/features/messaging/components/NewConversationDialog'
 import { useUnread } from '@/features/messaging/hooks'
+import { readLastConversation, rememberConversation } from '@/features/messaging/lastConversation'
+import { conversationView } from '@/features/messaging/screens'
+import { useCollapsedSections } from '@/features/messaging/useCollapsedSections'
 import { conversationTitle, displayName } from '@/features/messaging/names'
 import { ownWrite } from '@/lib/realtime'
+import { cn } from '@/lib/utils'
 
 // The message editor (TipTap) is only needed once a conversation opens, so it loads on demand.
-const ConversationView = lazy(() => import('@/features/messaging/components/ConversationView').then((m) => ({ default: m.ConversationView })))
+const ConversationView = conversationView.Component
 
 export function MessagesPage() {
   const { team, can } = useCurrentTeam()
@@ -29,10 +34,14 @@ export function MessagesPage() {
   const people = useSuspenseQuery(teamMembersQuery(team.id)).data
   const conversationMembers = useSuspenseQuery(teamConversationMembersQuery(team.id)).data
   const unread = useUnread(team.id)
+  const sectionState = useCollapsedSections()
   const [search, setSearch] = useState('')
   // The open conversation (and a message to scroll to) live in the URL, so links to a message work.
   const [params, setParams] = useSearchParams()
-  const selectedId = params.get('c') ?? undefined
+  // The link's conversation, else the one you last had open here (never one picked for you, like #general).
+  const [lastId] = useState(() => readLastConversation(team.id))
+  const selectedId = params.get('c') ?? lastId ?? undefined
+  const [newOpen, setNewOpen] = useState(false)
   const targetMessageId = params.get('m') ?? undefined
   const select = useCallback(
     (conversationId: string, messageId?: string) =>
@@ -62,21 +71,26 @@ export function MessagesPage() {
     conversation.kind === 'dm' ? people.find((person) => person.user_id !== user.id && participants.get(conversation.id)?.includes(person.user_id))?.profile : undefined
   const visible = conversations.filter((conversation) => titleOf(conversation).toLowerCase().includes(search.trim().toLowerCase()))
   const sections = [
-    { label: 'Channels', items: visible.filter((conversation) => conversation.kind === 'channel') },
-    { label: 'Direct messages', items: visible.filter((conversation) => conversation.kind === 'dm') },
-    { label: 'Groups', items: visible.filter((conversation) => conversation.kind === 'group') },
+    { kind: 'channel', label: 'Channels', items: visible.filter((conversation) => conversation.kind === 'channel') },
+    { kind: 'dm', label: 'Direct messages', items: visible.filter((conversation) => conversation.kind === 'dm') },
+    { kind: 'group', label: 'Groups', items: visible.filter((conversation) => conversation.kind === 'group') },
   ].filter((section) => section.items.length > 0)
-  const selected = conversations.find((conversation) => conversation.id === selectedId) ?? visible[0] ?? conversations[0]
+  const selected = conversations.find((conversation) => conversation.id === selectedId)
+  useEffect(() => {
+    if (selected) rememberConversation(team.id, selected.id)
+  }, [selected, team.id])
+  // Nobody to talk to yet (a new account or a new member): explain how to start, not just "pick one".
+  const firstTime = !conversations.some((conversation) => conversation.kind !== 'channel')
 
   return (
     <div className="flex h-[calc(100svh-3rem)] min-h-96 flex-col overflow-hidden bg-background lg:flex-row">
       <aside className="flex w-full shrink-0 flex-col border-b bg-muted/20 lg:w-64 lg:border-r lg:border-b-0">
         <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b px-4 lg:h-14">
           <div className="min-w-0">
-            <h1 className="text-sm font-semibold">Messages</h1>
+            <h1 className="text-sm font-semibold">Chat</h1>
             <p className="truncate text-xs text-muted-foreground">{team.name}</p>
           </div>
-          <NewConversationDialog teamId={team.id} people={people} canCreateChannel={can.isAdmin} onCreated={(id) => {
+          <NewConversationDialog teamId={team.id} people={people} canCreateChannel={can.isAdmin} open={newOpen} onOpenChange={setNewOpen} onCreated={(id) => {
               select(id)
               // The list, who is in what, and the unread counts; not every open conversation's messages. Its own echo is dropped.
               for (const table of ['conversations', 'conversation_members']) ownWrite(table, id)
@@ -105,9 +119,22 @@ export function MessagesPage() {
           </div>
         )}
         <nav aria-label="Conversations" className="flex gap-1 overflow-x-auto px-2 pb-2 lg:block lg:min-h-0 lg:flex-1 lg:space-y-4 lg:overflow-x-visible lg:overflow-y-auto lg:pt-2">
-          {sections.map((section) => (
-            <div key={section.label} className="flex gap-1 lg:block lg:space-y-0.5">
-              <h3 className="px-2 pb-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase max-lg:hidden">{section.label}</h3>
+          {sections.map((section) => {
+            // A closed section hides its rows on wide screens only; the phone strip has no headings to reopen it.
+            const collapsed = sectionState.isCollapsed(section.kind)
+            return (
+            <div key={section.kind} className="flex gap-1 lg:block lg:space-y-0.5">
+              <h3 className="max-lg:hidden">
+                <button
+                  type="button"
+                  aria-expanded={!collapsed}
+                  className="flex w-full items-center gap-1 rounded px-1 pb-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase hover:text-foreground"
+                  onClick={() => sectionState.toggle(section.kind)}
+                >
+                  <ChevronRight className={cn('size-3 transition-transform', !collapsed && 'rotate-90')} />
+                  {section.label}
+                </button>
+              </h3>
               {section.items.map((conversation) => {
                 const counts = unread.byConversation.get(conversation.id)
                 return (
@@ -121,11 +148,13 @@ export function MessagesPage() {
                     mentions={counts?.mention_count ?? 0}
                     muted={unread.muted.has(conversation.id)}
                     onClick={() => select(conversation.id)}
+                    className={cn(collapsed && 'lg:hidden')}
                   />
                 )
               })}
             </div>
-          ))}
+            )
+          })}
           {visible.length === 0 && <p className="px-2 py-6 text-center text-sm text-muted-foreground">No conversations found.</p>}
         </nav>
       </aside>
@@ -148,8 +177,29 @@ export function MessagesPage() {
             />
           </Suspense>
         ) : (
-          <div className="flex h-full items-center justify-center p-8 text-center text-sm text-muted-foreground">
-            <div><MessageCircle className="mx-auto mb-2 size-8" /><p>Select a conversation to start messaging.</p></div>
+          <div className="flex h-full items-center justify-center p-8 text-center">
+            {firstTime ? (
+              <div className="max-w-sm">
+                <MessageCircle className="mx-auto mb-3 size-8 text-muted-foreground" />
+                <h2 className="text-base font-semibold">Start a conversation</h2>
+                <ol className="mt-3 space-y-1.5 text-left text-sm text-muted-foreground">
+                  <li>1. Press <span className="font-medium text-foreground">New conversation</span> (or the + above the list).</li>
+                  <li>2. Pick one person for a direct message, or several for a group.</li>
+                  <li>3. Write your message. Only the people in it can read it.</li>
+                </ol>
+                <p className="mt-3 text-left text-sm text-muted-foreground">
+                  <span className="font-medium text-foreground">#general</span> is for everyone in {team.name}.
+                </p>
+                <Button className="mt-5" onClick={() => setNewOpen(true)}>
+                  <Plus /> New conversation
+                </Button>
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground">
+                <MessageCircle className="mx-auto mb-2 size-8" />
+                <p>Pick a conversation on the left, or press + to start one.</p>
+              </div>
+            )}
           </div>
         )}
       </section>

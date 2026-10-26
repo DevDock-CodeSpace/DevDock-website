@@ -1,5 +1,5 @@
 import { LoaderCircle } from 'lucide-react'
-import { useState, type FormEvent } from 'react'
+import { useState, type FormEvent, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -22,6 +22,7 @@ export function NameDialog({
   submitLabel,
   placeholder = '',
   onSubmit,
+  children,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -31,6 +32,8 @@ export function NameDialog({
   submitLabel: string
   placeholder?: string
   onSubmit: (name: string) => Promise<void>
+  /** More fields under the name (e.g. who can open a new folder). */
+  children?: ReactNode
 }) {
   const [name, setName] = useState(initialName)
   const [pending, setPending] = useState(false)
@@ -70,6 +73,7 @@ export function NameDialog({
               onChange={(e) => setName(e.target.value)}
             />
           </div>
+          {children}
           {error && (
             <p role="alert" className="text-sm text-destructive">
               {error}

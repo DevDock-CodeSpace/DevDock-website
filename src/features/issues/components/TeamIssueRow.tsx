@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { issuePath } from '@/features/teams/nav'
 import { workspaceMembersQuery, type WorkspaceMember } from '@/features/workspaces/api'
 import { cyclesQuery, type IssuePatch, type TeamIssue } from '../api'
+import type { RowNest } from './IssueList'
 import { IssueRowView } from './IssueRowView'
 
 /**
@@ -13,6 +14,7 @@ import { IssueRowView } from './IssueRowView'
 export function TeamIssueRow({
   issue,
   subIssues,
+  nest,
   teamSlug,
   userId,
   showProject,
@@ -20,6 +22,7 @@ export function TeamIssueRow({
 }: {
   issue: TeamIssue
   subIssues?: { done: number; total: number }
+  nest?: RowNest
   teamSlug: string
   userId: string
   showProject: boolean
@@ -38,6 +41,7 @@ export function TeamIssueRow({
     <IssueRowView
       issue={issue}
       subIssues={subIssues}
+      nest={nest}
       source={{
         href: issuePath(teamSlug, issue.workspace.id, issue.number),
         workspace: issue.workspace,

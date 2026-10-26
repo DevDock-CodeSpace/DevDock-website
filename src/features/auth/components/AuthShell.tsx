@@ -1,4 +1,4 @@
-import { CalendarDays, Check, CircleDot, FileText, GitPullRequest, Video, Workflow, type LucideIcon } from 'lucide-react'
+import { CalendarDays, Check, CircleCheckBig, FileText, GitPullRequest, Presentation, Video, type LucideIcon } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { LogoMark, LogoWordmark } from '@/components/Logo'
@@ -8,10 +8,10 @@ import { cn } from '@/lib/utils'
 type Tool = 'issues' | 'docs' | 'diagrams' | 'meetings'
 
 const TOOLS: { id: Tool; label: string; icon: LucideIcon }[] = [
-  { id: 'issues', label: 'Issues & sprints', icon: CircleDot },
+  { id: 'issues', label: 'Issues & sprints', icon: CircleCheckBig },
   { id: 'docs', label: 'Docs', icon: FileText },
-  { id: 'diagrams', label: 'Diagrams', icon: Workflow },
-  { id: 'meetings', label: 'Meetings', icon: Video },
+  { id: 'diagrams', label: 'Whiteboards', icon: Presentation },
+  { id: 'meetings', label: 'Meetings', icon: CalendarDays },
 ]
 
 /** How long each tool stays in the showcase before the next one, unless someone picks one. */
@@ -226,7 +226,7 @@ function IssuesPanel() {
         [
           ['WEB-14', 'Remember me on the sign-in page', 'border-muted-foreground/50', 'Ana'],
           ['WEB-9', 'Group invite codes', 'border-emerald-500 bg-emerald-500', 'Sam'],
-          ['WEB-15', 'Dark mode for diagrams', 'border-muted-foreground/50', 'Lee'],
+          ['WEB-15', 'Dark mode for whiteboards', 'border-muted-foreground/50', 'Lee'],
         ] as const
       ).map(([key, name, dot, who]) => (
         <div key={key} className="flex items-center gap-3 border-b px-4 py-2.5 last:border-b-0">

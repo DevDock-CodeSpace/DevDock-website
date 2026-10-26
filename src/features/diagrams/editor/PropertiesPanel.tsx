@@ -78,6 +78,15 @@ function NodeOptions({ nodes, onNodes, onAlign, onDistribute }: PropertiesPanelP
   const allIcons = nodes.every((n) => n.type === 'icon')
   const single = nodes.length === 1 ? nodes[0] : null
 
+  // Drawn strokes only have a color.
+  if (nodes.every((n) => n.type === 'ink')) {
+    return (
+      <Group title={nodes.length === 1 ? (nodes[0].data.ink?.tool === 'highlighter' ? 'Highlight' : 'Drawing') : `${nodes.length} strokes`}>
+        <Swatches<ColorKey> keys={COLOR_KEYS} value={same('stroke')} onChange={(stroke) => onNodes({ stroke })} kind="line" />
+      </Group>
+    )
+  }
+
   return (
     <>
       <Group title={nodes.length === 1 ? kindTitle(nodes[0]) : `${nodes.length} shapes`}>
@@ -231,7 +240,7 @@ const shortcuts: [string, string][] = [
   ['⌘ + scroll / pinch', 'Zoom'],
   ['⌘Z / ⇧⌘Z', 'Undo / redo'],
   ['⌘C ⌘V ⌘D', 'Copy, paste, duplicate'],
-  ['⌘C here, ⌘V there', 'Copy to another diagram'],
+  ['⌘C here, ⌘V there', 'Copy to another whiteboard'],
   ['⌘A', 'Select all'],
   ['Arrows', 'Nudge (⇧ = 10px; a grid step when snapping)'],
   ['⌘Enter', 'Finish a paragraph, list or table'],
@@ -291,6 +300,7 @@ function kindTitle(node: DiagramNode) {
   if (node.type === 'container') return 'Container'
   if (node.type === 'icon') return 'Icon'
   if (node.type === 'block') return blockLabels[node.data.block ?? 'paragraph']
+  if (node.type === 'ink') return 'Drawing'
   return node.data.shape === 'text' ? 'Text' : 'Shape'
 }
 

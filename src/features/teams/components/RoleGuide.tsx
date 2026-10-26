@@ -63,7 +63,7 @@ export function RoleGuide({ type, myRole }: { type: TeamType; myRole: TeamRole }
         `Decide who sees each ${noun}: only the people added, everyone in its collection, or the whole group`,
         'Create collections and choose their people',
         `See and manage every ${noun}, even ones they haven’t joined`,
-        'Write group-wide diagrams, delete group-wide docs and organize their folders, schedule group-wide meetings, and change group settings',
+        'Write group-wide whiteboards, delete group-wide docs and organize their folders, schedule group-wide meetings, and change group settings',
         'Add and remove the group’s GitHub repositories',
       ],
     },
@@ -73,7 +73,7 @@ export function RoleGuide({ type, myRole }: { type: TeamType; myRole: TeamRole }
       who: who.member,
       can: [
         `Sees the ${nouns} they’ve been added to, plus any that are open to the group or to a collection they’re in`,
-        'Reads group-wide diagrams, and creates and edits group-wide docs',
+        'Reads group-wide whiteboards, and creates and edits group-wide docs',
         `What they can do inside a ${noun} depends on their role there (below)`,
         'Can leave the group at any time',
       ],
@@ -86,7 +86,7 @@ export function RoleGuide({ type, myRole }: { type: TeamType; myRole: TeamRole }
       who: who.lead,
       can: [
         `Change the ${noun}’s settings and tools, and add or remove its members`,
-        'Write its diagrams, delete its docs, and organize doc folders',
+        'Write its whiteboards, delete its docs, and organize doc folders',
         'Schedule its meetings',
         'Delete issues, and manage labels and sprints',
         'Link the group’s repositories to it, and set their branches',
@@ -101,7 +101,7 @@ export function RoleGuide({ type, myRole }: { type: TeamType; myRole: TeamRole }
       who: type === 'learning' ? 'Takes the course' : `Works in the ${noun}`,
       can: [
         `Anyone a ${noun} is open to works as a member, without being added by name`,
-        'Creates and edits its docs, and reads its diagrams',
+        'Creates and edits its docs, and reads its whiteboards',
         'Creates and updates issues (including their repository), and comments',
         'On issues in a connected repo, In Review and Done come from GitHub: open a PR, then merge it',
         ...(type === 'learning' ? ['Takes lessons and tracks their own progress'] : []),

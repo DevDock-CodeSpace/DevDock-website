@@ -1,12 +1,13 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
-import { lazy, Suspense } from 'react'
+import { Suspense } from 'react'
 import { useParams } from 'react-router'
 import { Skeleton } from '@/components/ui/skeleton'
 import { documentQuery } from '@/features/docs/api'
 import { useCanEditDocs, useCanWriteDocs } from '@/features/docs/hooks'
+import { docView } from '@/features/docs/screens'
 
-// The editor (TipTap + highlight.js) is only downloaded when a doc is opened.
-const DocView = lazy(() => import('@/features/docs/components/DocView'))
+// The editor (TipTap + highlight.js) is only downloaded when a doc is opened (docLoader starts it with the data).
+const DocView = docView.Component
 
 /**
  * One doc, at /t/:teamSlug/docs/:docId (team view) or …/w/:workspaceId/docs/:docId
@@ -16,8 +17,10 @@ const DocView = lazy(() => import('@/features/docs/components/DocView'))
 export function DocPage() {
   const { docId = '' } = useParams()
   const doc = useSuspenseQuery(documentQuery(docId)).data
-  const canEdit = useCanEditDocs()(doc?.workspace_id ?? null)
-  const canDelete = useCanWriteDocs()(doc?.workspace_id ?? null)
+  // The role rules, narrowed by how it's shared (a viewer of a restricted doc only reads it).
+  const level = doc?.access_level ?? 0
+  const canEdit = (useCanEditDocs()(doc?.workspace_id ?? null) && level === 3) || level === 2
+  const canDelete = useCanWriteDocs()(doc?.workspace_id ?? null) && level === 3
 
   if (!doc) {
     return <p className="py-16 text-center text-sm text-muted-foreground">This doc doesn’t exist anymore.</p>

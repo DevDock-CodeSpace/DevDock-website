@@ -47,7 +47,7 @@ export function PrivacyPage() {
           <p>DevDock stores the things you and your group create, so you can use them:</p>
           <ul>
             <li>groups, workspaces and who belongs to them, with their roles;</li>
-            <li>docs (including images you add to them) and diagrams;</li>
+            <li>docs (including images you add to them) and whiteboards;</li>
             <li>issues (including images you add to their descriptions), comments, labels and sprints, and a history of changes made to issues;</li>
             <li>the GitHub repositories your group uses (their names and GitHub ids) and which projects use them;</li>
             <li>notes you keep for yourself: their title, details, the time you want them to pop up (if any) and the workspace or issue they are about.</li>
@@ -103,7 +103,8 @@ export function PrivacyPage() {
         <Section title="In your browser">
           <p>
             DevDock keeps your sign-in session and a few preferences in your browser: light or dark theme, the last
-            group you opened, and whether some panels are open. The session stays in the tab you signed in with and
+            group you opened, whether some panels are open, and your Ask DevDock conversation in each group (until you
+            start a new chat). The session stays in the tab you signed in with and
             ends after 4 hours; if you tick “Remember me”, this browser keeps it for up to 12 hours. Either way you are
             signed out after 15 minutes without use. There are no ads, no analytics and no tracking.
           </p>

@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient, useSuspenseQueries, useSuspenseQuery } from '@tanstack/react-query'
-import { ArrowDown, ArrowUp, ChevronDown, Clock, FileText, Folder, Globe, Layers, Plus, Search, Workflow, X, type LucideIcon } from 'lucide-react'
+import { ArrowDown, ArrowUp, ChevronDown, Clock, FileText, Folder, Globe, Layers, Plus, Search, Presentation, X, type LucideIcon } from 'lucide-react'
 import { Suspense, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { PersonAvatar } from '@/components/PersonRow'
@@ -22,7 +22,9 @@ import { useCanEditDocs, useCanWriteDocs } from '../hooks'
 import { CreateDocDialog } from './CreateDocDialog'
 import { DocBrowser } from './DocBrowser'
 import { DocScope } from './DocScope'
+import { useAuth } from '@/features/auth/hooks'
 import { FileRowActions } from './FileRowActions'
+import { RestrictedMark } from './RestrictedMark'
 import { FILE_HEADER, FILE_ROW } from './fileGrid'
 
 /** What the chips choose (`?view=`; the Folders chip is 'files' in code and is the default). */
@@ -115,7 +117,7 @@ export function FilesView({
     { id: 'recent', label: 'Recent', icon: Clock },
     { id: 'files', label: 'Folders', icon: Folder },
     ...(docsOn ? [{ id: 'docs' as const, label: 'Docs', icon: FileText, count: placeDocs.length }] : []),
-    ...(diagramsOn ? [{ id: 'diagrams' as const, label: 'Diagrams', icon: Workflow, count: placeDiagrams.length }] : []),
+    ...(diagramsOn ? [{ id: 'diagrams' as const, label: 'Whiteboards', icon: Presentation, count: placeDiagrams.length }] : []),
   ]
 
   const placeControl = workspace ? undefined : (
@@ -167,7 +169,7 @@ export function FilesView({
             canCreate={canEdit(placeWorkspace ?? null)}
             hrefFor={hrefFor}
             rootLabel={space?.title ?? 'Group-wide'}
-            empty={space ? `Nothing in ${space.title} yet.` : 'Nothing group-wide yet. Create a doc, a diagram or a folder.'}
+            empty={space ? `Nothing in ${space.title} yet.` : 'Nothing group-wide yet. Create a doc, a whiteboard or a folder.'}
           />
         </Suspense>
       ) : (
@@ -296,6 +298,7 @@ function FlatList({
   canWrite: (workspaceId: string | null) => boolean
 }) {
   const { team } = useCurrentTeam()
+  const { user } = useAuth()
   const [now] = useState(Date.now)
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<{ by: 'updated' | 'name'; dir: 'asc' | 'desc' }>({ by: 'updated', dir: 'desc' })
@@ -321,7 +324,7 @@ function FlatList({
         : order * a.item.title.localeCompare(b.item.title, undefined, { sensitivity: 'base' }),
     )
     .slice(0, recent ? RECENT_LIMIT : undefined)
-  const noun = view === 'docs' ? 'doc' : view === 'diagrams' ? 'diagram' : 'file'
+  const noun = view === 'docs' ? 'doc' : view === 'diagrams' ? 'whiteboard' : 'file'
   const sortBy = (by: 'updated' | 'name') =>
     setSort((s) => (s.by === by ? { by, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { by, dir: by === 'name' ? 'asc' : 'desc' }))
   const sortIcon = (by: 'updated' | 'name') =>
@@ -367,7 +370,7 @@ function FlatList({
                 )}
                 {canNewDiagram && (
                   <DropdownMenuItem onSelect={() => setCreating('diagram')}>
-                    <Workflow /> Diagram
+                    <Presentation /> Whiteboard
                   </DropdownMenuItem>
                 )}
               </DropdownMenuContent>
@@ -396,7 +399,7 @@ function FlatList({
           </div>
           <ul>
             {shown.map(({ kind, item }) => {
-              const Icon = kind === 'doc' ? FileText : Workflow
+              const Icon = kind === 'doc' ? FileText : Presentation
               return (
                 <li key={`${kind}:${item.id}`} data-file-row="" className={FILE_ROW}>
                   <span className="flex size-7 items-center justify-center">
@@ -406,8 +409,9 @@ function FlatList({
                     <Link to={hrefFor(kind, item)} className="min-w-0 truncate text-sm font-medium outline-none after:absolute after:inset-0">
                       {item.title}
                     </Link>
-                    <span className="truncate text-xs text-muted-foreground">
-                      {kind === 'doc' ? 'Doc' : 'Diagram'}
+                    <span className="flex min-w-0 items-center gap-1 truncate text-xs text-muted-foreground">
+                      {item.access === 'restricted' && <RestrictedMark />}
+                      {kind === 'doc' ? 'Doc' : 'Whiteboard'}
                       {everywhere ? ` · ${item.author?.display_name ?? 'Former member'}` : placeOf(item.folder_id)}
                     </span>
                   </span>
@@ -423,7 +427,9 @@ function FlatList({
                   )}
                   <span className="text-right font-mono text-xs text-muted-foreground">{timeAgo(item.updated_at, now)}</span>
                   <span className="hidden justify-self-end md:block">
-                    {canWrite(item.workspace_id) && <FileRowActions kind={kind} item={item} folders={everywhere ? undefined : folders} />}
+                    {(canWrite(item.workspace_id) || item.created_by === user.id) && (
+                      <FileRowActions kind={kind} item={item} folders={everywhere ? undefined : folders} canWrite={canWrite(item.workspace_id)} />
+                    )}
                   </span>
                 </li>
               )
