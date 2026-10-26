@@ -1,4 +1,4 @@
-import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query'
+import { infiniteQueryOptions, keepPreviousData, queryOptions } from '@tanstack/react-query'
 import { requireAffected, toDataError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
 import type { Database } from '@/types/database.types'
@@ -79,6 +79,35 @@ export const remindersPageQuery = (teamId: string, userId: string, status: Remin
       return { rows: data, total, next: data.length === REMINDERS_PAGE && after < total ? after : undefined }
     },
     getNextPageParam: (last) => last.next,
+  })
+
+/** A note with a time, as the meetings calendar draws it: a tag on its day. */
+export type CalendarNote = Pick<Reminder, 'id' | 'title' | 'remind_at' | 'status'>
+
+/**
+ * Your open and done notes with a time between `from` and `to` (archived ones stay off the calendar);
+ * with `workspaceId`, only the ones about that workspace. Under the lists' key, so every note change
+ * (here, in the panel or by Realtime) refreshes it too.
+ */
+export const calendarNotesQuery = (teamId: string, userId: string, from: Date, to: Date, workspaceId: string | null) =>
+  queryOptions({
+    queryKey: [...reminderKeys.lists, 'calendar', teamId, userId, workspaceId ?? 'all', from.toISOString(), to.toISOString()],
+    queryFn: async (): Promise<CalendarNote[]> => {
+      let query = supabase
+        .from('reminders')
+        .select('id, title, remind_at, status')
+        .eq('team_id', teamId)
+        .eq('user_id', userId)
+        .in('status', ['pending', 'completed'])
+        .gte('remind_at', from.toISOString())
+        .lt('remind_at', to.toISOString())
+      if (workspaceId) query = query.eq('workspace_id', workspaceId)
+      const { data, error } = await query.order('remind_at').limit(300)
+      if (error) throw toDataError('load notes', error)
+      return data
+    },
+    // Moving to the next month shows this one's until the new one arrives, like the meetings.
+    placeholderData: keepPreviousData,
   })
 
 export type IssueOption = { id: string; number: number; title: string }

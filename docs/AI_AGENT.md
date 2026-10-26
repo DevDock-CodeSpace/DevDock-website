@@ -24,8 +24,9 @@ Ask DevDock panel (src/features/ai, lazy-loaded)
 ```
 
 The function keeps two tables: `ai_pending_actions` (confirmations waiting) and `ai_requests` (a record of each request,
-below). Chat history lives in the browser tab and the last 12 turns are sent with each request (bounded again on the
-server); the chat itself isn't stored, only each request on its own.
+below). Chat history is kept in the browser (localStorage, per person and group, the newest 50 turns, until "New chat";
+`src/features/ai/history.ts`) and the last 12 turns are sent with each request (bounded again on the server); the
+server doesn't store the chat, only each request on its own.
 
 **Request record (`ai_requests`, `agent/record.ts`):** the owner asked (2026-10-19) to keep what people type so a wrong
 answer can be traced (a reminder came out at the wrong time). One row per message request: the text, open page, time
