@@ -401,6 +401,23 @@ export async function uploadMessageAttachment(input: { teamId: string; conversat
   return data
 }
 
+/**
+ * Links for every image shown in a conversation, signed in one request (never one per image).
+ * Keyed by the paths, so a new image asks again; links last an hour and are reused for 50 minutes.
+ */
+export const attachmentImageUrlsQuery = (conversationId: string, paths: string[]) =>
+  queryOptions({
+    queryKey: ['messaging', 'image-urls', conversationId, paths.join('|')] as const,
+    queryFn: async (): Promise<Record<string, string>> => {
+      const { data, error } = await supabase.storage.from('message-attachments').createSignedUrls(paths, 3600)
+      if (error) throw toDataError('load images', { message: error.message })
+      return Object.fromEntries(data.flatMap((item) => (item.path && item.signedUrl ? [[item.path, item.signedUrl]] : [])))
+    },
+    staleTime: 50 * 60_000,
+  })
+
+export const isImageAttachment = (mimeType: string) => mimeType.startsWith('image/')
+
 export async function createSignedAttachmentUrl(storagePath: string) {
   const { data, error } = await supabase.storage.from('message-attachments').createSignedUrl(storagePath, 300)
   if (error) throw toDataError('open the attachment', { message: error.message })

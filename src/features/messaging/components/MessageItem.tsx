@@ -40,11 +40,14 @@ type Props = {
   threadUnread: number
   /** Same author as the message above, a moment later: no avatar or name, just the text. */
   compact: boolean
+  /** Signed links for the conversation's images, from one batch. */
+  imageUrls: Record<string, string> | undefined
+  imagesLoading: boolean
 }
 
 const toolbarButton = 'size-7 text-muted-foreground hover:text-foreground'
 
-export function MessageItem({ message, conversationId, teamId, teamSlug, people, participants, currentUserId, pinned, reactions, attachments, replies, threadUnread, compact }: Props) {
+export function MessageItem({ message, conversationId, teamId, teamSlug, people, participants, currentUserId, pinned, reactions, attachments, replies, threadUnread, compact, imageUrls, imagesLoading }: Props) {
   const queryClient = useQueryClient()
   const [threadOpen, setThreadOpen] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -82,6 +85,11 @@ export function MessageItem({ message, conversationId, teamId, teamSlug, people,
   const name = mine ? 'You' : authorName(message.author_id, people)
   const time = formatTime(message.created_at)
   const mentionNames = people.flatMap((item) => (item.profile?.display_name ? [item.profile.display_name] : []))
+  // Yours sit on the right, everyone else's on the left. Avatar and name only for other people,
+  // and only with more than two people here: in a one-to-one chat you know who wrote it.
+  const showAuthor = !mine && participants.length > 2
+  // Files sent without any text: show just the files, not an empty bubble.
+  const filesOnly = !deleted && attachments.length > 0 && message.body !== null && !JSON.stringify(message.body).includes('"type":"text"')
 
   // One pill per emoji that has reactions: how many, whether you're in it, and who (on hover).
   const pills = MESSAGE_REACTIONS.flatMap((emoji) => {
@@ -97,22 +105,25 @@ export function MessageItem({ message, conversationId, teamId, teamSlug, people,
     <article
       id={`message-${message.id}`}
       className={cn(
-        'group relative flex gap-3 px-4 transition-colors hover:bg-muted/40 focus-within:bg-muted/40',
+        'group relative flex gap-2 px-4 transition-colors',
+        mine && 'justify-end',
         compact ? 'py-0.5' : 'pt-2 pb-1',
         sending && 'opacity-60',
       )}
     >
-      <div className="w-8 shrink-0 pt-0.5">
-        {compact ? (
-          <time className="block pt-1 text-right font-mono text-[10px] text-transparent group-hover:text-muted-foreground" dateTime={message.created_at} title={formatFullDate(message.created_at)}>{time}</time>
-        ) : (
-          <PersonAvatar profile={person?.profile ?? null} className="size-8" fallbackClassName="text-xs" />
-        )}
-      </div>
-      <div className="min-w-0 flex-1">
+      {showAuthor && (
+        <div className="w-8 shrink-0 pt-0.5">
+          {compact ? (
+            <time className="block pt-1 text-right font-mono text-[10px] text-transparent group-hover:text-muted-foreground" dateTime={message.created_at} title={formatFullDate(message.created_at)}>{time}</time>
+          ) : (
+            <PersonAvatar profile={person?.profile ?? null} className="size-8" fallbackClassName="text-xs" />
+          )}
+        </div>
+      )}
+      <div className={cn('min-w-0', editing || threadOpen ? 'flex-1' : 'max-w-[75%]', mine && 'flex flex-col items-end')} title={compact && !showAuthor ? formatFullDate(message.created_at) : undefined}>
         {!compact && (
-          <div className="flex flex-wrap items-baseline gap-x-2">
-            <span className="text-sm font-semibold">{name}</span>
+          <div className={cn('flex flex-wrap items-baseline gap-x-2 px-1 pb-0.5', mine && 'justify-end')}>
+            {showAuthor && <span className="text-sm font-semibold">{name}</span>}
             <time className="font-mono text-[11px] text-muted-foreground" dateTime={message.created_at} title={formatFullDate(message.created_at)}>{time}</time>
             {message.edited_at && !deleted && <span className="text-xs text-muted-foreground">(edited)</span>}
             {sending && <span className="text-xs text-muted-foreground">Sending…</span>}
@@ -120,22 +131,27 @@ export function MessageItem({ message, conversationId, teamId, teamSlug, people,
           </div>
         )}
         {compact && (message.edited_at || sending || pinned) && !deleted && (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div className={cn('flex items-center gap-2 px-1 pb-0.5 text-xs text-muted-foreground', mine && 'justify-end')}>
             {message.edited_at && <span>(edited)</span>}
             {sending && <span>Sending…</span>}
             {pinned && <span className="flex items-center gap-1"><Pin className="size-3 fill-current" />Pinned</span>}
           </div>
         )}
-        {deleted ? (
-          <p className="text-sm text-muted-foreground italic">This message was deleted.</p>
-        ) : editing ? (
-          <MessageEditor body={message.body} saving={edit.isPending} onSave={(content, body) => edit.mutate({ content, body })} onCancel={() => setEditing(false)} />
+        {filesOnly && !editing ? null : editing ? (
+          <div className="self-stretch"><MessageEditor body={message.body} saving={edit.isPending} onSave={(content, body) => edit.mutate({ content, body })} onCancel={() => setEditing(false)} /></div>
         ) : (
-          <MessageBody body={message.body} fallback={message.content} mentionNames={mentionNames} />
+          // A chat bubble, as in Teams or WhatsApp: yours tinted, everyone else's grey.
+          <div className={cn('w-fit max-w-full rounded-2xl px-3 py-1.5', mine ? 'bg-brand/15 dark:bg-brand/30' : 'bg-muted', deleted && 'bg-transparent ring-1 ring-border')}>
+            {deleted ? (
+              <p className="text-sm text-muted-foreground italic">This message was deleted.</p>
+            ) : (
+              <MessageBody body={message.body} fallback={message.content} mentionNames={mentionNames} />
+            )}
+          </div>
         )}
-        {!deleted && attachments.length > 0 && <div className="mt-1.5 flex flex-wrap gap-1.5">{attachments.map((attachment) => <AttachmentItem key={attachment.id} attachment={attachment} />)}</div>}
+        {!deleted && attachments.length > 0 && <div className={cn('mt-1.5 flex flex-wrap gap-1.5', mine && 'justify-end')}>{attachments.map((attachment) => <AttachmentItem key={attachment.id} attachment={attachment} previewUrl={imageUrls?.[attachment.storage_path]} previewLoading={imagesLoading && !imageUrls?.[attachment.storage_path]} />)}</div>}
         {!deleted && !sending && pills.length > 0 && (
-          <div className="mt-1.5 flex flex-wrap items-center gap-1">
+          <div className={cn('mt-1.5 flex flex-wrap items-center gap-1', mine && 'justify-end')}>
             {pills.map((pill) => (
               <button
                 key={pill.emoji}
@@ -161,13 +177,16 @@ export function MessageItem({ message, conversationId, teamId, teamSlug, people,
             {threadUnread > 0 && !threadOpen && <span className="rounded-full bg-brand px-1.5 font-mono text-[10px] leading-4 text-brand-foreground">{threadUnread} new</span>}
           </button>
         )}
-        {threadOpen && !deleted && <ThreadReplyBox conversationId={conversationId} teamId={teamId} teamSlug={teamSlug} parentId={message.id} replies={replies} people={people} participants={participants} currentUserId={currentUserId} />}
+        {threadOpen && !deleted && <div className="self-stretch"><ThreadReplyBox conversationId={conversationId} teamId={teamId} teamSlug={teamSlug} parentId={message.id} replies={replies} people={people} participants={participants} currentUserId={currentUserId} /></div>}
       </div>
 
       {!deleted && !sending && !editing && (
         <div
           className={cn(
-            'absolute -top-3.5 right-4 z-10 flex items-center rounded-md border bg-background p-0.5 shadow-sm',
+            // On the side away from the text, so it never covers what you're reading.
+            'absolute -top-3.5 z-10',
+            mine ? 'left-4' : 'right-4',
+            'flex items-center rounded-md border bg-background p-0.5 shadow-sm',
             // Shown on hover or keyboard focus; always shown on touch screens, which can't hover.
             'opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-focus-within:opacity-100 [@media(hover:hover)]:group-hover:opacity-100',
             pickerOpen && '[@media(hover:hover)]:opacity-100',
@@ -177,7 +196,7 @@ export function MessageItem({ message, conversationId, teamId, teamSlug, people,
             <PopoverTrigger asChild>
               <Button variant="ghost" size="icon-xs" className={toolbarButton} aria-label="Add reaction" title="Add reaction"><SmilePlus /></Button>
             </PopoverTrigger>
-            <PopoverContent align="end" className="w-auto flex-row gap-0.5 p-1">
+            <PopoverContent align={mine ? 'start' : 'end'} className="w-auto flex-row gap-0.5 p-1">
               {MESSAGE_REACTIONS.map((emoji) => (
                 <button
                   key={emoji}

@@ -3,12 +3,13 @@ import { BlockNode } from './BlockNode'
 import { ConnectorEdge } from './ConnectorEdge'
 import { ContainerNode } from './ContainerNode'
 import { IconNode } from './IconNode'
+import { InkNode } from './InkNode'
 import { ShapeNode } from './ShapeNode'
 
 // What every React Flow canvas of a diagram renders with: the editor and the
 // Mermaid import preview, so the preview looks exactly like the result.
 
-export const nodeTypes = { shape: ShapeNode, icon: IconNode, container: ContainerNode, block: BlockNode }
+export const nodeTypes = { shape: ShapeNode, icon: IconNode, container: ContainerNode, block: BlockNode, ink: InkNode }
 export const edgeTypes = { connector: ConnectorEdge }
 
 // React Flow's own colors, pointed at DevDock's theme tokens.

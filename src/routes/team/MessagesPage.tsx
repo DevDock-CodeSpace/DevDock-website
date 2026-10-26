@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
-import { MessageCircle, Search } from 'lucide-react'
+import { ChevronRight, MessageCircle, Search } from 'lucide-react'
 import { lazy, Suspense, useCallback, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { DockSpinner } from '@/components/DockSpinner'
@@ -15,8 +15,10 @@ import {
 import { ConversationItem } from '@/features/messaging/components/ConversationItem'
 import { NewConversationDialog } from '@/features/messaging/components/NewConversationDialog'
 import { useUnread } from '@/features/messaging/hooks'
+import { useCollapsedSections } from '@/features/messaging/useCollapsedSections'
 import { conversationTitle, displayName } from '@/features/messaging/names'
 import { ownWrite } from '@/lib/realtime'
+import { cn } from '@/lib/utils'
 
 // The message editor (TipTap) is only needed once a conversation opens, so it loads on demand.
 const ConversationView = lazy(() => import('@/features/messaging/components/ConversationView').then((m) => ({ default: m.ConversationView })))
@@ -29,6 +31,7 @@ export function MessagesPage() {
   const people = useSuspenseQuery(teamMembersQuery(team.id)).data
   const conversationMembers = useSuspenseQuery(teamConversationMembersQuery(team.id)).data
   const unread = useUnread(team.id)
+  const sectionState = useCollapsedSections()
   const [search, setSearch] = useState('')
   // The open conversation (and a message to scroll to) live in the URL, so links to a message work.
   const [params, setParams] = useSearchParams()
@@ -62,9 +65,9 @@ export function MessagesPage() {
     conversation.kind === 'dm' ? people.find((person) => person.user_id !== user.id && participants.get(conversation.id)?.includes(person.user_id))?.profile : undefined
   const visible = conversations.filter((conversation) => titleOf(conversation).toLowerCase().includes(search.trim().toLowerCase()))
   const sections = [
-    { label: 'Channels', items: visible.filter((conversation) => conversation.kind === 'channel') },
-    { label: 'Direct messages', items: visible.filter((conversation) => conversation.kind === 'dm') },
-    { label: 'Groups', items: visible.filter((conversation) => conversation.kind === 'group') },
+    { kind: 'channel', label: 'Channels', items: visible.filter((conversation) => conversation.kind === 'channel') },
+    { kind: 'dm', label: 'Direct messages', items: visible.filter((conversation) => conversation.kind === 'dm') },
+    { kind: 'group', label: 'Groups', items: visible.filter((conversation) => conversation.kind === 'group') },
   ].filter((section) => section.items.length > 0)
   const selected = conversations.find((conversation) => conversation.id === selectedId) ?? visible[0] ?? conversations[0]
 
@@ -73,7 +76,7 @@ export function MessagesPage() {
       <aside className="flex w-full shrink-0 flex-col border-b bg-muted/20 lg:w-64 lg:border-r lg:border-b-0">
         <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b px-4 lg:h-14">
           <div className="min-w-0">
-            <h1 className="text-sm font-semibold">Messages</h1>
+            <h1 className="text-sm font-semibold">Chat</h1>
             <p className="truncate text-xs text-muted-foreground">{team.name}</p>
           </div>
           <NewConversationDialog teamId={team.id} people={people} canCreateChannel={can.isAdmin} onCreated={(id) => {
@@ -105,9 +108,22 @@ export function MessagesPage() {
           </div>
         )}
         <nav aria-label="Conversations" className="flex gap-1 overflow-x-auto px-2 pb-2 lg:block lg:min-h-0 lg:flex-1 lg:space-y-4 lg:overflow-x-visible lg:overflow-y-auto lg:pt-2">
-          {sections.map((section) => (
-            <div key={section.label} className="flex gap-1 lg:block lg:space-y-0.5">
-              <h3 className="px-2 pb-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase max-lg:hidden">{section.label}</h3>
+          {sections.map((section) => {
+            // A closed section hides its rows on wide screens only; the phone strip has no headings to reopen it.
+            const collapsed = sectionState.isCollapsed(section.kind)
+            return (
+            <div key={section.kind} className="flex gap-1 lg:block lg:space-y-0.5">
+              <h3 className="max-lg:hidden">
+                <button
+                  type="button"
+                  aria-expanded={!collapsed}
+                  className="flex w-full items-center gap-1 rounded px-1 pb-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase hover:text-foreground"
+                  onClick={() => sectionState.toggle(section.kind)}
+                >
+                  <ChevronRight className={cn('size-3 transition-transform', !collapsed && 'rotate-90')} />
+                  {section.label}
+                </button>
+              </h3>
               {section.items.map((conversation) => {
                 const counts = unread.byConversation.get(conversation.id)
                 return (
@@ -121,11 +137,13 @@ export function MessagesPage() {
                     mentions={counts?.mention_count ?? 0}
                     muted={unread.muted.has(conversation.id)}
                     onClick={() => select(conversation.id)}
+                    className={cn(collapsed && 'lg:hidden')}
                   />
                 )
               })}
             </div>
-          ))}
+            )
+          })}
           {visible.length === 0 && <p className="px-2 py-6 text-center text-sm text-muted-foreground">No conversations found.</p>}
         </nav>
       </aside>

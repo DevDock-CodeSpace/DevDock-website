@@ -31,7 +31,7 @@ const items: Item[] = [
   { label: 'Quote', hint: '>', icon: Quote, run: (e) => e.chain().focus().setBlockquote().run() },
   { label: 'Divider', hint: '---', icon: Minus, run: (e) => e.chain().focus().setHorizontalRule().run() },
   // Typing `[[` opens the picker (FileLinkPicker), so this does the same.
-  { label: 'Link a doc or diagram', hint: '[[', icon: Link2, run: (e) => e.chain().focus().insertContent('[[').run() },
+  { label: 'Link a doc or whiteboard', hint: '[[', icon: Link2, run: (e) => e.chain().focus().insertContent('[[').run() },
 ]
 
 /**

@@ -9,6 +9,8 @@ import { useAuth } from '@/features/auth/hooks'
 import type { TeamMember } from '@/features/teams/api'
 import { useOthersTyping } from '@/hooks/use-others-typing'
 import {
+  attachmentImageUrlsQuery,
+  isImageAttachment,
   NOTIFICATION_LIMIT,
   PAGE_SIZE,
   conversationAttachmentsQuery,
@@ -49,6 +51,7 @@ type Props = {
 }
 
 const NONE: never[] = []
+const NO_URLS: Record<string, string> = {}
 /** Within this many pixels of the bottom counts as "reading the latest". */
 const BOTTOM_SLACK = 80
 /** How far back a link may reach for a message that isn't in the loaded window. */
@@ -78,6 +81,11 @@ export function ConversationView({ conversationId, kind, description, teamId, te
   const attachments = useQuery(conversationAttachmentsQuery(conversationId)).data ?? NONE
   const replies = useQuery(conversationRepliesQuery(conversationId)).data ?? NONE
   const threadUnread = useQuery(threadUnreadQuery(conversationId)).data
+  // Every image's link in one request; while a new one is signed, the others keep theirs.
+  const imagePaths = useMemo(() => attachments.filter((row) => isImageAttachment(row.mime_type)).map((row) => row.storage_path), [attachments])
+  const images = useQuery({ ...attachmentImageUrlsQuery(conversationId, imagePaths), enabled: imagePaths.length > 0, placeholderData: keepPreviousData })
+  const imageUrls = images.isError ? NO_URLS : images.data
+  const imagesLoading = !images.isError && (images.isPending || images.isPlaceholderData)
   const byMessage = useMemo(
     () => ({
       reactions: groupBy(reactions, (row) => row.message_id),
@@ -161,6 +169,17 @@ export function ConversationView({ conversationId, kind, description, teamId, te
     else setNewBelow(true)
   }, [lastId, lastMine])
 
+  // Things that grow after a message arrives (a picture loading, reactions) keep the latest in view.
+  const stickToBottom = useCallback((content: HTMLDivElement | null) => {
+    if (!content) return
+    const observer = new ResizeObserver(() => {
+      const el = scroller.current
+      if (el && atBottom.current) el.scrollTop = el.scrollHeight
+    })
+    observer.observe(content)
+    return () => observer.disconnect()
+  }, [])
+
   // After earlier messages load, keep the reader where they were.
   useLayoutEffect(() => {
     const el = scroller.current
@@ -195,6 +214,8 @@ export function ConversationView({ conversationId, kind, description, teamId, te
   }
   const loadEarlier = () => {
     anchor.current = scroller.current?.scrollHeight ?? null
+    // Reading back now: growth above must not pull the view down.
+    atBottom.current = false
     setLimit((current) => current + PAGE_SIZE)
   }
 
@@ -279,7 +300,7 @@ export function ConversationView({ conversationId, kind, description, teamId, te
               <p className="text-sm text-muted-foreground">Start the conversation.</p>
             </div>
           ) : (
-            <div className="flex min-h-full flex-col justify-end py-3">
+            <div ref={stickToBottom} className="flex min-h-full flex-col justify-end py-3">
               {hasMore && (
                 <div className="flex justify-center pb-2">
                   <Button variant="ghost" size="xs" className="text-muted-foreground" onClick={loadEarlier} disabled={messagesResult.isPlaceholderData}>{messagesResult.isPlaceholderData ? 'Loading…' : 'Load earlier messages'}</Button>
@@ -312,6 +333,8 @@ export function ConversationView({ conversationId, kind, description, teamId, te
                       participants={participants}
                       threadUnread={threadUnread?.get(message.id) ?? 0}
                       compact={compact}
+                      imageUrls={imageUrls}
+                      imagesLoading={imagesLoading}
                     />
                   </div>
                 )

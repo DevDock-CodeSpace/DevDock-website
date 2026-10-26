@@ -47,7 +47,7 @@ export function PrivacyPage() {
           <p>DevDock stores the things you and your group create, so you can use them:</p>
           <ul>
             <li>groups, workspaces and who belongs to them, with their roles;</li>
-            <li>docs (including images you add to them) and diagrams;</li>
+            <li>docs (including images you add to them) and whiteboards;</li>
             <li>issues (including images you add to their descriptions), comments, labels and sprints, and a history of changes made to issues;</li>
             <li>the GitHub repositories your group uses (their names and GitHub ids) and which projects use them;</li>
             <li>notes you keep for yourself: their title, details, the time you want them to pop up (if any) and the workspace or issue they are about.</li>

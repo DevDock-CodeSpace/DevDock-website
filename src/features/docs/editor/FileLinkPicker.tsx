@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import type { Editor } from '@tiptap/react'
-import { FileText, Workflow } from 'lucide-react'
+import { FileText, Presentation } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { teamDiagramsQuery } from '@/features/diagrams/api'
@@ -114,7 +114,7 @@ export function FileLinkPicker({ editor, excludeId }: { editor: Editor; excludeI
   return createPortal(
     <div
       role="listbox"
-      aria-label="Link a doc or diagram"
+      aria-label="Link a doc or whiteboard"
       className="fixed z-50 w-80 rounded-lg border bg-popover p-1 text-popover-foreground shadow-xl"
       style={{ left: Math.min(open.left, window.innerWidth - 336), top: open.top + 6 }}
     >
@@ -124,10 +124,10 @@ export function FileLinkPicker({ editor, excludeId }: { editor: Editor; excludeI
       {loading ? (
         <p className="px-2 py-1.5 text-sm text-muted-foreground">Loading…</p>
       ) : results.length === 0 ? (
-        <p className="px-2 py-1.5 text-sm text-muted-foreground">No docs or diagrams match.</p>
+        <p className="px-2 py-1.5 text-sm text-muted-foreground">No docs or whiteboards match.</p>
       ) : (
         results.map(({ kind, item }, index) => {
-          const Icon = kind === 'diagram' ? Workflow : FileText
+          const Icon = kind === 'diagram' ? Presentation : FileText
           return (
             <button
               key={item.id}

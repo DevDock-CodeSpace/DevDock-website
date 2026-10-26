@@ -15,9 +15,10 @@ type Props = {
   mentions: number
   muted: boolean
   onClick: () => void
+  className?: string
 }
 
-export function ConversationItem({ kind, title, profile, active, unread, mentions, muted, onClick }: Props) {
+export function ConversationItem({ kind, title, profile, active, unread, mentions, muted, onClick, className }: Props) {
   const hasUnread = unread > 0 && !active
   const ref = useRef<HTMLButtonElement>(null)
   // On a phone the list is a scrolling strip: keep the open conversation in view.
@@ -34,6 +35,7 @@ export function ConversationItem({ kind, title, profile, active, unread, mention
         'flex h-8 min-w-36 shrink-0 items-center gap-2 rounded-md px-2 text-left text-sm transition-colors lg:w-full',
         active ? 'bg-accent font-medium text-accent-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
         hasUnread && !muted && 'font-semibold text-foreground',
+        className,
       )}
     >
       {kind === 'channel' ? (

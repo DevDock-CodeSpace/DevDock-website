@@ -12,7 +12,7 @@ import {
   Shapes,
   Users,
   Video,
-  Workflow,
+  Presentation,
   type LucideIcon,
 } from 'lucide-react'
 import { matchPath } from 'react-router'
@@ -87,7 +87,7 @@ export const FILES_TAB = { title: 'Files', icon: Files }
 
 export const teamToolDefs: Record<TeamToolId, { item: string; items: string }> = {
   docs: { item: 'doc', items: 'docs' },
-  diagrams: { item: 'diagram', items: 'diagrams' },
+  diagrams: { item: 'whiteboard', items: 'whiteboards' },
   live: { item: 'meeting', items: 'meetings' },
 }
 
@@ -128,7 +128,7 @@ export function getTeamNav(
   const base = teamPath(slug)
   return {
     home: { title: 'Home', to: base, icon: Home, end: true },
-    messages: { title: 'Messages', to: `${base}/messages`, icon: MessageSquare },
+    messages: { title: 'Chat', to: `${base}/messages`, icon: MessageSquare },
     tools: [
       ...TEAM_TOOLS.map((id) => ({
         id,
@@ -159,7 +159,7 @@ export const workspaceTabDefs: Record<
   learning: { title: 'Learning', icon: BookOpen, hint: 'Modules, lessons and progress' },
   issues: { title: 'Issues', icon: CircleDot, hint: 'Linear-style tasks and bugs' },
   docs: { title: 'Docs', icon: FileText, hint: 'Pages and notes, in Files', soon: 'Docs assigned to this workspace will live here.' },
-  diagrams: { title: 'Diagrams', icon: Workflow, hint: 'Architecture and flow diagrams, in Files', soon: 'Diagrams assigned to this workspace will live here.' },
+  diagrams: { title: 'Whiteboards', icon: Presentation, hint: 'Draw freely or with shapes: lessons, architecture, schemas. In Files', soon: 'Whiteboards assigned to this workspace will live here.' },
   exercises: { title: 'Exercises', icon: Shapes, hint: 'Practice and submissions', soon: 'Exercises and submissions will live here.' },
   github: { title: 'GitHub', icon: GitPullRequest, hint: 'Linked repositories' },
   live: { title: 'Meetings', icon: Video, hint: 'Video meetings and schedule' },

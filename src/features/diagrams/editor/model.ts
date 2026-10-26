@@ -25,6 +25,15 @@ export type ShapeKind =
   | 'note'
   | 'text'
 
+/** Free drawing: a pen stroke or a highlighter stroke. */
+export type InkTool = 'pen' | 'highlighter'
+
+/**
+ * One freehand stroke ('ink' nodes). `points` is flat, relative to the node's position:
+ * [x, y, x, y, …], or [x, y, pressure, …] when a stylus gave real pressure.
+ */
+export type InkStroke = { tool: InkTool; size: number; pressure: boolean; points: number[] }
+
 /** Text blocks and tables: they grow with their text, and only their width is set by hand. */
 export type BlockKind = 'heading' | 'paragraph' | 'list' | 'table'
 
@@ -38,6 +47,8 @@ export type DiagramNodeData = {
   shape?: ShapeKind
   /** 'icon' nodes only. */
   icon?: IconKey
+  /** 'ink' nodes only; `stroke` is its color. */
+  ink?: InkStroke
   fill: FillKey
   /** Border color; the icon color on icon nodes. */
   stroke: ColorKey
@@ -46,7 +57,7 @@ export type DiagramNodeData = {
   bold: boolean
 }
 
-export type DiagramNodeType = 'shape' | 'icon' | 'container' | 'block'
+export type DiagramNodeType = 'shape' | 'icon' | 'container' | 'block' | 'ink'
 export type DiagramNode = Node<DiagramNodeData, DiagramNodeType>
 
 export type Routing = 'orthogonal' | 'straight' | 'curved'
@@ -201,6 +212,42 @@ export function createNode(item: LibraryItem, center: XYPosition): DiagramNode {
   }
 }
 
+/** Longest stroke kept (points); a longer one is thinned out, never refused. */
+const MAX_INK_POINTS = 3000
+const round1 = (v: number) => Math.round(v * 10) / 10
+
+// A stroke only answers to its own lines, not its whole box: a big circle drawn around
+// some shapes mustn't swallow clicks meant for them (the drawn path turns pointer events back on).
+const INK_STYLE = { pointerEvents: 'none' } as const
+// A highlight tints what's under it instead of covering it (on the node: each node is its own layer).
+const HIGHLIGHT_CLASS = 'mix-blend-multiply dark:mix-blend-screen'
+
+/**
+ * A drawn stroke as a node. `points` are flow coordinates, [x, y] or [x, y, pressure]
+ * (`pressure`), and the node is the stroke's box with room for its width.
+ */
+export function createInk(points: number[][], tool: InkTool, size: number, pressure: boolean, color: ColorKey): DiagramNode {
+  const step = Math.max(1, Math.ceil(points.length / MAX_INK_POINTS))
+  const kept = points.filter((_, i) => i % step === 0 || i === points.length - 1)
+  const pad = size
+  const minX = Math.min(...kept.map((p) => p[0])) - pad
+  const minY = Math.min(...kept.map((p) => p[1])) - pad
+  const maxX = Math.max(...kept.map((p) => p[0])) + pad
+  const maxY = Math.max(...kept.map((p) => p[1])) + pad
+  const flat = kept.flatMap((p) => (pressure ? [round1(p[0] - minX), round1(p[1] - minY), Math.round((p[2] ?? 0.5) * 100) / 100] : [round1(p[0] - minX), round1(p[1] - minY)]))
+  return {
+    id: crypto.randomUUID(),
+    type: 'ink',
+    position: { x: Math.round(minX), y: Math.round(minY) },
+    width: Math.ceil(maxX - minX),
+    height: Math.ceil(maxY - minY),
+    zIndex: NODE_Z,
+    style: INK_STYLE,
+    ...(tool === 'highlighter' ? { className: HIGHLIGHT_CLASS } : {}),
+    data: { ...baseData, label: '', fill: 'none', line: 'none', stroke: color, ink: { tool, size, pressure, points: flat } },
+  }
+}
+
 export function createEdge(source: string, target: string, sourceHandle?: string | null, targetHandle?: string | null): DiagramEdge {
   return {
     id: crypto.randomUUID(),
@@ -304,7 +351,7 @@ export function parse(json: Json): DiagramContent {
   const nodes: DiagramNode[] = []
   for (const raw of rawNodes) {
     if (!isObject(raw) || typeof raw.id !== 'string' || !isObject(raw.position) || !isObject(raw.data)) continue
-    const type = oneOf<DiagramNodeType>(raw.type, ['shape', 'icon', 'container', 'block'], 'shape')
+    const type = oneOf<DiagramNodeType>(raw.type, ['shape', 'icon', 'container', 'block', 'ink'], 'shape')
     const { x, y } = raw.position
     if (typeof x !== 'number' || typeof y !== 'number') continue
     const d = raw.data
@@ -318,6 +365,16 @@ export function parse(json: Json): DiagramContent {
     }
     if (type === 'shape') data.shape = oneOf(d.shape, SHAPE_KINDS, 'rectangle')
     if (type === 'icon') data.icon = oneOf(d.icon, Object.keys(ICONS) as IconKey[], 'server')
+    if (type === 'ink') {
+      const ink = isObject(d.ink) ? d.ink : {}
+      const pressure = ink.pressure === true
+      const points = Array.isArray(ink.points) ? ink.points.slice(0, MAX_INK_POINTS * 3) : []
+      // A stroke with bad numbers is dropped, not drawn wrong.
+      if (points.length < 2 || points.length % (pressure ? 3 : 2) !== 0 || !points.every((v) => typeof v === 'number' && Number.isFinite(v))) continue
+      const size = typeof ink.size === 'number' && ink.size > 0 ? Math.min(ink.size, 64) : 4
+      data.ink = { tool: oneOf<InkTool>(ink.tool, ['pen', 'highlighter'], 'pen'), size, pressure, points: points as number[] }
+      data.label = ''
+    }
     if (type === 'block') {
       data.block = oneOf(d.block, BLOCK_KINDS, 'paragraph')
       data.label = data.label.slice(0, MAX_BODY)
@@ -330,6 +387,8 @@ export function parse(json: Json): DiagramContent {
       width: typeof raw.width === 'number' && raw.width > 0 ? raw.width : undefined,
       height: type !== 'block' && typeof raw.height === 'number' && raw.height > 0 ? raw.height : undefined,
       ...(typeof raw.parentId === 'string' ? { parentId: raw.parentId } : {}),
+      ...(type === 'ink' ? { style: INK_STYLE } : {}),
+      ...(type === 'ink' && data.ink?.tool === 'highlighter' ? { className: HIGHLIGHT_CLASS } : {}),
       data,
     })
   }
