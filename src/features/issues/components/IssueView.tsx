@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
-import { ArrowLeft, ChevronRight, GitBranch, NotebookPen, Trash2 } from 'lucide-react'
+import { ArrowLeft, Bookmark, ChevronRight, GitBranch, Trash2 } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { toast } from 'sonner'
@@ -177,7 +177,7 @@ export default function IssueView({ issue }: { issue: IssueDetail }) {
                   className="text-muted-foreground hover:text-foreground"
                   onClick={() => setReminding(true)}
                 >
-                  <NotebookPen />
+                  <Bookmark />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Add a note about this issue</TooltipContent>

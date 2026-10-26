@@ -1,4 +1,4 @@
-import { NotebookPen } from 'lucide-react'
+import { Bookmark } from 'lucide-react'
 import { lazy, Suspense, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -24,7 +24,7 @@ export function NotesButton() {
               setOpen(true)
             }}
           >
-            <NotebookPen />
+            <Bookmark />
             <span className="hidden sm:inline">Notes</span>
           </Button>
         </TooltipTrigger>
