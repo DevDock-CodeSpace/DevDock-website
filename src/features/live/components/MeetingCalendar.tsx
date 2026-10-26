@@ -1,7 +1,9 @@
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { Bookmark, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { Link } from 'react-router'
 import { Button } from '@/components/ui/button'
+import type { CalendarNote } from '@/features/reminders/api'
+import { openNotes } from '@/features/reminders/openNotes'
 import { cn } from '@/lib/utils'
 import type { LiveSession } from '../api'
 import {
@@ -20,6 +22,8 @@ import { formatTime, sessionStatus } from '../time'
 
 type MeetingCalendarProps = {
   sessions: LiveSession[]
+  /** Your own notes with a time: tags on their days, which open the Notes panel. */
+  notes?: CalendarNote[]
   now: number
   cursor: Date
   mode: CalendarMode
@@ -86,8 +90,17 @@ const shortDate = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'num
 const hourLabel = new Intl.DateTimeFormat(undefined, { hour: 'numeric' })
 
 /** Month and week calendar of meetings (Google Calendar style). */
-export function MeetingCalendar({ sessions, now, cursor, mode, onNavigate, href, onCreate }: MeetingCalendarProps) {
+export function MeetingCalendar({ sessions, notes = [], now, cursor, mode, onNavigate, href, onCreate }: MeetingCalendarProps) {
   const byDay = useMemo(() => groupByDay(sessions), [sessions])
+  const notesByDay = useMemo(() => {
+    const map = new Map<string, CalendarNote[]>()
+    for (const note of notes) {
+      if (!note.remind_at) continue
+      const key = toDateKey(new Date(note.remind_at))
+      map.set(key, [...(map.get(key) ?? []), note])
+    }
+    return map
+  }, [notes])
   const days = weekDays(cursor)
   const title =
     mode === 'month'
@@ -143,9 +156,9 @@ export function MeetingCalendar({ sessions, now, cursor, mode, onNavigate, href,
       </div>
 
       {mode === 'month' ? (
-        <MonthGrid cursor={cursor} byDay={byDay} now={now} href={href} onCreate={onCreate} onNavigate={onNavigate} />
+        <MonthGrid cursor={cursor} byDay={byDay} notesByDay={notesByDay} now={now} href={href} onCreate={onCreate} onNavigate={onNavigate} />
       ) : (
-        <WeekGrid days={days} byDay={byDay} now={now} href={href} onCreate={onCreate} />
+        <WeekGrid days={days} byDay={byDay} notesByDay={notesByDay} now={now} href={href} onCreate={onCreate} />
       )}
     </div>
   )
@@ -153,6 +166,7 @@ export function MeetingCalendar({ sessions, now, cursor, mode, onNavigate, href,
 
 type GridProps = {
   byDay: Map<string, LiveSession[]>
+  notesByDay: Map<string, CalendarNote[]>
   now: number
   href: (session: LiveSession) => string
   onCreate?: (start: Date) => void
@@ -173,6 +187,7 @@ function dayStart(day: Date, now: number): Date {
 function MonthGrid({
   cursor,
   byDay,
+  notesByDay,
   now,
   href,
   onCreate,
@@ -199,7 +214,11 @@ function MonthGrid({
         {weeks.map((week) => (
           <div key={toDateKey(week[0])} className="grid min-h-0 grid-cols-7">
             {week.map((day) => {
-              const list = byDay.get(toDateKey(day)) ?? []
+              // Meetings and notes together, in time order.
+              const list: Entry[] = [
+                ...(byDay.get(toDateKey(day)) ?? []).map((session) => ({ kind: 'meeting' as const, at: session.starts_at, session })),
+                ...(notesByDay.get(toDateKey(day)) ?? []).map((note) => ({ kind: 'note' as const, at: note.remind_at!, note })),
+              ].sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
               const outside = day.getMonth() !== cursor.getMonth()
               const isToday = isSameDay(day, today)
               // As many as fit; when some don't, the last line says how many more.
@@ -224,9 +243,13 @@ function MonthGrid({
                       {day.getDate()}
                     </span>
                   </div>
-                  {shown.map((session) => (
-                    <MonthChip key={session.id} session={session} now={now} href={href(session)} />
-                  ))}
+                  {shown.map((entry) =>
+                    entry.kind === 'meeting' ? (
+                      <MonthChip key={entry.session.id} session={entry.session} now={now} href={href(entry.session)} />
+                    ) : (
+                      <NoteTag key={entry.note.id} note={entry.note} />
+                    ),
+                  )}
                   {list.length > shown.length && (
                     <button
                       type="button"
@@ -247,6 +270,31 @@ function MonthGrid({
         </div>
       </div>
     </div>
+  )
+}
+
+type Entry = { kind: 'meeting'; at: string; session: LiveSession } | { kind: 'note'; at: string; note: CalendarNote }
+
+/** A note on its day: a round tag (meetings are square chips) that opens it in the Notes panel. */
+function NoteTag({ note }: { note: CalendarNote }) {
+  const done = note.status === 'completed'
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation()
+        openNotes({ noteId: note.id })
+      }}
+      title={`Note: ${note.title}${done ? ' (done)' : ''}`}
+      className={cn(
+        'flex w-full min-w-0 items-center gap-1 rounded-full border border-dashed bg-background px-1.5 py-px text-left text-[11px] leading-tight hover:border-solid hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring',
+        done ? 'text-muted-foreground' : 'border-foreground/30 text-foreground',
+      )}
+    >
+      <Bookmark className={cn('size-3 shrink-0', done ? 'opacity-60' : 'text-brand')} />
+      <span className="shrink-0 font-mono text-muted-foreground">{formatTime(note.remind_at!)}</span>
+      <span className={cn('truncate', done && 'line-through')}>{note.title}</span>
+    </button>
   )
 }
 
@@ -275,7 +323,7 @@ function MonthChip({ session, now, href }: { session: LiveSession; now: number; 
   )
 }
 
-function WeekGrid({ days, byDay, now, href, onCreate }: GridProps & { days: Date[] }) {
+function WeekGrid({ days, byDay, notesByDay, now, href, onCreate }: GridProps & { days: Date[] }) {
   const scroller = useRef<HTMLDivElement>(null)
   const today = new Date(now)
   const nowMinutes = today.getHours() * 60 + today.getMinutes()
@@ -312,6 +360,33 @@ function WeekGrid({ days, byDay, now, href, onCreate }: GridProps & { days: Date
               </span>
             </div>
           ))}
+          {/* Notes for each day, above the hours (a point in time, so they don't take a slot). */}
+          {days.some((day) => notesByDay.has(toDateKey(day))) && (
+            <>
+              <div className="flex items-start justify-end border-t pt-1.5 pr-2">
+                <Bookmark className="size-3 text-muted-foreground" aria-label="Notes" />
+              </div>
+              {days.map((day) => {
+                const dayNotes = notesByDay.get(toDateKey(day)) ?? []
+                return (
+                  <div key={toDateKey(day)} className="min-w-0 space-y-0.5 border-t border-l p-1">
+                    {dayNotes.slice(0, 3).map((note) => (
+                      <NoteTag key={note.id} note={note} />
+                    ))}
+                    {dayNotes.length > 3 && (
+                      <button
+                        type="button"
+                        onClick={() => openNotes()}
+                        className="w-full rounded px-1.5 text-left text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground"
+                      >
+                        +{dayNotes.length - 3} more
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </>
+          )}
         </div>
         <div className="grid grid-cols-[56px_repeat(7,minmax(0,1fr))]">
           <div>

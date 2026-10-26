@@ -5,10 +5,12 @@ import { useLocation } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Textarea } from '@/components/ui/textarea'
+import { useAuth } from '@/features/auth/hooks'
 import { useCurrentTeam } from '@/features/teams/hooks'
 import { errorMessage } from '@/lib/errors'
 import { cn } from '@/lib/utils'
 import { AI_MESSAGE_MAX, askDevDock, cancelAiAction, confirmAiAction, type AiConfirmation, type AiHistoryTurn, type AiResponse } from '../api'
+import { loadHistory, saveHistory } from '../history'
 import { pageContext } from '../page-context'
 
 type ActionState = 'waiting' | 'working' | 'done' | 'cancelled' | 'failed'
@@ -44,9 +46,15 @@ const EXAMPLES = ['Show me my open issues', 'What meetings do I have today?', 'R
 export default function AskDevDockPanel({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const { team } = useCurrentTeam()
   const location = useLocation()
-  const [turns, setTurns] = useState<Turn[]>([])
+  const { user } = useAuth()
+  // Kept in this browser (history.ts). A card that was mid-send when the page went away shows as
+  // waiting again; its expiry decides whether it can still be sent.
+  const [turns, setTurns] = useState<Turn[]>(() =>
+    (loadHistory(user.id, team.id) as Turn[]).map((turn) => (turn.kind === 'action' && turn.state === 'working' ? { ...turn, state: 'waiting' } : turn)),
+  )
   const [draft, setDraft] = useState('')
-  const nextId = useRef(1)
+  const nextId = useRef(Math.max(0, ...turns.map((turn) => turn.id)) + 1)
+  useEffect(() => saveHistory(user.id, team.id, turns), [turns, user.id, team.id])
   const end = useRef<HTMLDivElement>(null)
 
   const add = (turn: NewTurn) => {
@@ -182,27 +190,39 @@ export default function AskDevDockPanel({ open, onOpenChange }: { open: boolean;
         </div>
 
         <form
-          className="border-t p-3"
+          className="border-t bg-popover px-4 pt-3 pb-4"
           onSubmit={(event) => {
             event.preventDefault()
             send(draft)
           }}
         >
-          <div className="flex items-end gap-2 rounded-md border bg-background p-1.5 focus-within:ring-2 focus-within:ring-ring">
-            <Textarea
+          {/* The same box as the Notes panel's write box. */}
+          <div className="rounded-xl border bg-background shadow-xs transition-shadow focus-within:border-brand/50 focus-within:ring-3 focus-within:ring-brand/15">
+            <textarea
               autoFocus
-              rows={1}
+              rows={2}
               value={draft}
               maxLength={AI_MESSAGE_MAX}
-              placeholder="Ask DevDock…"
+              placeholder="Ask DevDock…  (Shift+Enter for a new line)"
               aria-label="Ask DevDock"
-              className="max-h-40 min-h-8 resize-none border-0 bg-transparent px-1.5 py-1 shadow-none focus-visible:ring-0 dark:bg-transparent"
+              className="block max-h-40 min-h-[50px] w-full resize-none bg-transparent px-3 pt-2.5 text-sm outline-none [field-sizing:content] placeholder:text-muted-foreground/70"
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={onKeyDown}
             />
-            <Button type="submit" size="icon-sm" aria-label="Send request" disabled={busy || !draft.trim()}>
-              <ArrowUp />
-            </Button>
+            <div className="flex items-center gap-1 px-3 pb-1.5">
+              <span className="text-[11px] text-muted-foreground">Enter to send</span>
+              <span className="flex-1" />
+              <Button
+                type="submit"
+                size="icon-xs"
+                aria-label="Send request"
+                title="Send (Enter)"
+                disabled={busy || !draft.trim()}
+                className={cn('-mr-1.5 rounded-full', (busy || !draft.trim()) && 'opacity-40')}
+              >
+                <ArrowUp />
+              </Button>
+            </div>
           </div>
         </form>
       </SheetContent>

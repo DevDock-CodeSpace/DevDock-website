@@ -46,6 +46,10 @@ type ReminderDialogProps = {
   /** Edit this reminder instead of creating one. */
   reminder?: Reminder
   defaults?: ReminderDefaults
+  /** What was typed in the Notes panel's write box, carried over to pick a time (starts with a time on). */
+  draft?: { title: string; notes: string }
+  /** Called after a successful save. */
+  onSaved?: () => void
   /** Custom trigger (defaults to a "New note" button). Ignored when controlled. */
   children?: ReactNode
   open?: boolean
@@ -57,7 +61,7 @@ type ReminderDialogProps = {
  * and time) and optionally a workspace and an issue in it. Times are entered and shown in the
  * browser's time zone and saved as an instant.
  */
-export function ReminderDialog({ reminder, defaults, children, open: controlledOpen, onOpenChange }: ReminderDialogProps) {
+export function ReminderDialog({ reminder, defaults, draft, onSaved, children, open: controlledOpen, onOpenChange }: ReminderDialogProps) {
   const { team } = useCurrentTeam()
   // Personal, so every workspace the person can open in the group, not only the collection in view.
   const workspaces = useSuspenseQuery(teamWorkspacesQuery(team.id)).data
@@ -71,9 +75,9 @@ export function ReminderDialog({ reminder, defaults, children, open: controlledO
     const workspaceId = reminder?.workspace_id ?? defaults?.workspaceId ?? null
     const issueKey = reminder?.workspace?.issue_key
     return {
-      title: reminder?.title ?? '',
-      notes: reminder?.notes ?? '',
-      remind: reminder ? reminder.remind_at !== null : (defaults?.remind ?? false),
+      title: reminder?.title ?? draft?.title ?? '',
+      notes: reminder?.notes ?? draft?.notes ?? '',
+      remind: reminder ? reminder.remind_at !== null : draft ? true : (defaults?.remind ?? false),
       date,
       time,
       workspaceId,
@@ -113,6 +117,7 @@ export function ReminderDialog({ reminder, defaults, children, open: controlledO
     const done = {
       onSuccess: () => {
         setOpen(false)
+        onSaved?.()
         toast.success(input.remindAt ? `Note saved. It will show up ${formatReminderWhen(input.remindAt, Date.now()).toLowerCase()}.` : 'Note saved.')
       },
       onError: (error: unknown) => toast.error(errorMessage(error)),
@@ -144,7 +149,7 @@ export function ReminderDialog({ reminder, defaults, children, open: controlledO
         <form onSubmit={submit} className="flex min-h-0 flex-col gap-4">
           <DialogHeader>
             <DialogTitle>{editing ? 'Edit note' : 'New note'}</DialogTitle>
-            <DialogDescription>Only you can see it. Pick a time if you want it to pop up then; otherwise it stays a note.</DialogDescription>
+            <DialogDescription>Only you can see it. Pick a time if you want DevDock to open it for you then; otherwise it stays a note.</DialogDescription>
           </DialogHeader>
 
           <div className="-mr-2 min-h-0 flex-1 space-y-4 overflow-y-auto pr-2">

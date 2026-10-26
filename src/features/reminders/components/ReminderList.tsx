@@ -1,75 +1,47 @@
 import { useInfiniteQuery } from '@tanstack/react-query'
-import { Check, Circle, CircleCheckBig, MoreHorizontal, Pencil, RotateCcw, X } from 'lucide-react'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Link } from 'react-router'
-import { toast } from 'sonner'
+import { Check, RotateCcw, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import { LoadMore } from '@/components/LoadMore'
-import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { issueIdentifier } from '@/features/issues/meta'
-import { useCurrentTeam } from '@/features/teams/hooks'
-import { issuePath, workspacePath } from '@/features/teams/nav'
-import { errorMessage } from '@/lib/errors'
 import { cn } from '@/lib/utils'
-import { remindersPageQuery, type Reminder, type RemindersPage, type ReminderStatus } from '../api'
-import { useSetReminderStatus } from '../hooks'
-import { formatReminderDay, formatReminderWhen, isOverdue } from '../when'
+import { remindersPageQuery, type Reminder, type RemindersPage } from '../api'
+import { useChangeNoteStatus } from '../hooks'
+import { formatReminderDay } from '../when'
+import { NoteContext } from './NoteContext'
+import { NoteMenu } from './NoteMenu'
 import { ReminderDialog } from './ReminderDialog'
 
 type ReminderSectionProps = {
-  title: string
-  status: ReminderStatus
+  status: 'completed' | 'cancelled'
   teamId: string
   userId: string
   now: number
-  /** A reminder to scroll to and outline (opened from a notification). */
+  /** A note to scroll to and outline (opened from a notification). */
   highlight: string | null
-  /** Load further pages by scrolling (only the page's last section). */
+  /** Load further pages by scrolling (only the panel's last section). */
   auto: boolean
-  empty?: ReactNode
 }
 
-/** One section of the Notes panel: the caller's notes with one status, a page at a time. */
-export function ReminderSection({ title, status, teamId, userId, now, highlight, auto, empty }: ReminderSectionProps) {
+/** The finished notes (Done or Archived) in the Notes panel's fold: compact rows, a page at a time. */
+export function ReminderSection({ status, teamId, userId, now, highlight, auto }: ReminderSectionProps) {
   const query = useInfiniteQuery(remindersPageQuery(teamId, userId, status))
-  if (query.isPending) return <div className="h-24 animate-pulse rounded-md bg-muted/40" aria-label={`Loading ${title.toLowerCase()}`} />
-  if (query.isError) {
-    return <div className="border-y py-8 text-center text-sm text-muted-foreground">Couldn’t load notes. Reload the page to try again.</div>
-  }
+  if (query.isPending) return <div className="h-16 animate-pulse rounded-md bg-muted/40" aria-label="Loading notes" />
+  if (query.isError) return <p className="py-4 text-center text-xs text-muted-foreground">Couldn’t load notes. Reload the page to try again.</p>
   // Rows another section now owns (changed here a moment ago, before the refetch) are left out.
   const rows = rowsOf(query.data.pages).filter((r) => r.status === status)
-  const total = Math.max(0, (query.data.pages[0]?.total ?? 0) - (rowsOf(query.data.pages).length - rows.length))
-  if (total === 0 && !empty) return null
-
+  if (rows.length === 0) {
+    return <p className="py-3 text-center text-xs text-muted-foreground">{status === 'completed' ? 'Nothing done yet.' : 'Nothing archived.'}</p>
+  }
   return (
-    <section aria-label={title} className="space-y-2">
-      <div className="flex items-baseline justify-between">
-        <h2 className="text-sm font-semibold">{title}</h2>
-        <span className="font-mono text-xs text-muted-foreground">{total}</span>
-      </div>
-      {rows.length === 0 ? (
-        <div className="border-y py-10 text-center text-sm text-muted-foreground">{empty}</div>
-      ) : (
-        <>
-          <ul className="divide-y border-y">
-            {rows.map((reminder) => (
-              <ReminderRow key={reminder.id} reminder={reminder} now={now} highlighted={reminder.id === highlight} />
-            ))}
-          </ul>
-          <LoadMore query={query} auto={auto} />
-        </>
-      )}
-    </section>
+    <>
+      <ul className="space-y-px">
+        {rows.map((reminder) => (
+          <FinishedRow key={reminder.id} reminder={reminder} now={now} highlighted={reminder.id === highlight} />
+        ))}
+      </ul>
+      <LoadMore query={query} auto={auto} />
+    </>
   )
 }
-
-const showError = (error: unknown) => void toast.error(errorMessage(error))
 
 /** The pages' rows in order. A reminder that moved between pages shows once. */
 function rowsOf(pages: RemindersPage[]): Reminder[] {
@@ -77,126 +49,40 @@ function rowsOf(pages: RemindersPage[]): Reminder[] {
   return pages.flatMap((page) => page.rows).filter((row) => !seen.has(row.id) && seen.add(row.id))
 }
 
-function ReminderRow({ reminder, now, highlighted }: { reminder: Reminder; now: number; highlighted: boolean }) {
-  const { team } = useCurrentTeam()
-  const setStatus = useSetReminderStatus()
+function FinishedRow({ reminder, now, highlighted }: { reminder: Reminder; now: number; highlighted: boolean }) {
+  const change = useChangeNoteStatus()
   const [editing, setEditing] = useState(false)
   const row = useRef<HTMLLIElement>(null)
-  const pending = reminder.status === 'pending'
-  const overdue = pending && isOverdue(reminder.remind_at, now)
+  const done = reminder.status === 'completed'
+  const at = done ? reminder.completed_at : reminder.cancelled_at
 
   useEffect(() => {
     if (highlighted) row.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
   }, [highlighted])
 
-  const change = (status: ReminderStatus, done: string) =>
-    setStatus(reminder.id, status).then(
-      () =>
-        toast.success(done, {
-          action: status === 'pending' ? undefined : { label: 'Undo', onClick: () => void setStatus(reminder.id, 'pending').catch(showError) },
-        }),
-      showError,
-    )
-
-  const issueId = reminder.issue && reminder.workspace ? issueIdentifier(reminder.workspace.issue_key, reminder.issue.number) : null
-  const when =
-    reminder.status === 'completed' && reminder.completed_at
-      ? `Done ${formatReminderDay(reminder.completed_at, now).toLowerCase()}`
-      : reminder.status === 'cancelled' && reminder.cancelled_at
-        ? `Archived ${formatReminderDay(reminder.cancelled_at, now).toLowerCase()}`
-        : reminder.remind_at
-          ? formatReminderWhen(reminder.remind_at, now)
-          : ''
-
   return (
     <li
       ref={row}
-      className={cn(
-        'group flex items-start gap-3 px-3 py-2.5 transition-colors hover:bg-muted/50',
-        highlighted && 'bg-brand/5 ring-1 ring-brand/40 ring-inset',
-      )}
+      className={cn('group flex items-center gap-2.5 rounded-md px-2 py-1.5 hover:bg-muted/50', highlighted && 'bg-brand/5 ring-1 ring-brand/40 ring-inset')}
     >
       <button
         type="button"
-        onClick={() => (pending ? change('completed', 'Note marked done.') : change('pending', 'Note reopened.'))}
-        aria-label={pending ? `Mark “${reminder.title}” done` : `Reopen “${reminder.title}”`}
-        className="mt-0.5 shrink-0 rounded-full text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        onClick={() => void change(reminder, 'pending', 'Note reopened.')}
+        aria-label={`Reopen “${reminder.title}”`}
+        title="Reopen"
+        className="group/check relative flex size-4 shrink-0 items-center justify-center rounded-full focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
       >
-        {reminder.status === 'completed' ? (
-          <span className="flex size-4 items-center justify-center rounded-full bg-brand text-brand-foreground">
-            <Check className="size-3" strokeWidth={3} />
-          </span>
-        ) : reminder.status === 'cancelled' ? (
-          <X className="size-4" />
-        ) : (
-          <Circle className="size-4" />
-        )}
+        <span className={cn('flex size-4 items-center justify-center rounded-full group-hover/check:hidden', done ? 'bg-brand/80 text-brand-foreground' : 'bg-muted text-muted-foreground')}>
+          {done ? <Check className="size-2.5" strokeWidth={3} /> : <X className="size-2.5" strokeWidth={3} />}
+        </span>
+        <RotateCcw className="hidden size-3.5 text-muted-foreground group-hover/check:block" />
       </button>
-
-      {/* Stacked for the Notes panel's narrow column: title, then text, then a line of details. */}
-      <div className="min-w-0 flex-1">
-        <button type="button" onClick={() => setEditing(true)} className="block w-full text-left focus-visible:outline-none">
-          <span className={cn('line-clamp-2 text-sm font-medium break-words', !pending && 'text-muted-foreground', reminder.status === 'cancelled' && 'line-through')}>
-            {reminder.title}
-          </span>
-          {reminder.notes && <span className="mt-0.5 line-clamp-2 text-xs break-words text-muted-foreground">{reminder.notes}</span>}
-        </button>
-        {(when || issueId || reminder.workspace) && (
-          <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-            {when && (
-              <span
-                className={cn('font-mono', overdue && 'text-destructive')}
-                title={reminder.remind_at ? new Date(reminder.remind_at).toLocaleString() : undefined}
-              >
-                {when}
-              </span>
-            )}
-            {issueId && reminder.issue && reminder.workspace_id && (
-              <Link
-                to={issuePath(team.slug, reminder.workspace_id, reminder.issue.number)}
-                title={reminder.issue.title}
-                className="inline-flex shrink-0 items-center gap-1 font-mono hover:text-foreground"
-              >
-                <CircleCheckBig className="size-3" /> {issueId}
-              </Link>
-            )}
-            {reminder.workspace && reminder.workspace_id && (
-              <Link to={workspacePath(team.slug, reminder.workspace_id)} className="max-w-40 truncate hover:text-foreground">
-                {reminder.workspace.title}
-              </Link>
-            )}
-          </div>
-        )}
-      </div>
-
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon-xs" aria-label={`Actions for “${reminder.title}”`} className="-my-0.5 text-muted-foreground">
-            <MoreHorizontal />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onSelect={() => setEditing(true)}>
-            <Pencil /> Edit
-          </DropdownMenuItem>
-          {pending ? (
-            <>
-              <DropdownMenuItem onSelect={() => change('completed', 'Note marked done.')}>
-                <Check /> Mark done
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem variant="destructive" onSelect={() => change('cancelled', 'Note archived.')}>
-                <X /> Archive
-              </DropdownMenuItem>
-            </>
-          ) : (
-            <DropdownMenuItem onSelect={() => change('pending', 'Note reopened.')}>
-              <RotateCcw /> Reopen
-            </DropdownMenuItem>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
-
+      <button type="button" onClick={() => setEditing(true)} className="min-w-0 flex-1 text-left focus-visible:outline-none">
+        <span className={cn('block truncate text-sm text-muted-foreground', !done && 'line-through')}>{reminder.title}</span>
+      </button>
+      <NoteContext reminder={reminder} className="hidden max-w-28 sm:flex" />
+      {at && <span className="shrink-0 font-mono text-[11px] text-muted-foreground/80">{formatReminderDay(at, now)}</span>}
+      <NoteMenu reminder={reminder} onEdit={() => setEditing(true)} className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100" />
       {editing && <ReminderDialog reminder={reminder} open onOpenChange={setEditing} />}
     </li>
   )

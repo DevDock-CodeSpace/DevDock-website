@@ -21,11 +21,13 @@ import { IssueCollection } from '@/features/issues/components/IssueCollection'
 import { IssueFilterBar } from '@/features/issues/components/IssueFilterBar'
 import { IssuesNav } from '@/features/issues/components/IssuesNav'
 import { PanelToggle, SidePanelLayout } from '@/features/issues/components/SidePanel'
+import { NestToggle } from '@/features/issues/components/NestToggle'
 import { ViewToggle } from '@/features/issues/components/ViewToggle'
 import { currentCycle, cycleProgress, cycleState, cycleTitle, cycleWhen, nextCycle } from '@/features/issues/cycles'
 import { applyFilters } from '@/features/issues/filters'
 import { useIssueContext, useIssueFilters, useIssueView } from '@/features/issues/hooks'
 import { isClosed } from '@/features/issues/meta'
+import { useNested } from '@/features/issues/useNested'
 import { usePanelOpen } from '@/features/issues/usePanelOpen'
 import { useCurrentTeam } from '@/features/teams/hooks'
 import { cyclePath, cyclesPath } from '@/features/teams/nav'
@@ -48,6 +50,7 @@ export function IssueCyclePage() {
   const [creating, setCreating] = useState<IssueStatus | null>(null)
   const [filterOpen, setFilterOpen] = useState(false)
   const [panelOpen, setPanelOpen] = usePanelOpen()
+  const [nested, setNested] = useNested()
   const [editing, setEditing] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -121,6 +124,7 @@ export function IssueCyclePage() {
           <>
             <CyclePinButton cycle={cycle} current={cycleState(cycle, today) === 'current'} />
             <PanelToggle open={panelOpen} onChange={setPanelOpen} />
+            {view === 'list' && <NestToggle nested={nested} onChange={setNested} />}
             <ViewToggle view={view} onChange={setView} />
             <Button size="sm" onClick={() => setCreating('todo')}>
               <Plus /> New issue
@@ -220,6 +224,7 @@ export function IssueCyclePage() {
         <IssueCollection
           issues={issues}
           view={view}
+          nested={nested}
           cycleId={cycle.id}
           creating={creating}
           onCreatingChange={setCreating}
