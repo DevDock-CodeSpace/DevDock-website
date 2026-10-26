@@ -22,7 +22,9 @@ import { useCanEditDocs, useCanWriteDocs } from '../hooks'
 import { CreateDocDialog } from './CreateDocDialog'
 import { DocBrowser } from './DocBrowser'
 import { DocScope } from './DocScope'
+import { useAuth } from '@/features/auth/hooks'
 import { FileRowActions } from './FileRowActions'
+import { RestrictedMark } from './RestrictedMark'
 import { FILE_HEADER, FILE_ROW } from './fileGrid'
 
 /** What the chips choose (`?view=`; the Folders chip is 'files' in code and is the default). */
@@ -296,6 +298,7 @@ function FlatList({
   canWrite: (workspaceId: string | null) => boolean
 }) {
   const { team } = useCurrentTeam()
+  const { user } = useAuth()
   const [now] = useState(Date.now)
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<{ by: 'updated' | 'name'; dir: 'asc' | 'desc' }>({ by: 'updated', dir: 'desc' })
@@ -406,7 +409,8 @@ function FlatList({
                     <Link to={hrefFor(kind, item)} className="min-w-0 truncate text-sm font-medium outline-none after:absolute after:inset-0">
                       {item.title}
                     </Link>
-                    <span className="truncate text-xs text-muted-foreground">
+                    <span className="flex min-w-0 items-center gap-1 truncate text-xs text-muted-foreground">
+                      {item.access === 'restricted' && <RestrictedMark />}
                       {kind === 'doc' ? 'Doc' : 'Whiteboard'}
                       {everywhere ? ` · ${item.author?.display_name ?? 'Former member'}` : placeOf(item.folder_id)}
                     </span>
@@ -423,7 +427,9 @@ function FlatList({
                   )}
                   <span className="text-right font-mono text-xs text-muted-foreground">{timeAgo(item.updated_at, now)}</span>
                   <span className="hidden justify-self-end md:block">
-                    {canWrite(item.workspace_id) && <FileRowActions kind={kind} item={item} folders={everywhere ? undefined : folders} />}
+                    {(canWrite(item.workspace_id) || item.created_by === user.id) && (
+                      <FileRowActions kind={kind} item={item} folders={everywhere ? undefined : folders} canWrite={canWrite(item.workspace_id)} />
+                    )}
                   </span>
                 </li>
               )

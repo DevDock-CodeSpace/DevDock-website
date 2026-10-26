@@ -10,28 +10,33 @@ import { errorMessage } from '@/lib/errors'
 import { ownWrite } from '@/lib/realtime'
 import { deleteDocument, foldersQuery, moveFolderItems, type DocFolder, type DocSummary } from '../api'
 import { MoveDocDialog } from './MoveDocDialog'
+import { ShareDialog } from './ShareDialog'
 
 /** What a move or delete changes: the lists (and Files' folder counts), never another open item. */
 const LISTS = [['documents', 'team'], ['documents', 'workspace'], ['diagrams', 'team'], ['diagrams', 'workspace']]
 
 /**
- * The ··· on a doc or diagram row in Files (Folders, Docs, Diagrams, Recent): Move to… a folder of
- * its own place (moves can be undone) and Delete (asks first). Only rendered for writers; the
- * database re-checks both. Folders are the ones passed in, or the item's place's folders, loaded
+ * The ··· on a doc or diagram row in Files (Folders, Docs, Diagrams, Recent): Share…, Move to… a
+ * folder of its own place (moves can be undone) and Delete (asks first). Writers get all three; an
+ * item's owner who isn't a writer gets Share… only. The database re-checks everything. Folders are the ones passed in, or the item's place's folders, loaded
  * when "Move to…" opens.
  */
 export function FileRowActions({
   kind,
   item,
   folders: knownFolders,
+  canWrite = true,
 }: {
   kind: 'doc' | 'diagram'
   item: DocSummary
   folders?: DocFolder[]
+  /** Writers move and delete; an item's owner who isn't one only shares it. */
+  canWrite?: boolean
 }) {
   const queryClient = useQueryClient()
   const [moving, setMoving] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [sharing, setSharing] = useState(false)
   const [busy, setBusy] = useState(false)
   const loaded = useQuery({ ...foldersQuery(item.team_id, item.workspace_id), enabled: moving && !knownFolders }).data
   const folders = knownFolders ?? loaded ?? []
@@ -96,13 +101,19 @@ export function FileRowActions({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onSelect={() => setMoving(true)}>Move to…</DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem variant="destructive" onSelect={() => setDeleting(true)}>
-            Delete
-          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => setSharing(true)}>Share…</DropdownMenuItem>
+          {canWrite && (
+            <>
+              <DropdownMenuItem onSelect={() => setMoving(true)}>Move to…</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem variant="destructive" onSelect={() => setDeleting(true)}>
+                Delete
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
+      {sharing && <ShareDialog kind={kind} item={item} open onOpenChange={setSharing} />}
       {moving && (
         <MoveDocDialog
           open

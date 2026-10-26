@@ -17,8 +17,10 @@ const DocView = docView.Component
 export function DocPage() {
   const { docId = '' } = useParams()
   const doc = useSuspenseQuery(documentQuery(docId)).data
-  const canEdit = useCanEditDocs()(doc?.workspace_id ?? null)
-  const canDelete = useCanWriteDocs()(doc?.workspace_id ?? null)
+  // The role rules, narrowed by how it's shared (a viewer of a restricted doc only reads it).
+  const level = doc?.access_level ?? 0
+  const canEdit = (useCanEditDocs()(doc?.workspace_id ?? null) && level === 3) || level === 2
+  const canDelete = useCanWriteDocs()(doc?.workspace_id ?? null) && level === 3
 
   if (!doc) {
     return <p className="py-16 text-center text-sm text-muted-foreground">This doc doesn’t exist anymore.</p>

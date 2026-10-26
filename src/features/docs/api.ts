@@ -4,6 +4,7 @@ import type { WorkspaceType } from '@/features/workspaces/api'
 import { DataError, requireAffected, toDataError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
 import type { Json, TablesInsert } from '@/types/database.types'
+import type { FileAccess } from './sharing'
 
 // Documents: workspace_id null = team-wide, otherwise assigned to that workspace.
 // RLS decides who sees what; these queries just ask for "everything I can see".
@@ -20,13 +21,22 @@ export type DocSummary = {
   author: PersonProfile
   /** null for team-wide docs. */
   workspace: { id: string; title: string; type: WorkspaceType } | null
+  /** 'restricted': only its owner, the people it's shared with, and group owners/admins (RLS). */
+  access: FileAccess
+  /** The owner (who made it); null if they've left. */
+  created_by: string | null
 }
 /** `body` is TipTap JSON (null = empty); `content` is its plain-text copy. */
-export type Doc = DocSummary & { content: string; body: Json | null }
+export type Doc = DocSummary & {
+  content: string
+  body: Json | null
+  /** The caller's level on it (public.access_level): 1 view, 2 edit (shared as an editor), 3 the usual role rules. */
+  access_level: number
+}
 
 // Content is left out of lists; it can be large.
 const SUMMARY =
-  'id, team_id, workspace_id, folder_id, title, created_at, updated_at, author:profiles!documents_created_by_fkey(display_name, avatar_url), workspace:workspaces!documents_workspace_team_fkey(id, title, type)'
+  'id, team_id, workspace_id, folder_id, title, created_at, updated_at, access, created_by, author:profiles!documents_created_by_fkey(display_name, avatar_url), workspace:workspaces!documents_workspace_team_fkey(id, title, type)'
 
 /** A folder of docs and diagrams, group-wide (workspace_id null) or in one workspace; depth 1–3. */
 export type DocFolder = {
@@ -37,6 +47,8 @@ export type DocFolder = {
   name: string
   depth: number
   updated_at: string
+  access: FileAccess
+  created_by: string | null
 }
 
 /** Folders can nest this deep (enforced by the database). */
@@ -63,7 +75,7 @@ export const teamDocsQuery = (teamId: string) =>
     },
   })
 
-const FOLDER_COLUMNS = 'id, team_id, workspace_id, parent_id, name, depth, updated_at'
+const FOLDER_COLUMNS = 'id, team_id, workspace_id, parent_id, name, depth, updated_at, access, created_by'
 
 /** Folders of one scope: group-wide (workspaceId null) or one workspace's. */
 export const foldersQuery = (teamId: string, workspaceId: string | null) =>
@@ -85,9 +97,11 @@ export const documentQuery = (docId: string) =>
     queryFn: async (): Promise<Doc | null> => {
       const { data, error } = await supabase
         .from('documents')
-        .select(`${SUMMARY}, content, body`)
+        .select(`${SUMMARY}, content, body, access_level`)
         .eq('id', docId)
         .maybeSingle()
+        // access_level is a computed column (public.access_level); the generated types can't see it.
+        .overrideTypes<Doc, { merge: false }>()
       if (error) throw toDataError('load the doc', error)
       return data
     },
@@ -102,6 +116,7 @@ export async function createDocument(input: {
   title: string
   /** Create it inside this folder (same scope). */
   folderId?: string | null
+  access?: FileAccess
 }): Promise<{ id: string }> {
   const { data, error } = await supabase
     .from('documents')
@@ -110,6 +125,7 @@ export async function createDocument(input: {
       workspace_id: input.workspaceId,
       title: input.title.trim(),
       folder_id: input.folderId ?? null,
+      access: input.access ?? 'place',
     })
     .select('id')
     .single()
@@ -183,8 +199,9 @@ export async function createFolder(input: {
   workspaceId: string | null
   parentId: string | null
   name: string
+  access?: FileAccess
 }): Promise<DocFolder> {
-  const row = { team_id: input.teamId, workspace_id: input.workspaceId, parent_id: input.parentId, name: input.name.trim() }
+  const row = { team_id: input.teamId, workspace_id: input.workspaceId, parent_id: input.parentId, name: input.name.trim(), access: input.access ?? 'place' }
   // Generated types can't see the trigger that sets `depth`.
   const { data, error } = await supabase
     .from('doc_folders')

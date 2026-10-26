@@ -8,6 +8,7 @@ import { OthersTypingAlert } from '@/components/OthersTypingAlert'
 import { Button } from '@/components/ui/button'
 import { foldersQuery } from '@/features/docs/api'
 import { DocScope } from '@/features/docs/components/DocScope'
+import { ShareButton } from '@/features/docs/components/ShareButton'
 import { folderPath } from '@/features/docs/folders'
 import { useCurrentTeam } from '@/features/teams/hooks'
 import { useOthersTyping } from '@/hooks/use-others-typing'
@@ -276,6 +277,7 @@ export default function DiagramView({ diagram, canWrite, embedded = false }: { d
           </span>
           {!canWrite && <span className="shrink-0 rounded-sm border px-1.5 py-0.5">View only</span>}
         </div>
+        <ShareButton kind="diagram" item={diagram} />
         {canWrite && (
           <div className="flex shrink-0 items-center gap-1">
             <SaveIndicator status={status} />
