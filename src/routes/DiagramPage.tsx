@@ -17,7 +17,9 @@ const DiagramView = diagramView.Component
 export function DiagramPage() {
   const { diagramId = '' } = useParams()
   const diagram = useSuspenseQuery(diagramQuery(diagramId)).data
-  const canWrite = useCanWriteDiagrams()(diagram?.workspace_id ?? null)
+  // The role rules, narrowed by how it's shared (a viewer of a restricted whiteboard only looks).
+  const level = diagram?.access_level ?? 0
+  const canWrite = (useCanWriteDiagrams()(diagram?.workspace_id ?? null) && level === 3) || level === 2
 
   if (!diagram) {
     return <p className="py-16 text-center text-sm text-muted-foreground">This whiteboard doesn’t exist anymore.</p>
