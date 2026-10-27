@@ -1,6 +1,7 @@
 import { data, type LoaderFunctionArgs } from 'react-router'
 import { requireUser } from '@/features/auth/loaders'
 import { queryClient } from '@/lib/query-client'
+import { teamPlansQuery } from '@/features/plans/api'
 import { workspaceReposQuery } from '@/features/repos/api'
 import { workspaceMembersQuery, workspaceQuery } from '@/features/workspaces/api'
 import {
@@ -67,6 +68,7 @@ export async function issuesLoader({ request, params }: LoaderFunctionArgs) {
     queryClient.prefetchQuery(labelsQuery(workspaceId)),
     queryClient.prefetchQuery(cyclesQuery(workspaceId)),
     queryClient.prefetchQuery(workspaceReposQuery(workspaceId)),
+    queryClient.prefetchQuery(teamPlansQuery(workspace.team_id)),
     queryClient.prefetchQuery(workspaceViewsQuery(workspaceId)),
     ...(onIssuePage ? [] : [queryClient.prefetchQuery(workspaceIssuesQuery(workspaceId))]),
   ])

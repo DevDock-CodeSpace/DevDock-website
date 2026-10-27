@@ -169,6 +169,15 @@ function isOwnWrite(table: string, change: Change) {
  * tables busy enough to be worth narrowing). A table must also be in the
  * `supabase_realtime` publication (see the enable_realtime migration) to send events.
  */
+/**
+ * A file added to a lesson's folder: the lesson page shows it as a tab, so that lesson is asked for
+ * again. Only on insert: saving a lesson's text (once a second while typing) mustn't refetch it.
+ */
+function lessonFileAdded(change: Change): QueryKey[] {
+  const lesson = id(change.new.lesson_id)
+  return change.eventType === 'INSERT' && lesson ? [['learning', 'lesson', lesson]] : []
+}
+
 const AFFECTS: Record<string, QueryKey[] | ((change: Change) => QueryKey[])> = {
   teams: [['teams']],
   team_members: [['teams'], ['workspaces']],
@@ -177,17 +186,15 @@ const AFFECTS: Record<string, QueryKey[] | ((change: Change) => QueryKey[])> = {
   workspace_collections: [['workspaces']],
   workspace_collection_members: [['workspaces']],
   workspace_modules: [['workspaces']],
-  workspace_pins: [['workspaces', 'pins']],
-  documents: (change) => rowQueries(change, DOC_LISTS, (row) => (id(row.id) ? ['documents', id(row.id)] : undefined), [['documents']], true),
+  documents: (change) => [
+    ...rowQueries(change, DOC_LISTS, (row) => (id(row.id) ? ['documents', id(row.id)] : undefined), [['documents']], true),
+    ...lessonFileAdded(change),
+  ],
   doc_folders: [['documents', 'folders']],
-  diagrams: (change) => {
-    // A lesson's own whiteboard is in no list: refresh just it (and, when one is made, its lesson's lookup),
-    // or every autosave would refetch Files in every tab.
-    const lesson = id(change.new.lesson_id)
-    const board = id(change.new.id)
-    if (lesson && board) return change.eventType === 'UPDATE' ? [['diagrams', board]] : [['diagrams', 'lesson', lesson], ['diagrams', board]]
-    return rowQueries(change, DIAGRAM_LISTS, (row) => (id(row.id) ? ['diagrams', id(row.id)] : undefined), [['diagrams']], true)
-  },
+  diagrams: (change) => [
+    ...rowQueries(change, DIAGRAM_LISTS, (row) => (id(row.id) ? ['diagrams', id(row.id)] : undefined), [['diagrams']], true),
+    ...lessonFileAdded(change),
+  ],
   issues: issueQueries,
   // The group list carries labels, sprints and project repos with each issue (teamIssuesQuery).
   issue_labels: [['issues', 'labels'], ['issues', 'team']],
@@ -198,6 +205,8 @@ const AFFECTS: Record<string, QueryKey[] | ((change: Change) => QueryKey[])> = {
   issue_views: [['issues', 'views'], ['issues', 'pins']],
   issue_pins: [['issues', 'pins']],
   issue_pull_requests: [['issues', 'pull-requests']],
+  // Goals assigned to issues (features/plans); a plan's name or status shows in its chips and lists.
+  plans: [['plans']],
   // Shared with someone, or unshared: their Files (docs, whiteboards, folders) and the Share dialog.
   file_shares: [['documents'], ['diagrams'], ['file-shares']],
   issue_branches: [['issues', 'branches']],

@@ -1,8 +1,8 @@
 import { queryOptions } from '@tanstack/react-query'
+import { DOC_SUMMARY, removeDocImages, type Doc } from '@/features/docs/api'
 import type { PersonProfile } from '@/features/teams/api'
 import { requireAffected, toDataError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
-import type { Json } from '@/types/database.types'
 
 // Learning: modules → ordered lessons, and each person's lessons marked done.
 // Everyone in the workspace reads the outline; leads and group owners/admins
@@ -17,8 +17,21 @@ export type LessonSummary = {
   position: number
   updated_at: string
 }
-/** body is TipTap JSON (null = empty). */
-export type Lesson = LessonSummary & { body: Json | null; author: PersonProfile }
+/** A file in a lesson's folder (besides its Lesson doc and Whiteboard): shown as a tab on the lesson page. */
+export type LessonFile = { id: string; kind: 'doc' | 'diagram'; title: string; created_at: string }
+/**
+ * A lesson and its files (owner's choice, 2026-10-27): its text is the doc "Lesson" in its folder in
+ * the course's Files (`doc`, loaded with it), its whiteboard is a whiteboard there (made when a teacher
+ * starts it), and teachers can add more files there (`files`).
+ */
+export type Lesson = LessonSummary & {
+  author: PersonProfile
+  folder_id: string | null
+  doc_id: string | null
+  whiteboard_id: string | null
+  doc: Doc | null
+  files: LessonFile[]
+}
 export type ProgressRow = { user_id: string; lesson_id: string; completed_at: string }
 
 export const learningKeys = {
@@ -64,18 +77,37 @@ export const lessonsQuery = (workspaceId: string) =>
     },
   })
 
-/** null when the lesson doesn't exist or the caller can't see it. */
+type LessonRow = Omit<Lesson, 'files'> & {
+  docs: { id: string; title: string; created_at: string }[]
+  boards: { id: string; title: string; created_at: string }[]
+}
+
+/**
+ * null when the lesson doesn't exist or the caller can't see it. One request brings the lesson, its
+ * Lesson doc (whole, as `documentQuery` has it: lessonLoader puts it in that cache) and the other
+ * files in its folder.
+ */
 export const lessonQuery = (lessonId: string) =>
   queryOptions({
     queryKey: learningKeys.lesson(lessonId),
     queryFn: async (): Promise<Lesson | null> => {
       const { data, error } = await supabase
         .from('lessons')
-        .select(`${LESSON_COLUMNS}, body, author:profiles!lessons_created_by_fkey(display_name, avatar_url)`)
+        .select(
+          `${LESSON_COLUMNS}, folder_id, doc_id, whiteboard_id, author:profiles!lessons_created_by_fkey(display_name, avatar_url), doc:documents!lessons_doc_id_fkey(${DOC_SUMMARY}, content, body, access_level), docs:documents!documents_lesson_fkey(id, title, created_at), boards:diagrams!diagrams_lesson_fkey(id, title, created_at)`,
+        )
         .eq('id', lessonId)
         .maybeSingle()
+        // access_level is a computed column (public.access_level); the generated types can't see it.
+        .overrideTypes<LessonRow, { merge: false }>()
       if (error) throw toDataError('load the lesson', error)
-      return data
+      if (!data) return null
+      const { docs, boards, ...lesson } = data
+      const files: LessonFile[] = [
+        ...docs.filter((d) => d.id !== lesson.doc_id).map((d) => ({ ...d, kind: 'doc' as const })),
+        ...boards.filter((b) => b.id !== lesson.whiteboard_id).map((b) => ({ ...b, kind: 'diagram' as const })),
+      ].sort((a, b) => a.created_at.localeCompare(b.created_at))
+      return { ...lesson, files }
     },
   })
 
@@ -126,8 +158,9 @@ export async function renameModule(moduleId: string, title: string) {
   requireAffected(data, 'rename module')
 }
 
-/** Deletes the module, its lessons, and everyone's progress on them. */
-export async function deleteModule(moduleId: string) {
+/** Deletes the module, its lessons (with their files), and everyone's progress on them. */
+export async function deleteModule(teamId: string, moduleId: string, lessonIds: string[]) {
+  await removeLessonImages(teamId, lessonIds)
   const { data, error } = await supabase.from('learning_modules').delete().eq('id', moduleId).select('id')
   if (error) throw toDataError('delete the module', error, writeErrors)
   requireAffected(data, 'delete module')
@@ -148,9 +181,9 @@ export async function createLesson(workspaceId: string, moduleId: string, title:
   return data
 }
 
-export async function updateLesson(lessonId: string, patch: { title?: string; body?: Json | null }) {
-  const update = patch.title === undefined ? patch : { ...patch, title: patch.title.trim() }
-  const { data, error } = await supabase.from('lessons').update(update).eq('id', lessonId).select('id')
+/** Renames a lesson (its folder in Files follows). Its text is its doc's, saved by the docs editor. */
+export async function renameLesson(lessonId: string, title: string) {
+  const { data, error } = await supabase.from('lessons').update({ title: title.trim() }).eq('id', lessonId).select('id')
   if (error) throw toDataError('save the lesson', error, writeErrors)
   requireAffected(data, 'update lesson')
 }
@@ -167,10 +200,27 @@ export async function reorderLessons(moduleId: string, ids: string[]) {
   if (error) throw toDataError('reorder the lessons', error, writeErrors)
 }
 
-export async function deleteLesson(lessonId: string) {
+/** Deletes the lesson with its files (its folder's docs and whiteboards go with it). */
+export async function deleteLesson(teamId: string, lessonId: string) {
+  await removeLessonImages(teamId, [lessonId])
   const { data, error } = await supabase.from('lessons').delete().eq('id', lessonId).select('id')
   if (error) throw toDataError('delete the lesson', error, writeErrors)
   requireAffected(data, 'delete lesson')
+}
+
+/** Starts a lesson's whiteboard in its folder (teachers); returns its id. */
+export async function startLessonWhiteboard(lessonId: string): Promise<string> {
+  const { data, error } = await supabase.rpc('lesson_whiteboard', { p_lesson_id: lessonId })
+  if (error) throw toDataError('start the whiteboard', error, writeErrors)
+  return data
+}
+
+/** Images in the lessons' docs live in Storage, which a database delete can't reach: they go first. */
+async function removeLessonImages(teamId: string, lessonIds: string[]) {
+  if (lessonIds.length === 0) return
+  const { data, error } = await supabase.rpc('lesson_doc_ids', { p_lesson_ids: lessonIds })
+  if (error) throw toDataError('delete the lesson’s files', error, writeErrors)
+  await Promise.all(data.map((docId) => removeDocImages(teamId, docId)))
 }
 
 /** user_id is the caller (database default). */

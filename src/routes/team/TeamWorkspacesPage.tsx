@@ -1,5 +1,5 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
-import { Pin } from 'lucide-react'
+import { Star } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { PageHeader } from '@/components/PageHeader'
@@ -17,7 +17,7 @@ import {
 import { useCollectionView } from '@/features/collections/hooks'
 import { myWorkspaceRolesQuery, type WorkspaceType } from '@/features/workspaces/api'
 import { CreateWorkspaceDialog } from '@/features/workspaces/components/CreateWorkspaceDialog'
-import { usePins } from '@/features/workspaces/hooks'
+import { useWorkspaceStars } from '@/features/workspaces/hooks'
 import { timeAgo } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
@@ -37,7 +37,7 @@ export function TeamWorkspacesPage() {
   // The collection being looked at (null in a group without collections) and what is in it.
   const { collection, workspaces } = useCollectionView()
   const myRoles = useSuspenseQuery(myWorkspaceRolesQuery(team.id, user.id)).data
-  const { isPinned, setPinned } = usePins()
+  const { isStarred, setStarred } = useWorkspaceStars(team.id)
   const [now] = useState(Date.now)
   const [params] = useSearchParams()
   const typeParam = params.get('type')
@@ -47,7 +47,7 @@ export function TeamWorkspacesPage() {
   )
   const shown = workspaces
     .filter((w) => !type || w.type === type)
-    .sort((a, b) => Number(isPinned(b.id)) - Number(isPinned(a.id)))
+    .sort((a, b) => Number(isStarred(b.id)) - Number(isStarred(a.id)))
 
   return (
     <>
@@ -100,13 +100,13 @@ export function TeamWorkspacesPage() {
             <span className="text-right">Members</span>
             <span>You</span>
             <span className="text-right">Updated</span>
-            <span className="sr-only">Pin</span>
+            <span className="sr-only">Star</span>
           </div>
           <ul className="divide-y">
             {shown.map((workspace) => {
               const { label: typeLabel, icon: TypeIcon } = workspaceTypes[workspace.type]
               const myRole = myRoles[workspace.id]
-              const pinned = isPinned(workspace.id)
+              const starred = isStarred(workspace.id)
               return (
                 <li
                   key={workspace.id}
@@ -150,16 +150,16 @@ export function TeamWorkspacesPage() {
                     </span>
                     <button
                       type="button"
-                      onClick={() => setPinned(workspace.id, !pinned)}
-                      aria-label={pinned ? `Unpin ${workspace.title}` : `Pin ${workspace.title}`}
-                      aria-pressed={pinned}
-                      title={pinned ? 'Unpin from the sidebar' : 'Pin to the top of the sidebar'}
+                      onClick={() => setStarred(workspace.id, !starred)}
+                      aria-label={starred ? `Unstar ${workspace.title}` : `Star ${workspace.title}`}
+                      aria-pressed={starred}
+                      title={starred ? 'Unstar' : 'Star: it shows in the sidebar’s Starred list'}
                       className={cn(
                         'relative z-10 flex size-7 items-center justify-center rounded-md transition-opacity hover:bg-muted focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none',
-                        pinned ? 'text-foreground' : 'text-muted-foreground opacity-0 group-hover:opacity-100',
+                        starred ? 'text-amber-400' : 'text-muted-foreground opacity-0 group-hover:opacity-100',
                       )}
                     >
-                      <Pin className={cn('size-3.5', pinned && 'fill-current')} />
+                      <Star className={cn('size-3.5', starred && 'fill-current')} />
                     </button>
                 </li>
               )

@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
+import type { Plan } from '@/features/plans/api'
 import { issuePath } from '@/features/teams/nav'
 import { workspaceMembersQuery, type WorkspaceMember } from '@/features/workspaces/api'
 import { cyclesQuery, type IssuePatch, type TeamIssue } from '../api'
@@ -18,6 +19,7 @@ export function TeamIssueRow({
   teamSlug,
   userId,
   showProject,
+  plans,
   update,
 }: {
   issue: TeamIssue
@@ -26,6 +28,8 @@ export function TeamIssueRow({
   teamSlug: string
   userId: string
   showProject: boolean
+  /** The group's plans (the page's one list). */
+  plans: Plan[]
   update: (issue: TeamIssue, patch: IssuePatch) => void
 }) {
   const [wanted, setWanted] = useState(false)
@@ -49,6 +53,7 @@ export function TeamIssueRow({
         labels: issue.labels,
         cycles: cycles ?? (issue.cycle ? [issue.cycle] : []),
         repos: issue.workspace.repos,
+        plans,
         userId,
         update: (patch) => update(issue, patch),
         project: showProject ? issue.workspace.title : undefined,

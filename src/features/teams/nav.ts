@@ -100,7 +100,13 @@ export function isTeamTool(tool: string): tool is TeamToolId {
 export const remindersPath = (slug: string) => `${teamPath(slug)}/reminders`
 
 /** Group-wide issues: every project's issues in one list. */
+/** The Issues hub (sidebar → Issues): My issues, Plans, Sprints, Views (docs/ISSUES_HUB_PLAN.md). */
 export const teamIssuesPath = (slug: string) => `${teamPath(slug)}/issues`
+export const hubPlansPath = (slug: string) => `${teamIssuesPath(slug)}/plans`
+export const planPath = (slug: string, planId: string) => `${hubPlansPath(slug)}/${planId}`
+export const hubSprintsPath = (slug: string) => `${teamIssuesPath(slug)}/sprints`
+export const hubViewsPath = (slug: string) => `${teamIssuesPath(slug)}/views`
+export const hubSettingsPath = (slug: string) => `${teamIssuesPath(slug)}/settings`
 
 /**
  * Whether the group has a group-wide Issues page: development groups always,

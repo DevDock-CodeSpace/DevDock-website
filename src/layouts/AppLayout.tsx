@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Fragment, type CSSProperties } from 'react'
 import { Link, Outlet, useLocation, useParams } from 'react-router'
 import { AppSidebar } from '@/components/AppSidebar'
+import { NavigationSpinner } from '@/components/NavigationSpinner'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { AskDevDockButton } from '@/features/ai/components/AskDevDockButton'
 import { NotificationBell } from '@/features/messaging/components/NotificationBell'
@@ -22,10 +23,11 @@ import { liveSessionQuery } from '@/features/live/api'
 import { CallDock, LiveCallProvider } from '@/features/live/call/CallDock'
 import { documentQuery } from '@/features/docs/api'
 import { issueQuery } from '@/features/issues/api'
+import { planQuery } from '@/features/plans/api'
 import { lessonQuery } from '@/features/learning/api'
 import { issueIdentifier } from '@/features/issues/meta'
 import { useCurrentTeam, useCurrentWorkspace } from '@/features/teams/hooks'
-import { getTeamNav, getWorkspaceTabs, isNavActive, teamPath, workspacePath, type NavItem } from '@/features/teams/nav'
+import { getTeamNav, getWorkspaceTabs, isNavActive, teamIssuesPath, teamPath, workspacePath, type NavItem } from '@/features/teams/nav'
 import { workspaceQuery } from '@/features/workspaces/api'
 import { useRealtimeSync } from '@/hooks/use-realtime-sync'
 import { useSidebarWidth } from '@/hooks/use-sidebar-width'
@@ -69,6 +71,7 @@ function AppShell() {
             <ThemeToggle />
           </div>
         </header>
+        <NavigationSpinner />
         <NotePopups />
         <PageArea fullBleed={fullBleed}>
           <Outlet />
@@ -114,7 +117,7 @@ function WorkspaceBreadcrumb() {
  * crumb, but only where its loader would show it (same team/workspace).
  */
 function useItemCrumb(): Crumb[] {
-  const { docId, diagramId, sessionId, issueNumber, cycleNumber, lessonId, workspaceId } = useParams()
+  const { docId, diagramId, sessionId, issueNumber, cycleNumber, lessonId, workspaceId, planId } = useParams()
   const { pathname } = useLocation()
   const { team } = useCurrentTeam()
   const doc = useQuery({ ...documentQuery(docId ?? ''), enabled: docId !== undefined }).data
@@ -126,6 +129,17 @@ function useItemCrumb(): Crumb[] {
   }).data
   const workspace = useQuery({ ...workspaceQuery(workspaceId ?? ''), enabled: workspaceId !== undefined }).data
   const lesson = useQuery({ ...lessonQuery(lessonId ?? ''), enabled: lessonId !== undefined }).data
+  // The plan page's loader has it cached: no request.
+  const plan = useQuery({ ...planQuery(planId ?? ''), enabled: planId !== undefined }).data
+  // The Issues hub's tabs and a plan: Issues › Plans › Custom Auth Roles.
+  const hub = teamIssuesPath(team.slug)
+  if (!workspaceId && (pathname === hub || pathname.startsWith(`${hub}/`))) {
+    const rest = pathname.slice(hub.length).split('/').filter(Boolean)
+    const tab = { plans: 'Plans', sprints: 'Sprints', views: 'Views', settings: 'Issue settings' }[rest[0] ?? ''] ?? 'My issues'
+    const crumbs: Crumb[] = [{ label: tab, to: rest[0] ? `${hub}/${rest[0]}` : hub }]
+    if (planId && plan && plan.team_id === team.id) crumbs.push({ label: plan.name, to: pathname })
+    return crumbs
+  }
   if (lessonId && lesson && lesson.workspace_id === workspaceId) return [{ label: lesson.title, to: pathname }]
   if (workspaceId && pathname.endsWith('/learning/progress')) return [{ label: 'Class progress', to: pathname }]
   if (issueNumber && issue && workspace) {
@@ -156,7 +170,7 @@ function Crumbs({ crumbs }: { crumbs: Crumb[] }) {
     <Breadcrumb className="min-w-0">
       <BreadcrumbList className="flex-nowrap">
         {crumbs.map((crumb, i) => (
-          <Fragment key={crumb.to}>
+          <Fragment key={`${i}:${crumb.to}`}>
             {i > 0 && <BreadcrumbSeparator className="hidden sm:block" />}
             <BreadcrumbItem className={i < crumbs.length - 1 ? 'hidden min-w-0 sm:inline-flex' : 'min-w-0'}>
               {i === crumbs.length - 1 ? (

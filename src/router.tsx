@@ -6,6 +6,8 @@ import { watchAuthIdentity } from '@/features/auth/session'
 import { diagramLoader } from '@/features/diagrams/loaders'
 import { docLoader, filesLoader, filesShouldRevalidate } from '@/features/docs/loaders'
 import { cycleLoader, issueLoader, issuesLoader } from '@/features/issues/loaders'
+import { issueImportLoader, workspaceSettingsLoader } from '@/features/issues/import/loaders'
+import { hubSettingsLoader, hubSprintsLoader, hubViewsLoader, issuesHubLoader, planLoader } from '@/features/issues/hub/loaders'
 import { lessonLoader } from '@/features/learning/loaders'
 import { liveSessionLoader } from '@/features/live/loaders'
 import { githubCallbackLoader } from '@/features/repos/loaders'
@@ -15,22 +17,17 @@ import { APP_ROUTE_ID, appLoader } from '@/layouts/app-loader'
 import { queryClient } from '@/lib/query-client'
 import { DiagramPage } from '@/routes/DiagramPage'
 import { DocPage } from '@/routes/DocPage'
-import { GitHubCallbackPage } from '@/routes/GitHubCallbackPage'
 import { MessagesPage } from '@/routes/team/MessagesPage'
 import { FULL_BLEED } from '@/layouts/full-bleed'
 import { NotFoundPage, RouteErrorPage } from '@/routes/NotFoundPage'
 import { OnboardingPage } from '@/routes/OnboardingPage'
-import { PrivacyPage } from '@/routes/PrivacyPage'
-import { TeamIssuesPage } from '@/routes/team/TeamIssuesPage'
+import { IssuesHubLayout } from '@/routes/team/IssuesHubLayout'
 import { TeamLivePage } from '@/routes/team/TeamLivePage'
 import { TeamMembersPage } from '@/routes/team/TeamMembersPage'
-import { TeamSettingsPage } from '@/routes/team/TeamSettingsPage'
 import { TeamWorkspacesPage } from '@/routes/team/TeamWorkspacesPage'
-import { WorkspaceGitHubPage } from '@/routes/workspace/WorkspaceGitHubPage'
 import { IssueCyclePage } from '@/routes/workspace/IssueCyclePage'
 import { IssueCyclesPage } from '@/routes/workspace/IssueCyclesPage'
 import { IssuePage } from '@/routes/workspace/IssuePage'
-import { LearningProgressPage } from '@/routes/workspace/LearningProgressPage'
 import { LessonPage } from '@/routes/workspace/LessonPage'
 import { WorkspaceLearningPage } from '@/routes/workspace/WorkspaceLearningPage'
 import { WorkspaceLivePage } from '@/routes/workspace/WorkspaceLivePage'
@@ -38,7 +35,6 @@ import { WorkspaceIssuesPage } from '@/routes/workspace/WorkspaceIssuesPage'
 import { WorkspaceLayout } from '@/routes/workspace/WorkspaceLayout'
 import { WorkspaceMembersPage } from '@/routes/workspace/WorkspaceMembersPage'
 import { WorkspaceOverviewPage } from '@/routes/workspace/WorkspaceOverviewPage'
-import { WorkspaceSettingsPage } from '@/routes/workspace/WorkspaceSettingsPage'
 import { WorkspaceTabPage } from '@/routes/workspace/WorkspaceTabPage'
 import { WorkspaceToolGate } from '@/routes/workspace/WorkspaceToolGate'
 import { DiagramsRedirect } from '@/routes/DiagramsRedirect'
@@ -64,7 +60,7 @@ export const router = createBrowserRouter([
     errorElement: <RouteErrorPage />,
   },
   // Public: no loader, so no session is needed (linked from Google's consent screen).
-  { path: '/privacy', element: <PrivacyPage />, errorElement: <RouteErrorPage /> },
+  { path: '/privacy', lazy: async () => ({ Component: (await import('@/routes/PrivacyPage')).PrivacyPage }), errorElement: <RouteErrorPage /> },
   {
     path: '/auth/callback',
     loader: authCallbackLoader, // always redirects
@@ -93,7 +89,7 @@ export const router = createBrowserRouter([
       {
         path: 'github/callback',
         loader: githubCallbackLoader,
-        element: <GitHubCallbackPage />,
+        lazy: async () => ({ Component: (await import('@/routes/GitHubCallbackPage')).GitHubCallbackPage }),
         hydrateFallbackElement: <AuthLoading label="Connecting GitHub…" />,
       },
       {
@@ -111,7 +107,7 @@ export const router = createBrowserRouter([
               // Where the group opens (after sign-in, or switching group or collection): its loader redirects.
               { path: 'start', loader: teamStartLoader },
               { path: 'members', element: <TeamMembersPage /> },
-              { path: 'settings', element: <TeamSettingsPage /> },
+              { path: 'settings', lazy: async () => ({ Component: (await import('@/routes/team/TeamSettingsPage')).TeamSettingsPage }) },
               // Team → Files (URL docs): group-wide docs and diagrams + those of every workspace the user can see.
               // Lazy page; filesLoader starts its queries alongside the chunk.
               { path: 'docs', loader: filesLoader, shouldRevalidate: filesShouldRevalidate, lazy: async () => ({ Component: (await import('@/routes/team/TeamDocsPage')).TeamDocsPage }) },
@@ -120,8 +116,22 @@ export const router = createBrowserRouter([
               { path: 'diagrams', element: <DiagramsRedirect /> },
               // Full-bleed: the canvas takes the whole area under the top bar (DiagramView sets its height).
               { path: 'diagrams/:diagramId', loader: diagramLoader, handle: FULL_BLEED, element: <DiagramPage /> },
-              // Development groups: issues from every project (the page checks the group type).
-              { path: 'issues', element: <TeamIssuesPage /> },
+              {
+                // The Issues hub (docs/ISSUES_HUB_PLAN.md): My issues, Plans, Sprints, Views. The layout checks the
+                // group has issues; issuesHubLoader starts the group's issues, plans and people. Tabs are lazy.
+                path: 'issues',
+                loader: issuesHubLoader,
+                element: <IssuesHubLayout />,
+                children: [
+                  { index: true, lazy: async () => ({ Component: (await import('@/routes/team/HubMyIssuesPage')).HubMyIssuesPage }) },
+                  { path: 'plans', lazy: async () => ({ Component: (await import('@/routes/team/HubPlansPage')).HubPlansPage }) },
+                  { path: 'plans/:planId', loader: planLoader, lazy: async () => ({ Component: (await import('@/routes/team/PlanPage')).PlanPage }) },
+                  { path: 'sprints', loader: hubSprintsLoader, lazy: async () => ({ Component: (await import('@/routes/team/HubSprintsPage')).HubSprintsPage }) },
+                  { path: 'views', loader: hubViewsLoader, lazy: async () => ({ Component: (await import('@/routes/team/HubViewsPage')).HubViewsPage }) },
+                  // ⚙ Issue settings: importing (every few months) and who imported names are.
+                  { path: 'settings', loader: hubSettingsLoader, lazy: async () => ({ Component: (await import('@/routes/team/HubSettingsPage')).HubSettingsPage }) },
+                ],
+              },
               // Group → Live: video sessions (Jitsi via JaaS) for the group and its workspaces.
               // The calendar (the default view) loads with the page, so it renders without waiting on its code.
               { path: 'live', loader: () => meetingCalendar.preload().then(() => null), element: <TeamLivePage /> },
@@ -142,7 +152,20 @@ export const router = createBrowserRouter([
                 children: [
                   { index: true, element: <WorkspaceOverviewPage /> },
                   { path: 'members', element: <WorkspaceMembersPage /> },
-                  { path: 'settings', element: <WorkspaceSettingsPage /> },
+                  {
+                    path: 'settings',
+                    children: [
+                      { index: true, loader: workspaceSettingsLoader, lazy: async () => ({ Component: (await import('@/routes/workspace/WorkspaceSettingsPage')).WorkspaceSettingsPage }) },
+                      {
+                        // Importing issues (Settings → Import): leads and group admins; its own chunk (CSV reading,
+                        // Markdown conversion). Needs the Issues tool.
+                        path: 'import',
+                        loader: issueImportLoader,
+                        element: <WorkspaceToolGate tool="issues" />,
+                        children: [{ index: true, lazy: async () => ({ Component: (await import('@/routes/workspace/IssueImportPage')).IssueImportPage }) }],
+                      },
+                    ],
+                  },
                   {
                     // Files (URL docs): this workspace's docs and diagrams; open when either tool is on.
                     path: 'docs',
@@ -180,7 +203,7 @@ export const router = createBrowserRouter([
                     element: <WorkspaceToolGate tool="learning" />,
                     children: [
                       { index: true, element: <WorkspaceLearningPage /> },
-                      { path: 'progress', element: <LearningProgressPage /> },
+                      { path: 'progress', lazy: async () => ({ Component: (await import('@/routes/workspace/LearningProgressPage')).LearningProgressPage }) },
                       { path: ':lessonId', loader: lessonLoader, element: <LessonPage /> },
                     ],
                   },
@@ -197,7 +220,7 @@ export const router = createBrowserRouter([
                     // The repos linked to this project (group repos; issues point at them).
                     path: 'github',
                     element: <WorkspaceToolGate tool="github" />,
-                    children: [{ index: true, element: <WorkspaceGitHubPage /> }],
+                    children: [{ index: true, lazy: async () => ({ Component: (await import('@/routes/workspace/WorkspaceGitHubPage')).WorkspaceGitHubPage }) }],
                   },
                   // Feature tabs that don't exist yet (Exercises); checked against the enabled tools.
                   { path: ':tab', element: <WorkspaceTabPage /> },

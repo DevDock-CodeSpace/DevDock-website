@@ -24,6 +24,10 @@ export type Issue = {
   status: IssueStatus
   priority: IssuePriority
   assignee_id: string | null
+  /** Imported issues only: the assignee as the file named them, until someone in DevDock is matched. */
+  import_assignee: string | null
+  /** The plan (a goal in the group) this issue is part of, or null. */
+  plan_id: string | null
   parent_id: string | null
   cycle_id: string | null
   /** A repo linked to the workspace (like a label), or null. */
@@ -93,13 +97,13 @@ export type IssueComment = {
 
 /** Fields the UI can change on an existing issue (column grants allow exactly these). */
 export type IssuePatch = Partial<
-  Pick<Issue, 'title' | 'status' | 'priority' | 'assignee_id' | 'parent_id' | 'cycle_id' | 'repo_id' | 'estimate' | 'due_date'> & {
+  Pick<Issue, 'title' | 'status' | 'priority' | 'assignee_id' | 'parent_id' | 'cycle_id' | 'repo_id' | 'estimate' | 'due_date' | 'plan_id'> & {
     description: Json | null
   }
 >
 
 const ISSUE_COLUMNS =
-  'id, workspace_id, number, title, status, priority, assignee_id, parent_id, cycle_id, repo_id, estimate, due_date, completed_at, created_by, created_at, updated_at, issue_label_links(label_id)'
+  'id, workspace_id, number, title, status, priority, assignee_id, import_assignee, plan_id, parent_id, cycle_id, repo_id, estimate, due_date, completed_at, created_by, created_at, updated_at, issue_label_links(label_id)'
 
 type IssueRow = Omit<Issue, 'labelIds' | 'priority'> & { priority: number; issue_label_links: { label_id: string }[] }
 
@@ -158,7 +162,7 @@ export type TeamIssue = Issue & {
 
 // Written out (not built from ISSUE_COLUMNS) so the typed client can read it.
 const TEAM_ISSUE_COLUMNS =
-  'id, workspace_id, number, title, status, priority, assignee_id, parent_id, cycle_id, repo_id, estimate, due_date, completed_at, created_by, created_at, updated_at, issue_label_links(label_id, label:issue_labels!issue_label_links_label_fkey(id, workspace_id, name, color)), workspace:workspaces!issues_workspace_team_fkey(id, title, issue_key, workspace_repos(repo:repos!workspace_repos_repo_fkey(id, team_id, owner, name, created_at, github_repo_id, installation_id))), assignee:profiles!issues_assignee_id_fkey(display_name, avatar_url), cycle:issue_cycles!issues_cycle_id_fkey(id, workspace_id, number, name, starts_on, ends_on)'
+  'id, workspace_id, number, title, status, priority, assignee_id, import_assignee, plan_id, parent_id, cycle_id, repo_id, estimate, due_date, completed_at, created_by, created_at, updated_at, issue_label_links(label_id, label:issue_labels!issue_label_links_label_fkey(id, workspace_id, name, color)), workspace:workspaces!issues_workspace_team_fkey(id, title, issue_key, workspace_repos(repo:repos!workspace_repos_repo_fkey(id, team_id, owner, name, created_at, github_repo_id, installation_id))), assignee:profiles!issues_assignee_id_fkey(display_name, avatar_url), cycle:issue_cycles!issues_cycle_id_fkey(id, workspace_id, number, name, starts_on, ends_on)'
 
 /** Issues from every workspace in the group the caller can see (RLS). */
 export const teamIssuesQuery = (teamId: string) =>
@@ -229,6 +233,25 @@ export const cyclesQuery = (workspaceId: string) =>
         .from('issue_cycles')
         .select('id, workspace_id, number, name, starts_on, ends_on')
         .eq('workspace_id', workspaceId)
+        .order('starts_on')
+      if (error) throw toDataError('load sprints', error)
+      return data
+    },
+  })
+
+/**
+ * The sprints of several projects in one request (the Issues hub's Sprints tab). Under the cycles
+ * prefix, so issue_cycles events refresh it.
+ */
+export const projectsCyclesQuery = (workspaceIds: string[]) =>
+  queryOptions({
+    queryKey: ['issues', 'cycles', 'projects', [...workspaceIds].sort().join(',')] as const,
+    queryFn: async (): Promise<IssueCycle[]> => {
+      if (workspaceIds.length === 0) return []
+      const { data, error } = await supabase
+        .from('issue_cycles')
+        .select('id, workspace_id, number, name, starts_on, ends_on')
+        .in('workspace_id', workspaceIds)
         .order('starts_on')
       if (error) throw toDataError('load sprints', error)
       return data
@@ -337,6 +360,7 @@ export type NewIssue = {
   parentId?: string | null
   cycleId?: string | null
   repoId?: string | null
+  planId?: string | null
   labelIds?: string[]
 }
 
@@ -352,6 +376,7 @@ export async function createIssue(input: NewIssue): Promise<{ id: string; number
     parent_id: input.parentId ?? null,
     cycle_id: input.cycleId ?? null,
     repo_id: input.repoId ?? null,
+    plan_id: input.planId ?? null,
   }
   // Generated types can't see the insert trigger that fills team_id and number.
   const { data, error } = await supabase

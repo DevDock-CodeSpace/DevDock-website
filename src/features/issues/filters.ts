@@ -2,7 +2,7 @@ import type { Issue, IssuePriority, IssueStatus } from './api'
 import { STATUS_ORDER } from './meta'
 
 // Issue list filters, kept in the URL so a filtered view can be shared or
-// bookmarked: ?tab=active&status=todo,in_review&assignee=me&label=<id>&cycle=current&repo=<id>
+// bookmarked: ?tab=active&status=todo,in_review&assignee=me&label=<id>&plan=<id>&cycle=current&repo=<id>
 
 export type IssueTab = 'all' | 'active' | 'backlog' | 'mine'
 
@@ -13,20 +13,21 @@ export const ISSUE_TABS: { id: IssueTab; label: string }[] = [
   { id: 'mine', label: 'My issues' },
 ]
 
-export type FilterFacet = 'status' | 'priority' | 'assignee' | 'label' | 'cycle' | 'repo'
+export type FilterFacet = 'status' | 'priority' | 'assignee' | 'label' | 'plan' | 'cycle' | 'repo'
 
-/** Selected values per facet. assignee: user ids, "me" or "none"; cycle: ids, "current" or "none"; repo: ids or "none". */
+/** Selected values per facet. assignee: user ids, "me" or "none"; cycle: ids, "current" or "none"; plan and repo: ids or "none". */
 export type IssueFilters = Record<FilterFacet, string[]>
 
-export const FACETS: FilterFacet[] = ['status', 'priority', 'assignee', 'label', 'cycle', 'repo']
+export const FACETS: FilterFacet[] = ['status', 'priority', 'assignee', 'label', 'plan', 'cycle', 'repo']
 
-export const NO_FILTERS: IssueFilters = { status: [], priority: [], assignee: [], label: [], cycle: [], repo: [] }
+export const NO_FILTERS: IssueFilters = { status: [], priority: [], assignee: [], label: [], plan: [], cycle: [], repo: [] }
 
 export const facetLabel: Record<FilterFacet, string> = {
   status: 'Status',
   priority: 'Priority',
   assignee: 'Assignee',
   label: 'Labels',
+  plan: 'Plan',
   cycle: 'Sprint',
   repo: 'Repository',
 }
@@ -43,6 +44,7 @@ export function readFilters(params: URLSearchParams): IssueFilters {
     priority: list('priority').filter((p) => ['0', '1', '2', '3', '4'].includes(p)),
     assignee: list('assignee'),
     label: list('label'),
+    plan: list('plan'),
     cycle: list('cycle'),
     repo: list('repo'),
   }
@@ -86,6 +88,7 @@ export function applyFilters(
         a === 'none' ? issue.assignee_id === null : issue.assignee_id === (a === 'me' ? context.userId : a),
       ) &&
       match('label', (l) => issue.labelIds.includes(l)) &&
+      match('plan', (p) => (p === 'none' ? issue.plan_id === null : issue.plan_id === p)) &&
       match('cycle', (c) =>
         c === 'none'
           ? issue.cycle_id === null
@@ -95,3 +98,6 @@ export function applyFilters(
     )
   })
 }
+
+/** `?new=1` opens New issue on a project's Issues page; `?new=<plan id>` opens it in that plan (the hub's links). */
+export const NEW_PARAM = 'new'

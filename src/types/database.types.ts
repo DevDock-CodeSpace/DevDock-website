@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.17"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       ai_pending_actions: {
@@ -425,8 +450,12 @@ export type Database = {
           created_by: string | null
           depth: number
           id: string
+          is_lessons_root: boolean
+          is_plans_root: boolean
+          lesson_id: string | null
           name: string
           parent_id: string | null
+          plan_id: string | null
           team_id: string
           updated_at: string
           workspace_id: string | null
@@ -437,8 +466,12 @@ export type Database = {
           created_by?: string | null
           depth: number
           id?: string
+          is_lessons_root?: boolean
+          is_plans_root?: boolean
+          lesson_id?: string | null
           name: string
           parent_id?: string | null
+          plan_id?: string | null
           team_id: string
           updated_at?: string
           workspace_id?: string | null
@@ -449,8 +482,12 @@ export type Database = {
           created_by?: string | null
           depth?: number
           id?: string
+          is_lessons_root?: boolean
+          is_plans_root?: boolean
+          lesson_id?: string | null
           name?: string
           parent_id?: string | null
+          plan_id?: string | null
           team_id?: string
           updated_at?: string
           workspace_id?: string | null
@@ -464,10 +501,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "doc_folders_lesson_fkey"
+            columns: ["lesson_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "lessons"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
             foreignKeyName: "doc_folders_parent_id_fkey"
             columns: ["parent_id"]
             isOneToOne: false
             referencedRelation: "doc_folders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "doc_folders_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
             referencedColumns: ["id"]
           },
           {
@@ -495,6 +546,7 @@ export type Database = {
           created_by: string | null
           folder_id: string | null
           id: string
+          lesson_id: string | null
           team_id: string
           title: string
           updated_at: string
@@ -508,6 +560,7 @@ export type Database = {
           created_by?: string | null
           folder_id?: string | null
           id?: string
+          lesson_id?: string | null
           team_id: string
           title: string
           updated_at?: string
@@ -521,6 +574,7 @@ export type Database = {
           created_by?: string | null
           folder_id?: string | null
           id?: string
+          lesson_id?: string | null
           team_id?: string
           title?: string
           updated_at?: string
@@ -540,6 +594,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "doc_folders"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_lesson_fkey"
+            columns: ["lesson_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "lessons"
+            referencedColumns: ["id", "workspace_id"]
           },
           {
             foreignKeyName: "documents_team_id_fkey"
@@ -917,6 +978,45 @@ export type Database = {
           },
         ]
       }
+      issue_import_people: {
+        Row: {
+          created_at: string
+          name: string
+          updated_at: string
+          user_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          name: string
+          updated_at?: string
+          user_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          name?: string
+          updated_at?: string
+          user_id?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "issue_import_people_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "issue_import_people_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       issue_label_links: {
         Row: {
           issue_id: string
@@ -987,40 +1087,46 @@ export type Database = {
           created_at: string
           cycle_id: string | null
           id: string
+          issue_id: string | null
           kind: string
           person_id: string | null
+          plan_id: string | null
           position: number
           tab: string | null
           team_id: string
           user_id: string
           view_id: string | null
-          workspace_id: string
+          workspace_id: string | null
         }
         Insert: {
           created_at?: string
           cycle_id?: string | null
           id?: string
+          issue_id?: string | null
           kind: string
           person_id?: string | null
+          plan_id?: string | null
           position?: number
           tab?: string | null
           team_id: string
           user_id?: string
           view_id?: string | null
-          workspace_id: string
+          workspace_id?: string | null
         }
         Update: {
           created_at?: string
           cycle_id?: string | null
           id?: string
+          issue_id?: string | null
           kind?: string
           person_id?: string | null
+          plan_id?: string | null
           position?: number
           tab?: string | null
           team_id?: string
           user_id?: string
           view_id?: string | null
-          workspace_id?: string
+          workspace_id?: string | null
         }
         Relationships: [
           {
@@ -1031,10 +1137,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "issue_pins_issue_id_fkey"
+            columns: ["issue_id"]
+            isOneToOne: false
+            referencedRelation: "issues"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "issue_pins_person_id_fkey"
             columns: ["person_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "issue_pins_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
             referencedColumns: ["id"]
           },
           {
@@ -1200,8 +1320,12 @@ export type Database = {
           due_date: string | null
           estimate: number | null
           id: string
+          import_assignee: string | null
+          import_ref: string | null
+          import_source: string | null
           number: number
           parent_id: string | null
+          plan_id: string | null
           priority: number
           repo_id: string | null
           status: Database["public"]["Enums"]["issue_status"]
@@ -1220,8 +1344,12 @@ export type Database = {
           due_date?: string | null
           estimate?: number | null
           id?: string
+          import_assignee?: string | null
+          import_ref?: string | null
+          import_source?: string | null
           number: number
           parent_id?: string | null
+          plan_id?: string | null
           priority?: number
           repo_id?: string | null
           status?: Database["public"]["Enums"]["issue_status"]
@@ -1240,8 +1368,12 @@ export type Database = {
           due_date?: string | null
           estimate?: number | null
           id?: string
+          import_assignee?: string | null
+          import_ref?: string | null
+          import_source?: string | null
           number?: number
           parent_id?: string | null
+          plan_id?: string | null
           priority?: number
           repo_id?: string | null
           status?: Database["public"]["Enums"]["issue_status"]
@@ -1277,6 +1409,13 @@ export type Database = {
             columns: ["parent_id"]
             isOneToOne: false
             referencedRelation: "issues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "issues_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
             referencedColumns: ["id"]
           },
           {
@@ -1371,33 +1510,42 @@ export type Database = {
           body: Json | null
           created_at: string
           created_by: string | null
+          doc_id: string | null
+          folder_id: string | null
           id: string
           module_id: string
           position: number
           title: string
           updated_at: string
+          whiteboard_id: string | null
           workspace_id: string
         }
         Insert: {
           body?: Json | null
           created_at?: string
           created_by?: string | null
+          doc_id?: string | null
+          folder_id?: string | null
           id?: string
           module_id: string
           position?: number
           title: string
           updated_at?: string
+          whiteboard_id?: string | null
           workspace_id: string
         }
         Update: {
           body?: Json | null
           created_at?: string
           created_by?: string | null
+          doc_id?: string | null
+          folder_id?: string | null
           id?: string
           module_id?: string
           position?: number
           title?: string
           updated_at?: string
+          whiteboard_id?: string | null
           workspace_id?: string
         }
         Relationships: [
@@ -1409,11 +1557,32 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "lessons_doc_id_fkey"
+            columns: ["doc_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lessons_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "doc_folders"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "lessons_module_fkey"
             columns: ["module_id", "workspace_id"]
             isOneToOne: false
             referencedRelation: "learning_modules"
             referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "lessons_whiteboard_id_fkey"
+            columns: ["whiteboard_id"]
+            isOneToOne: false
+            referencedRelation: "diagrams"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1930,6 +2099,100 @@ export type Database = {
             columns: ["team_id"]
             isOneToOne: false
             referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plans: {
+        Row: {
+          brief_id: string | null
+          created_at: string
+          created_by: string | null
+          description: Json | null
+          folder_id: string | null
+          id: string
+          lead_id: string | null
+          name: string
+          starts_on: string | null
+          status: Database["public"]["Enums"]["plan_status"]
+          target_on: string | null
+          team_id: string
+          updated_at: string
+          whiteboard_id: string | null
+        }
+        Insert: {
+          brief_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: Json | null
+          folder_id?: string | null
+          id?: string
+          lead_id?: string | null
+          name: string
+          starts_on?: string | null
+          status?: Database["public"]["Enums"]["plan_status"]
+          target_on?: string | null
+          team_id: string
+          updated_at?: string
+          whiteboard_id?: string | null
+        }
+        Update: {
+          brief_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: Json | null
+          folder_id?: string | null
+          id?: string
+          lead_id?: string | null
+          name?: string
+          starts_on?: string | null
+          status?: Database["public"]["Enums"]["plan_status"]
+          target_on?: string | null
+          team_id?: string
+          updated_at?: string
+          whiteboard_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plans_brief_id_fkey"
+            columns: ["brief_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plans_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plans_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "doc_folders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plans_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plans_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plans_whiteboard_id_fkey"
+            columns: ["whiteboard_id"]
+            isOneToOne: false
+            referencedRelation: "diagrams"
             referencedColumns: ["id"]
           },
         ]
@@ -2560,6 +2823,10 @@ export type Database = {
         }
         Returns: string
       }
+      brief_excerpt: {
+        Args: { p: Database["public"]["Tables"]["plans"]["Row"] }
+        Returns: string
+      }
       can_moderate_live_session: {
         Args: { p_session_id: string }
         Returns: boolean
@@ -2599,6 +2866,10 @@ export type Database = {
           starts_at: string
         }[]
       }
+      create_plan: {
+        Args: { p_name: string; p_team_id: string }
+        Returns: string
+      }
       create_workspace: {
         Args: {
           p_description: string
@@ -2626,6 +2897,7 @@ export type Database = {
         Returns: Database["public"]["Enums"]["workspace_module"][]
       }
       delete_message: { Args: { p_message_id: string }; Returns: undefined }
+      delete_plan: { Args: { p_plan_id: string }; Returns: undefined }
       edit_message: {
         Args: { p_body: Json; p_content: string; p_message_id: string }
         Returns: undefined
@@ -2661,12 +2933,37 @@ export type Database = {
         }
         Returns: number[]
       }
+      import_issues: {
+        Args: {
+          p_cycles?: Json
+          p_issues: Json
+          p_people?: Json
+          p_plans?: Json
+          p_source: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      import_people: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          name: string
+          user_id: string
+          waiting: number
+        }[]
+      }
       join_team: { Args: { invite_code: string }; Returns: string }
+      lesson_doc_ids: { Args: { p_lesson_ids: string[] }; Returns: string[] }
+      lesson_whiteboard: { Args: { p_lesson_id: string }; Returns: string }
       live_session_invitees: {
         Args: { p_session_id: string }
         Returns: {
           email: string
         }[]
+      }
+      map_import_assignee: {
+        Args: { p_name: string; p_user_id: string; p_workspace_id: string }
+        Returns: number
       }
       mark_conversation_read: {
         Args: {
@@ -2694,6 +2991,15 @@ export type Database = {
         Args: { p_from: string; p_to: string }
         Returns: number
       }
+      plan_files: {
+        Args: { p_plan_id: string }
+        Returns: {
+          doc_ids: string[]
+          folders: number
+          whiteboards: number
+        }[]
+      }
+      plan_whiteboard: { Args: { p_plan_id: string }; Returns: string }
       reorder_issue_pins: {
         Args: { p_ids: string[]; p_team_id: string }
         Returns: undefined
@@ -2801,6 +3107,12 @@ export type Database = {
         | "todo"
         | "in_progress"
         | "in_review"
+        | "done"
+        | "canceled"
+      plan_status:
+        | "not_started"
+        | "in_progress"
+        | "paused"
         | "done"
         | "canceled"
       reminder_status: "pending" | "completed" | "cancelled"
@@ -2943,6 +3255,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       file_access: ["place", "restricted"],
@@ -2954,6 +3269,7 @@ export const Constants = {
         "done",
         "canceled",
       ],
+      plan_status: ["not_started", "in_progress", "paused", "done", "canceled"],
       reminder_status: ["pending", "completed", "cancelled"],
       team_role: ["owner", "admin", "member"],
       team_type: ["development", "learning", "general"],

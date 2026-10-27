@@ -48,7 +48,12 @@ export function PrivacyPage() {
           <ul>
             <li>groups, workspaces and who belongs to them, with their roles;</li>
             <li>docs (including images you add to them) and whiteboards;</li>
-            <li>issues (including images you add to their descriptions), comments, labels and sprints, and a history of changes made to issues;</li>
+            <li>issues (including images you add to their descriptions), comments, labels, sprints and plans, a history of changes made to issues, and what you star;</li>
+            <li>
+              issues imported from a file (for example an export from Linear, Notion or Jira): what the file says about each
+              issue, including the name or email of its assignee when that person isn’t in DevDock, kept until a project lead
+              matches it to someone;
+            </li>
             <li>the GitHub repositories your group uses (their names and GitHub ids) and which projects use them;</li>
             <li>notes you keep for yourself: their title, details, the time you want them to pop up (if any) and the workspace or issue they are about.</li>
           </ul>

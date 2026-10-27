@@ -1,4 +1,4 @@
-import { CircleUserRound, IterationCw, ListFilter, Tag, X } from 'lucide-react'
+import { CircleUserRound, Goal, IterationCw, ListFilter, Tag, X } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { PersonAvatar } from '@/components/PersonRow'
 import { Button } from '@/components/ui/button'
@@ -20,6 +20,8 @@ import { labelDotClass, PRIORITY_ORDER, priorityLabel, STATUS_ORDER, statusLabel
 import { Picker, type PickerOption } from './Picker'
 import { PriorityIcon } from './PriorityIcon'
 import { StatusIcon } from './StatusIcon'
+import { PlanStatusDot } from '@/features/plans/components/PlanStatusDot'
+import { sortPlans } from '@/features/plans/meta'
 import { GitHubMark } from '@/features/repos/components/GitHubMark'
 
 const facetIcon: Record<FilterFacet, ReactNode> = {
@@ -27,13 +29,14 @@ const facetIcon: Record<FilterFacet, ReactNode> = {
   priority: <PriorityIcon priority={2} />,
   assignee: <CircleUserRound className="size-3.5" />,
   label: <Tag className="size-3.5" />,
+  plan: <Goal className="size-3.5" />,
   cycle: <IterationCw className="size-3.5" />,
   repo: <GitHubMark className="size-3.5" />,
 }
 
 /** The values a facet can take, with labels and icons (menus and chips share them). */
 function useFacetOptions(): Record<FilterFacet, PickerOption[]> {
-  const { members, labels, cycles, repos, userId } = useIssueContext()
+  const { members, labels, cycles, repos, plans, userId } = useIssueContext()
   return {
     status: STATUS_ORDER.map((s: IssueStatus) => ({ value: s, label: statusLabel[s], icon: <StatusIcon status={s} /> })),
     priority: PRIORITY_ORDER.map((p: IssuePriority) => ({
@@ -57,6 +60,14 @@ function useFacetOptions(): Record<FilterFacet, PickerOption[]> {
       label: l.name,
       icon: <span className={cn('size-2 rounded-full', labelDotClass[l.color])} />,
     })),
+    // The group's plans (plans aren't per project); none yet: the facet isn't offered.
+    plan:
+      plans.length === 0
+        ? []
+        : [
+            { value: 'none', label: 'No plan', icon: <Goal className="size-3.5 text-muted-foreground" /> },
+            ...sortPlans(plans).map((p) => ({ value: p.id, label: p.name, icon: <PlanStatusDot status={p.status} /> })),
+          ],
     cycle: [
       { value: 'current', label: 'Current sprint', icon: <IterationCw className="size-3.5 text-brand" /> },
       { value: 'none', label: 'No sprint', icon: <IterationCw className="size-3.5 text-muted-foreground" /> },

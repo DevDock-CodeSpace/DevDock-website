@@ -1,5 +1,7 @@
 import { data, redirect, type LoaderFunctionArgs } from 'react-router'
 import { requireUser } from '@/features/auth/loaders'
+import { teamPinsQuery, teamViewsQuery } from '@/features/issues/viewsApi'
+import { notificationsQuery, unreadCountsQuery } from '@/features/messaging/api'
 import { availableCollections, pickCollection, readCollectionView } from '@/features/collections/view'
 import { myWorkspaceRolesQuery, teamContentsQuery, teamWorkspacesQuery, workspaceQuery } from '@/features/workspaces/api'
 import { readRecentVisits } from '@/features/workspaces/recent'
@@ -25,7 +27,11 @@ export async function onboardingLoader({ request }: LoaderFunctionArgs) {
   return null
 }
 
-/** /t/:teamSlug: must be a member; primes workspaces for the sidebar and home page. */
+/**
+ * /t/:teamSlug: must be a member; primes workspaces for the sidebar and home page, and starts the rest
+ * of the shell's group data (Starred, saved views, unread counts, the bell) in the same round instead
+ * of after the sidebar has mounted. Only the workspace list and roles are awaited.
+ */
 export async function teamLoader({ request, params }: LoaderFunctionArgs) {
   const user = await requireUser(request)
   const memberships = await queryClient.ensureQueryData(myTeamsQuery(user.id))
@@ -33,6 +39,11 @@ export async function teamLoader({ request, params }: LoaderFunctionArgs) {
   if (!membership) throw data('Group not found, or you’re not a member.', { status: 404 })
 
   rememberTeam(membership.team.slug)
+  const team = membership.team.id
+  void queryClient.prefetchQuery(teamPinsQuery(team))
+  void queryClient.prefetchQuery(teamViewsQuery(team))
+  void queryClient.prefetchQuery(unreadCountsQuery(team))
+  void queryClient.prefetchQuery(notificationsQuery(team, user.id))
   await Promise.all([
     queryClient.ensureQueryData(teamWorkspacesQuery(membership.team.id)),
     queryClient.ensureQueryData(myWorkspaceRolesQuery(membership.team.id, user.id)),

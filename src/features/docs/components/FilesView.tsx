@@ -86,8 +86,10 @@ export function FilesView({
     workspaceId === null || (spaces.find((w) => w.id === workspaceId)?.modules.includes(tool) ?? false)
   const inPlace = (workspaceId: string | null) =>
     place === EVERYWHERE ? inView(workspaceId) && (workspaceId === null || spaces.some((w) => w.id === workspaceId)) : workspaceId === placeWorkspace
-  const placeDocs = docs.filter((d) => inPlace(d.workspace_id) && enabled(d.workspace_id, 'docs'))
-  const placeDiagrams = diagrams.filter((d) => inPlace(d.workspace_id) && enabled(d.workspace_id, 'diagrams'))
+  // A lesson's files are reached through its lesson page; only the course's managers see them here.
+  const shown = (item: DocSummary) => item.lesson_id === null || canWrite(item.workspace_id)
+  const placeDocs = docs.filter((d) => inPlace(d.workspace_id) && enabled(d.workspace_id, 'docs') && shown(d))
+  const placeDiagrams = diagrams.filter((d) => inPlace(d.workspace_id) && enabled(d.workspace_id, 'diagrams') && shown(d))
   const docsOn = workspace ? workspace.modules.includes('docs') : true
   const diagramsOn = workspace ? workspace.modules.includes('diagrams') : true
 
@@ -260,7 +262,9 @@ function PlaceFiles({
   empty: string
 }) {
   const { team } = useCurrentTeam()
-  const folders = useSuspenseQuery(foldersQuery(team.id, workspaceId)).data
+  const all = useSuspenseQuery(foldersQuery(team.id, workspaceId)).data
+  // The Lessons folder and what's in it: only for the course's managers (students open lessons).
+  const folders = props.canWrite ? all : withoutLessons(all)
   return (
     <DocBrowser
       {...props}
@@ -463,4 +467,11 @@ function RowsLoading() {
       ))}
     </div>
   )
+}
+
+/** Folders minus the Lessons folder and everything under it. */
+function withoutLessons(folders: DocFolder[]) {
+  const byId = new Map(folders.map((f) => [f.id, f]))
+  const inLessons = (f: DocFolder | undefined): boolean => !!f && (f.is_lessons_root || f.lesson_id !== null || inLessons(byId.get(f.parent_id ?? '')))
+  return folders.filter((f) => !inLessons(f))
 }
