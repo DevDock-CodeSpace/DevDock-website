@@ -245,7 +245,11 @@ export function DocBrowser({
 
   // ------------------------------------------------------------ selection
   const rowKey = (row: Row) => (row.kind === 'doc' ? docKey(row.item.id) : diagramKey(row.item.id))
-  const keys = useMemo(() => [...shownFolders.map((f) => folderKey(f.id)), ...rows.map(rowKey)], [shownFolders, rows])
+  // Plan folders (and the Plans folder) aren't selectable: they follow their plans.
+  const keys = useMemo(
+    () => [...shownFolders.filter((f) => !followsItsOwner(f)).map((f) => folderKey(f.id)), ...rows.map(rowKey)],
+    [shownFolders, rows],
+  )
   const selection = useSelection(keys)
   useEffect(() => {
     if (selection.count === 0) return
@@ -393,16 +397,17 @@ export function DocBrowser({
   /** Where a search result lives: "Testing › Week 1", or the top level. */
   const placeOf = (folderId: string | null) => folderPath(folderId, folders).map((f) => f.name).join(' › ') || rootName
 
-  const lead = (key: string, Icon: LucideIcon, label: string, iconClass?: string) => (
+  // `selectable` false: no checkbox (a plan's folder isn't moved or deleted by hand).
+  const lead = (key: string, Icon: LucideIcon, label: string, iconClass?: string, selectable = true) => (
     <span className="relative z-10 flex size-7 items-center justify-center">
       <Icon
         className={cn(
           'size-4 transition-opacity',
           iconClass,
-          canWrite && (selection.count > 0 ? 'opacity-0' : 'group-hover:opacity-0 [@media(hover:none)]:opacity-0'),
+          canWrite && selectable && (selection.count > 0 ? 'opacity-0' : 'group-hover:opacity-0 [@media(hover:none)]:opacity-0'),
         )}
       />
-      {canWrite && (
+      {canWrite && selectable && (
         <input
           type="checkbox"
           aria-label={`Select ${label}`}
@@ -553,12 +558,14 @@ export function DocBrowser({
           <ul>
             {shownFolders.map((folder) => {
               const key = folderKey(folder.id)
+              // The Plans folder and plan folders follow their plans (renamed and deleted with them).
+              const planFolder = followsItsOwner(folder)
               return (
                 <li
                   key={folder.id}
                   data-file-row=""
                   data-selected={selection.has(key) || undefined}
-                  draggable={canWrite && !searching}
+                  draggable={canWrite && !searching && !planFolder}
                   onDragStart={(e) => startDrag(e, key)}
                   onDragEnd={endDrag}
                   {...dropProps(folder.id, true)}
@@ -570,12 +577,12 @@ export function DocBrowser({
                     isDropTarget(folder.id) && 'bg-brand/10 ring-1 ring-brand ring-inset',
                   )}
                 >
-                  {lead(key, Folder, folder.name, 'fill-muted-foreground/15 text-muted-foreground')}
+                  {lead(key, Folder, folder.name, 'fill-muted-foreground/15 text-muted-foreground', !planFolder)}
                   <span className="flex min-w-0 flex-col">
                     <button
                       type="button"
                       onClick={(e) => {
-                        if (canWrite && selection.click(key, e)) return
+                        if (canWrite && !planFolder && selection.click(key, e)) return
                         open(folder.id)
                       }}
                       className="min-w-0 truncate text-left text-sm font-medium outline-none after:absolute after:inset-0"
@@ -585,6 +592,8 @@ export function DocBrowser({
                     <span className="flex min-w-0 items-center gap-1 truncate text-xs text-muted-foreground">
                       {folder.access === 'restricted' && <RestrictedMark />}
                       {searching ? `in ${placeOf(folder.parent_id)}` : summary(folder)}
+                      {folder.plan_id && <span>· Plan’s folder</span>}
+                      {folder.lesson_id && <span>· Lesson’s folder</span>}
                     </span>
                   </span>
                   <span className="hidden md:block" />
@@ -592,7 +601,7 @@ export function DocBrowser({
                     {timeAgo(changedAt(folder), now)}
                   </span>
                   <span className="hidden justify-self-end md:block">
-                    {canWrite && (
+                    {canWrite && !planFolder && (
                       <RowMenu label={`${folder.name} actions`}>
                         <DropdownMenuItem onSelect={() => setSharingFolder(folder)}>Share…</DropdownMenuItem>
                         <DropdownMenuItem onSelect={() => setNaming({ mode: 'rename', folder })}>Rename</DropdownMenuItem>
@@ -741,4 +750,9 @@ function RowMenu({ label, children }: { label: string; children: ReactNode }) {
       <DropdownMenuContent align="end">{children}</DropdownMenuContent>
     </DropdownMenu>
   )
+}
+
+/** Plan and lesson folders (and the Plans and Lessons folders) follow their plan or lesson: no moving, renaming or deleting by hand. */
+function followsItsOwner(folder: DocFolder) {
+  return folder.plan_id !== null || folder.is_plans_root || folder.lesson_id !== null || folder.is_lessons_root
 }

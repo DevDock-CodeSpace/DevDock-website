@@ -1,45 +1,37 @@
-import { useQueryClient } from '@tanstack/react-query'
-import type { JSONContent } from '@tiptap/core'
-import { EditorContent, useEditor } from '@tiptap/react'
-import { ArrowLeft, ArrowRight, Check, ChevronRight } from 'lucide-react'
-import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ArrowLeft, ArrowRight, Check, ChevronRight, FileText, Plus, Presentation } from 'lucide-react'
+import { Suspense, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { DockSpinner } from '@/components/DockSpinner'
-import { OthersTypingAlert } from '@/components/OthersTypingAlert'
 import { Button } from '@/components/ui/button'
-import { lessonBoardQuery } from '@/features/diagrams/api'
-import { adoptContent } from '@/features/docs/editor/adopt'
-import { docExtensions } from '@/features/docs/editor/extensions'
-import { FormatBubble } from '@/features/docs/editor/FormatBubble'
-import { FileLinkPicker } from '@/features/docs/editor/FileLinkPicker'
-import { InsertMenu } from '@/features/docs/editor/InsertMenu'
-import { docContentClass } from '@/features/docs/editor/styles'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Skeleton } from '@/components/ui/skeleton'
+import { createDiagram, diagramQuery } from '@/features/diagrams/api'
+import { createDocument, documentQuery } from '@/features/docs/api'
+import DocView from '@/features/docs/components/DocView'
 import { useCurrentTeam } from '@/features/teams/hooks'
 import { learningPath, lessonPath } from '@/features/teams/nav'
-import { useOthersTyping } from '@/hooks/use-others-typing'
 import { AUTOSAVE_MS, useSaveOnExit } from '@/hooks/use-save-on-exit'
 import { errorMessage } from '@/lib/errors'
-import { sameJson } from '@/lib/json'
 import { preloadable } from '@/lib/preloadable'
+import { ownWrite } from '@/lib/realtime'
 import { cn } from '@/lib/utils'
-import type { Json } from '@/types/database.types'
-import { learningKeys, updateLesson, type Lesson } from '../api'
+import { learningKeys, renameLesson, startLessonWhiteboard, type Lesson } from '../api'
 import { useLearning, useToggleDone } from '../hooks'
 
-// The Whiteboard tab brings React Flow: it loads when the tab is opened (or hovered), never with the lesson.
+// Whiteboards bring React Flow: it loads when one is opened (or its tab hovered), never with the lesson.
 const board = preloadable(() => import('./LessonBoard'))
 const LessonBoard = board.Component
 
-function initialContent(body: Json | null): JSONContent | null {
-  if (body && typeof body === 'object' && !Array.isArray(body) && body.type === 'doc') return body as JSONContent
-  return null
-}
+/** Which tab is open: the lesson's text, its whiteboard, or another file in its folder (by id). */
+type Tab = { kind: 'lesson' } | { kind: 'whiteboard' } | { kind: 'file'; id: string }
 
 /**
- * A lesson: the Docs editor for managers (autosaved; no images) or the same
- * rendering read-only for everyone else, then "Mark as done" and
- * previous/next lesson in reading order.
+ * A lesson (owner's choice, 2026-10-27: lessons keep their content in their folder in the course's
+ * Files, and this page is how students reach it). Tabs: Lesson (its doc, edited in place by teachers),
+ * Whiteboard, then any other doc or whiteboard teachers added to its folder (+). Then "Mark as done"
+ * and previous/next lesson in reading order.
  */
 export default function LessonView({ lesson }: { lesson: Lesson }) {
   const { team } = useCurrentTeam()
@@ -53,90 +45,92 @@ export default function LessonView({ lesson }: { lesson: Lesson }) {
   const previous = ordered[position - 1]
   const next = ordered[position + 1]
   const isDone = done.has(lesson.id)
-  // Lesson | Whiteboard, in the URL so a link can open the board.
+
+  // ------------------------------------------------------------ tabs (in the URL, so a link can open one)
   const [params, setParams] = useSearchParams()
-  const onBoard = params.get('tab') === 'whiteboard'
-  const showTab = (tab: 'lesson' | 'whiteboard') =>
-    setParams((current) => {
-      const next = new URLSearchParams(current)
-      if (tab === 'whiteboard') next.set('tab', 'whiteboard')
-      else next.delete('tab')
-      return next
-    }, { replace: true })
-  const prefetchBoard = () => {
+  const fileId = params.get('file')
+  const tab: Tab =
+    params.get('tab') === 'whiteboard'
+      ? { kind: 'whiteboard' }
+      : fileId && lesson.files.some((f) => f.id === fileId)
+        ? { kind: 'file', id: fileId }
+        : { kind: 'lesson' }
+  const open = (to: Tab) =>
+    setParams(
+      (current) => {
+        const p = new URLSearchParams(current)
+        p.delete('tab')
+        p.delete('file')
+        if (to.kind === 'whiteboard') p.set('tab', 'whiteboard')
+        if (to.kind === 'file') p.set('file', to.id)
+        return p
+      },
+      { replace: true },
+    )
+  // Docs stay mounted (hidden) once opened, so switching tabs never drops an edit in the autosave wait.
+  const [openedDocs, setOpenedDocs] = useState<string[]>([])
+  const openDoc = tab.kind === 'file' && lesson.files.find((f) => f.id === tab.id)?.kind === 'doc' ? tab.id : null
+  if (openDoc && !openedDocs.includes(openDoc)) setOpenedDocs([...openedDocs, openDoc])
+  const prefetchBoard = (id: string | null) => {
     void board.preload()
-    void queryClient.prefetchQuery(lessonBoardQuery(lesson.id))
+    if (id) void queryClient.prefetchQuery(diagramQuery(id))
   }
 
-  // ------------------------------------------------------------ saving (managers)
-  // Saves run one after another (an older one can't land on top of a newer one), and
-  // the cached lesson gets the text as soon as a save starts, so coming back shows it.
+  const start = useMutation({
+    mutationFn: () => startLessonWhiteboard(lesson.id),
+    onSuccess: (id) => {
+      ownWrite('diagrams', id)
+      queryClient.setQueryData<Lesson | null>(learningKeys.lesson(lesson.id), (old) => (old ? { ...old, whiteboard_id: id } : old))
+    },
+    onError: (error) => toast.error(errorMessage(error)),
+  })
+  const create = useMutation({
+    mutationFn: async (kind: 'doc' | 'diagram') => {
+      const input = { teamId: team.id, workspaceId: workspace.id, folderId: lesson.folder_id, title: kind === 'doc' ? 'Untitled doc' : 'Untitled whiteboard' }
+      return kind === 'doc' ? createDocument(input) : createDiagram(input)
+    },
+    onSuccess: async ({ id }) => {
+      await queryClient.invalidateQueries({ queryKey: learningKeys.lesson(lesson.id), exact: true })
+      open({ kind: 'file', id })
+    },
+    onError: (error) => toast.error(errorMessage(error)),
+  })
+
+  // ------------------------------------------------------------ the title (its folder is renamed with it)
+  const [title, setTitle] = useState(lesson.title)
   const [status, setStatus] = useState<'saved' | 'pending' | 'saving' | 'error'>('saved')
-  const pending = useRef<{ title?: string; body?: Json | null }>({})
+  const pending = useRef<string | null>(null)
   const timer = useRef<number | undefined>(undefined)
-  const saving = useRef(false)
-  const inflight = useRef<Promise<void>>(Promise.resolve())
-  const mounted = useRef(true)
-  // What the server has, as far as this view knows (the last load, save, or adopted change).
-  const synced = useRef<{ title: string; body: Json | null }>({ title: lesson.title, body: lesson.body })
-  const setCached = useCallback(
-    (patch: { title?: string; body?: Json | null }) =>
-      queryClient.setQueryData<Lesson | null>(learningKeys.lesson(lesson.id), (old) => (old ? { ...old, ...patch } : old)),
-    [lesson.id, queryClient],
-  )
-  const save = useCallback(async () => {
-    const patch = pending.current
-    if (Object.keys(patch).length === 0) return
-    pending.current = {}
-    saving.current = true
+  const saveTitle = async () => {
+    window.clearTimeout(timer.current)
+    const value = pending.current
+    if (value === null) return
+    pending.current = null
     setStatus('saving')
     try {
-      await updateLesson(lesson.id, patch)
-      const saved = patch.title === undefined ? patch : { ...patch, title: patch.title.trim() }
-      synced.current = { ...synced.current, ...saved }
-      // A refetch that started before this save still carries the old text: drop it.
-      void queryClient.cancelQueries({ queryKey: learningKeys.lesson(lesson.id), exact: true })
-      setCached(saved)
-      setStatus(Object.keys(pending.current).length === 0 ? 'saved' : 'pending')
-      if (patch.title !== undefined) void queryClient.invalidateQueries({ queryKey: learningKeys.lessons(workspace.id) })
+      await renameLesson(lesson.id, value)
+      queryClient.setQueryData<Lesson | null>(learningKeys.lesson(lesson.id), (old) => (old ? { ...old, title: value.trim() } : old))
+      void queryClient.invalidateQueries({ queryKey: learningKeys.lessons(workspace.id) })
+      setStatus(pending.current === null ? 'saved' : 'pending')
     } catch (error) {
-      // Keep the text for the next attempt (the next edit, or leaving the lesson).
-      pending.current = { ...patch, ...pending.current }
-      // Nobody is left to retry: the cache goes back to what the server has.
-      if (!mounted.current) setCached(synced.current)
+      pending.current ??= value
       setStatus('error')
       toast.error(errorMessage(error), { id: 'lesson-save' })
-    } finally {
-      saving.current = false
     }
-  }, [lesson.id, queryClient, setCached, workspace.id])
-  const flush = useCallback(() => {
-    window.clearTimeout(timer.current)
-    const patch = pending.current
-    if (Object.keys(patch).length === 0) return
-    setCached(patch.title === undefined ? patch : { ...patch, title: patch.title.trim() })
-    inflight.current = inflight.current.then(save)
-  }, [save, setCached])
-  const { lockedBy, markTyping } = useOthersTyping(`lesson:${lesson.id}`, canManage)
-  const queue = (patch: { title?: string; body?: Json | null }) => {
-    pending.current = { ...pending.current, ...patch }
-    markTyping()
-    setStatus('pending')
-    window.clearTimeout(timer.current)
-    timer.current = window.setTimeout(flush, AUTOSAVE_MS)
   }
-  // Send any unsaved change when leaving the lesson.
+  const saveRef = useRef(saveTitle)
   useEffect(() => {
-    mounted.current = true
-    return () => {
-      mounted.current = false
-      flush()
-    }
-  }, [flush])
-  useSaveOnExit(() => Object.keys(pending.current).length > 0 || saving.current, flush)
-
-  // ------------------------------------------------------------ title
-  const [title, setTitle] = useState(lesson.title)
+    saveRef.current = saveTitle
+  })
+  // Leaving the lesson (or the tab closing) sends an unsaved title.
+  useEffect(() => () => void saveRef.current(), [])
+  useSaveOnExit(() => pending.current !== null, () => void saveRef.current())
+  // Renamed elsewhere (another teacher, another tab): show it, unless this one is mid-edit.
+  const [shownTitle, setShownTitle] = useState(lesson.title)
+  if (lesson.title !== shownTitle) {
+    setShownTitle(lesson.title)
+    if (pending.current === null) setTitle(lesson.title)
+  }
   const titleField = useRef<HTMLTextAreaElement>(null)
   useLayoutEffect(() => {
     const el = titleField.current
@@ -145,42 +139,23 @@ export default function LessonView({ lesson }: { lesson: Lesson }) {
     el.style.height = `${el.scrollHeight}px`
   }, [title])
 
-  // ------------------------------------------------------------ editor
-  const extensions = useMemo(
-    () =>
-      docExtensions({
-        editable: canManage,
-        placeholder: 'Write the lesson… (press + for headings, lists, code)',
-      }),
-    [canManage],
+  const tabButton = (key: string, active: boolean, label: ReactNode, onClick: () => void, onIntent?: () => void) => (
+    <button
+      key={key}
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      onPointerEnter={onIntent}
+      onFocus={onIntent}
+      className={cn(
+        '-mb-px inline-flex max-w-48 shrink-0 items-center gap-1.5 border-b-2 pb-2 text-sm transition-colors',
+        active ? 'border-brand font-medium text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground',
+      )}
+    >
+      {label}
+    </button>
   )
-  const editor = useEditor({
-    extensions,
-    content: initialContent(lesson.body),
-    editable: canManage,
-    immediatelyRender: true,
-    editorProps: {
-      attributes: { class: cn(docContentClass, 'min-h-40'), 'aria-label': 'Lesson content' },
-    },
-    onUpdate: ({ editor }) => queue({ body: editor.isEmpty ? null : (editor.getJSON() as Json) }),
-  })
-
-  // Someone else has the text: read-only until they stop (see useOthersTyping). Not reported as an edit.
-  const locked = lockedBy.length > 0
-  useEffect(() => {
-    editor?.setEditable(canManage && !locked, false)
-  }, [editor, locked, canManage])
-
-  // A lesson that changed on the server (the instructor editing it, another tab)
-  // replaces what's shown here, unless there are unsaved edits.
-  useEffect(() => {
-    if (Object.keys(pending.current).length > 0 || saving.current) return
-    const sameBody = sameJson(lesson.body, synced.current.body)
-    if (sameBody && lesson.title === synced.current.title) return
-    synced.current = { title: lesson.title, body: lesson.body }
-    setTitle(lesson.title)
-    if (!sameBody && editor) adoptContent(editor, lesson.body)
-  }, [lesson.title, lesson.body, editor])
 
   return (
     <div>
@@ -202,9 +177,9 @@ export default function LessonView({ lesson }: { lesson: Lesson }) {
             </>
           )}
         </nav>
-        {canManage && (
+        {canManage && status !== 'saved' && (
           <span aria-live="polite" className={cn('text-xs', status === 'error' ? 'text-destructive' : 'text-muted-foreground')}>
-            {{ saved: 'Saved', pending: 'Editing…', saving: 'Saving…', error: 'Not saved' }[status]}
+            {{ pending: 'Editing…', saving: 'Saving…', error: 'Title not saved' }[status]}
           </span>
         )}
       </div>
@@ -216,73 +191,83 @@ export default function LessonView({ lesson }: { lesson: Lesson }) {
           rows={1}
           maxLength={200}
           aria-label="Lesson title"
-          readOnly={locked}
           placeholder="Lesson title"
           onChange={(e) => {
-            const next = e.target.value.replace(/\n/g, ' ')
-            setTitle(next)
-            if (next.trim()) queue({ title: next })
+            const value = e.target.value.replace(/\n/g, ' ')
+            setTitle(value)
+            if (!value.trim()) return
+            pending.current = value
+            setStatus('pending')
+            window.clearTimeout(timer.current)
+            timer.current = window.setTimeout(() => void saveRef.current(), AUTOSAVE_MS)
           }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault()
-              editor?.commands.focus('start')
-            }
-          }}
+          onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
           className="mb-6 block w-full resize-none overflow-hidden bg-transparent text-3xl leading-tight font-bold tracking-tight outline-none placeholder:text-muted-foreground/50"
         />
       ) : (
         <h1 className="mb-6 text-3xl leading-tight font-bold tracking-tight">{lesson.title}</h1>
       )}
 
-      <div role="tablist" aria-label="Lesson views" className="mb-6 flex gap-4 border-b">
-        {(['lesson', 'whiteboard'] as const).map((tab) => {
-          const active = (tab === 'whiteboard') === onBoard
-          return (
-            <button
-              key={tab}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              onClick={() => showTab(tab)}
-              onPointerEnter={tab === 'whiteboard' ? prefetchBoard : undefined}
-              onFocus={tab === 'whiteboard' ? prefetchBoard : undefined}
-              className={cn(
-                '-mb-px border-b-2 pb-2 text-sm transition-colors',
-                active ? 'border-brand font-medium text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground',
-              )}
-            >
-              {tab === 'lesson' ? 'Lesson' : 'Whiteboard'}
-            </button>
-          )
-        })}
+      <div className="mb-6 flex items-end gap-4 border-b">
+        <div role="tablist" aria-label="Lesson files" className="flex min-w-0 gap-4 overflow-x-auto">
+          {tabButton('lesson', tab.kind === 'lesson', 'Lesson', () => open({ kind: 'lesson' }))}
+          {tabButton('whiteboard', tab.kind === 'whiteboard', 'Whiteboard', () => open({ kind: 'whiteboard' }), () => prefetchBoard(lesson.whiteboard_id))}
+          {lesson.files.map((file) =>
+            tabButton(
+              file.id,
+              tab.kind === 'file' && tab.id === file.id,
+              <>
+                {file.kind === 'doc' ? <FileText className="size-3.5 shrink-0" /> : <Presentation className="size-3.5 shrink-0" />}
+                <span className="truncate">{file.title}</span>
+              </>,
+              () => open({ kind: 'file', id: file.id }),
+              file.kind === 'diagram' ? () => prefetchBoard(file.id) : undefined,
+            ),
+          )}
+        </div>
+        {canManage && lesson.folder_id && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon-sm" className="mb-1 shrink-0 text-muted-foreground" aria-label="Add a file to this lesson" disabled={create.isPending}>
+                <Plus />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => create.mutate('doc')}>
+                <FileText /> Doc
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => create.mutate('diagram')}>
+                <Presentation /> Whiteboard
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
 
-      {onBoard && (
+      {/* The lesson's text: hidden, not unmounted, on other tabs, so its unsaved edits stay put. */}
+      <div role="tabpanel" aria-label="Lesson" hidden={tab.kind !== 'lesson'}>
+        {lesson.doc_id ? (
+          <LessonDoc docId={lesson.doc_id} canManage={canManage} empty="This lesson doesn’t have any content yet." />
+        ) : (
+          <p className="text-sm text-muted-foreground">This lesson’s text is missing.</p>
+        )}
+      </div>
+      {openedDocs.map((id) => (
+        <div key={id} role="tabpanel" aria-label={lesson.files.find((f) => f.id === id)?.title} hidden={openDoc !== id}>
+          <LessonDoc docId={id} canManage={canManage} withTitle empty="This doc is empty." />
+        </div>
+      ))}
+      {(tab.kind === 'whiteboard' || (tab.kind === 'file' && !openDoc)) && (
         <div role="tabpanel" aria-label="Whiteboard" className="h-[calc(100svh-19rem)] min-h-[28rem] overflow-hidden rounded-lg border">
           <Suspense fallback={<div className="flex h-full items-center justify-center"><DockSpinner label="Loading the whiteboard" /></div>}>
-            <LessonBoard lessonId={lesson.id} lessonTitle={lesson.title} teamId={team.id} workspaceId={workspace.id} canManage={canManage} />
+            {tab.kind === 'whiteboard' ? (
+              <LessonBoard diagramId={lesson.whiteboard_id} canManage={canManage} onStart={() => start.mutate()} starting={start.isPending} />
+            ) : (
+              <LessonBoard key={tab.kind === 'file' ? tab.id : ''} diagramId={tab.kind === 'file' ? tab.id : null} canManage={canManage} />
+            )}
           </Suspense>
         </div>
       )}
-      {/* Hidden, not unmounted, on the Whiteboard tab: the text and its unsaved edits stay put. */}
-      <div role="tabpanel" aria-label="Lesson" hidden={onBoard}>
-      <OthersTypingAlert names={lockedBy} />
-      {editor && canManage && (
-        <>
-          <FormatBubble editor={editor} />
-          <InsertMenu editor={editor} />
-          <FileLinkPicker editor={editor} />
-        </>
-      )}
-      {!canManage && !lesson.body ? (
-        <p className="text-sm text-muted-foreground">This lesson doesn’t have any content yet.</p>
-      ) : (
-        <div className="-ml-8 pl-8">
-          <EditorContent editor={editor} />
-        </div>
-      )}
-      </div>
 
       <div className="mt-12 flex flex-col gap-4 border-t pt-6">
         <Button
@@ -333,6 +318,34 @@ export default function LessonView({ lesson }: { lesson: Lesson }) {
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+/**
+ * A doc in the lesson's folder, shown in place (the Docs editor; teachers edit, the database holds
+ * everyone else to viewing). The Lesson doc comes with the lesson (lessonLoader caches it); others
+ * load when their tab opens.
+ */
+function LessonDoc({ docId, canManage, withTitle = false, empty }: { docId: string; canManage: boolean; withTitle?: boolean; empty: string }) {
+  const doc = useQuery(documentQuery(docId))
+  if (doc.isPending) return <TextSkeleton />
+  if (doc.isError) return <p className="text-sm text-muted-foreground">Couldn’t load this.</p>
+  if (!doc.data) return <p className="text-sm text-muted-foreground">This doc was deleted.</p>
+  const canEdit = canManage && doc.data.access_level >= 2
+  // Readers of an empty doc see a line instead of a blank page (a doc of only images still has a body).
+  if (!canEdit && !doc.data.content.trim() && !JSON.stringify(doc.data.body ?? null).includes('docImage')) {
+    return <p className="text-sm text-muted-foreground">{empty}</p>
+  }
+  return <DocView key={doc.data.id} doc={doc.data} canEdit={canEdit} canDelete={false} embedded withTitle={withTitle} />
+}
+
+function TextSkeleton() {
+  return (
+    <div className="space-y-3">
+      <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-4 w-11/12" />
+      <Skeleton className="h-4 w-4/5" />
     </div>
   )
 }

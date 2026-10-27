@@ -51,16 +51,28 @@ function initialContent(body: Json | null): JSONContent | null {
 /**
  * The doc page body (lazy-loaded with the editor): Paper-style title + rich
  * editor for anyone who can edit, the same rendering read-only for everyone else.
- * Edits autosave; leaving flushes the save first.
+ * Edits autosave; leaving flushes the save first. `embedded` (a lesson's text) leaves out the page's
+ * frame (the Files path, author and delete, and the title unless `withTitle`): the page around it has its own.
  */
-export default function DocView({ doc, canEdit, canDelete }: { doc: Doc; canEdit: boolean; canDelete: boolean }) {
+export default function DocView({
+  doc,
+  canEdit,
+  canDelete,
+  embedded = false,
+  withTitle = false,
+}: {
+  doc: Doc
+  canEdit: boolean
+  canDelete: boolean
+  embedded?: boolean
+  /** Embedded only: show the doc's own title above it (a lesson's extra docs; its Lesson doc has none). */
+  withTitle?: boolean
+}) {
   const { workspaceId } = useParams()
   const { team } = useCurrentTeam()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [now] = useState(Date.now)
-  const folders = useSuspenseQuery(foldersQuery(doc.team_id, doc.workspace_id)).data
-  const path = folderPath(doc.folder_id, folders)
   const listPath = docsPath(team.slug, workspaceId)
   const folderLink = (folderId: string | null) => (folderId ? `${listPath}?folder=${folderId}` : listPath)
   // Back (and after deleting): the folder the doc is in.
@@ -265,24 +277,99 @@ export default function DocView({ doc, canEdit, canDelete }: { doc: Doc; canEdit
     }
   }
 
+  // The title: editable for editors (it wraps like Paper's), a heading for everyone else.
+  const titleInput = (
+    <>
+        {canEdit ? (
+          <textarea
+            ref={titleField}
+            value={title}
+            rows={1}
+            maxLength={200}
+            aria-label="Title"
+            placeholder="Untitled"
+            readOnly={locked}
+            onChange={(e) => {
+              const next = e.target.value.replace(/\n/g, ' ')
+              setTitle(next)
+              titleRef.current = next
+              markChanged()
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                editor?.commands.focus('start')
+              }
+            }}
+            className="block w-full resize-none overflow-hidden bg-transparent text-[2.25rem] leading-[1.15] font-bold tracking-tight outline-none placeholder:text-muted-foreground/50 md:text-[2.75rem]"
+          />
+        ) : (
+          <h1 className="text-[2.25rem] leading-[1.15] font-bold tracking-tight md:text-[2.75rem]">{doc.title}</h1>
+        )}
+    </>
+  )
+
+  // Leaving with a save that failed: asks before the edits are dropped (both layouts).
+  const saveFailedDialog = (
+    <ConfirmDialog
+      open={saveFailedOnLeave}
+      onOpenChange={(open) => {
+        if (open) return
+        setSaveFailedOnLeave(false)
+        if (blocker.state === 'blocked') blocker.reset()
+      }}
+      title="Couldn’t save your latest changes"
+      description="If you leave now, your most recent edits will be lost."
+      confirmLabel="Leave anyway"
+      onConfirm={() => {
+        setSaveFailedOnLeave(false)
+        if (blocker.state === 'blocked') blocker.proceed()
+      }}
+    />
+  )
+
+  if (embedded) {
+    return (
+      // The left gutter holds the drag handle and the heading collapse toggles.
+      <div className="-ml-8 pl-8" onKeyDown={onKeyDown}>
+        {canEdit && (
+          <div className="flex justify-end">
+            <SaveIndicator status={status} />
+          </div>
+        )}
+        {withTitle && <div className="mb-6">{titleInput}</div>}
+        {editor && canEdit && (
+          <>
+            <FormatBubble editor={editor} />
+            <InsertMenu editor={editor} onPickImage={() => fileInput.current?.click()} />
+            <FileLinkPicker editor={editor} excludeId={doc.id} />
+            <input
+              ref={fileInput}
+              type="file"
+              accept={IMAGE_TYPES.join(',')}
+              multiple
+              hidden
+              onChange={(e) => {
+                const files = Array.from(e.target.files ?? [])
+                e.target.value = ''
+                if (files.length) void insertImages(editor, files)
+              }}
+            />
+          </>
+        )}
+        <OthersTypingAlert names={lockedBy} />
+        <EditorContent editor={editor} className="pb-8" />
+        {saveFailedDialog}
+      </div>
+    )
+  }
+
   return (
     // Left gutter holds the drag handle and the heading collapse toggles.
     <div className="pl-6 md:pl-16" onKeyDown={onKeyDown}>
       <div className="mb-8 flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3 text-xs text-muted-foreground">
-          <nav aria-label="Folder path" className="flex min-w-0 items-center gap-1">
-            <Link to={listPath} className="inline-flex shrink-0 items-center gap-1 hover:text-foreground">
-              <ArrowLeft className="size-3.5" /> Files
-            </Link>
-            {path.map((folder) => (
-              <span key={folder.id} className="flex min-w-0 items-center gap-1">
-                <ChevronRight className="size-3 shrink-0" />
-                <Link to={folderLink(folder.id)} className="max-w-32 truncate hover:text-foreground">
-                  {folder.name}
-                </Link>
-              </span>
-            ))}
-          </nav>
+          <FolderPathNav doc={doc} listPath={listPath} folderLink={folderLink} />
           {/* In a workspace the scope is obvious from the tabs above. */}
           {!workspaceId && (
             <>
@@ -312,32 +399,7 @@ export default function DocView({ doc, canEdit, canDelete }: { doc: Doc; canEdit
         </div>
       </div>
 
-      {canEdit ? (
-        <textarea
-          ref={titleField}
-          value={title}
-          rows={1}
-          maxLength={200}
-          aria-label="Title"
-          placeholder="Untitled"
-          readOnly={locked}
-          onChange={(e) => {
-            const next = e.target.value.replace(/\n/g, ' ')
-            setTitle(next)
-            titleRef.current = next
-            markChanged()
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault()
-              editor?.commands.focus('start')
-            }
-          }}
-          className="block w-full resize-none overflow-hidden bg-transparent text-[2.25rem] leading-[1.15] font-bold tracking-tight outline-none placeholder:text-muted-foreground/50 md:text-[2.75rem]"
-        />
-      ) : (
-        <h1 className="text-[2.25rem] leading-[1.15] font-bold tracking-tight md:text-[2.75rem]">{doc.title}</h1>
-      )}
+      {titleInput}
 
       <p className="mt-3 mb-10 flex items-center gap-2 text-xs text-muted-foreground">
         <PersonAvatar profile={doc.author} className="size-5" />
@@ -393,21 +455,7 @@ export default function DocView({ doc, canEdit, canDelete }: { doc: Doc; canEdit
         pending={deleting}
         onConfirm={() => void remove()}
       />
-      <ConfirmDialog
-        open={saveFailedOnLeave}
-        onOpenChange={(open) => {
-          if (open) return
-          setSaveFailedOnLeave(false)
-          if (blocker.state === 'blocked') blocker.reset()
-        }}
-        title="Couldn’t save your latest changes"
-        description="If you leave now, your most recent edits will be lost."
-        confirmLabel="Leave anyway"
-        onConfirm={() => {
-          setSaveFailedOnLeave(false)
-          if (blocker.state === 'blocked') blocker.proceed()
-        }}
-      />
+      {saveFailedDialog}
     </div>
   )
 }
@@ -421,5 +469,25 @@ function SaveIndicator({ status }: { status: SaveStatus }) {
     >
       {label}
     </span>
+  )
+}
+
+/** "← Files › Week 1 › Notes": the doc's folders (fetched here, so an embedded doc doesn't ask for them). */
+function FolderPathNav({ doc, listPath, folderLink }: { doc: Doc; listPath: string; folderLink: (folderId: string | null) => string }) {
+  const folders = useSuspenseQuery(foldersQuery(doc.team_id, doc.workspace_id)).data
+  return (
+    <nav aria-label="Folder path" className="flex min-w-0 items-center gap-1">
+      <Link to={listPath} className="inline-flex shrink-0 items-center gap-1 hover:text-foreground">
+        <ArrowLeft className="size-3.5" /> Files
+      </Link>
+      {folderPath(doc.folder_id, folders).map((folder) => (
+        <span key={folder.id} className="flex min-w-0 items-center gap-1">
+          <ChevronRight className="size-3 shrink-0" />
+          <Link to={folderLink(folder.id)} className="max-w-32 truncate hover:text-foreground">
+            {folder.name}
+          </Link>
+        </span>
+      ))}
+    </nav>
   )
 }

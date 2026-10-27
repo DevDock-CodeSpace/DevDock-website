@@ -20,6 +20,8 @@ type IssueCollectionProps = {
   empty: ReactNode
   /** New issues start in this cycle (a cycle's page). */
   cycleId?: string | null
+  /** New issues start in this plan (opened from a plan with ?new=1&plan=). */
+  planId?: string | null
   /** Page-specific shortcuts (e.g. F for the filter menu). */
   shortcuts?: Record<string, () => void>
   /** The create dialog: open in a status, or closed (null). The page's "New issue" button opens it too. */
@@ -38,6 +40,7 @@ export function IssueCollection({
   nested,
   empty,
   cycleId,
+  planId,
   shortcuts,
   creating,
   onCreatingChange: setCreating,
@@ -89,6 +92,7 @@ export function IssueCollection({
         open={creating !== null}
         status={creating ?? 'todo'}
         cycleId={cycleId}
+        planId={planId}
         onOpenChange={(next) => !next && setCreating(null)}
       />
       <ShortcutsDialog open={help} onOpenChange={setHelp} />

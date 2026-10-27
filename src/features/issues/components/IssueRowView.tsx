@@ -3,6 +3,9 @@ import { ChevronRight, CircleUserRound, GitBranch, Gauge, IterationCw } from 'lu
 import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { PersonAvatar } from '@/components/PersonRow'
+import type { Plan } from '@/features/plans/api'
+import { PlanPicker } from '@/features/plans/components/PlanPicker'
+import { PlanStatusDot } from '@/features/plans/components/PlanStatusDot'
 import type { Repo } from '@/features/repos/api'
 import { GitHubMark } from '@/features/repos/components/GitHubMark'
 import type { WorkspaceMember } from '@/features/workspaces/api'
@@ -33,6 +36,8 @@ export type IssueRowSource = {
   labels: IssueLabel[]
   cycles: IssueCycle[]
   repos: Repo[]
+  /** The group's plans (one list for the whole group). */
+  plans: Plan[]
   userId: string
   update: (patch: IssuePatch) => void
   /** The group-wide page: the project's name, shown as a chip. */
@@ -71,10 +76,11 @@ export function IssueRowView({
   /** Extra menus anchored in the row (the project list's shortcut-only menus). */
   children?: ReactNode
 }) {
-  const { workspace, members, labels, cycles, repos, userId, update, onMenuOpen } = source
+  const { workspace, members, labels, cycles, repos, plans, userId, update, onMenuOpen } = source
   const queryClient = useQueryClient()
   const nav = useRowNav(issue.id)
   const cycle = cycles.find((c) => c.id === issue.cycle_id)
+  const plan = plans.find((p) => p.id === issue.plan_id)
   const repo = repos.find((r) => r.id === issue.repo_id)
   const [today] = useState(() => localDateISO(new Date()))
   const assignee = members.find((m) => m.user_id === issue.assignee_id)
@@ -169,6 +175,21 @@ export function IssueRowView({
         </button>
       )}
       <span className="flex-1" />
+      {plan &&
+        (issue.parent_id ? (
+          // A sub-issue is in its parent's plan: shown, not chosen here.
+          <span className={cn(chip, 'max-w-40 font-sans lg:flex')} title={`Plan: ${plan.name} (from its parent)`}>
+            <PlanStatusDot status={plan.status} className="size-2" />
+            <span className="truncate">{plan.name}</span>
+          </span>
+        ) : (
+          <PlanPicker value={issue.plan_id} plans={plans} align="end" onChange={(plan_id) => update({ plan_id })} {...menu('plan')}>
+            <button type="button" className={cn(chip, 'max-w-40 font-sans lg:flex')} title={`Plan: ${plan.name}`} aria-label={`Plan: ${plan.name}`}>
+              <PlanStatusDot status={plan.status} className="size-2" />
+              <span className="truncate">{plan.name}</span>
+            </button>
+          </PlanPicker>
+        ))}
       {cycle && (
         <CyclePicker value={issue.cycle_id} cycles={cycles} align="end" onChange={(cycle_id) => update({ cycle_id })} {...menu()}>
           <button type="button" className={cn(chip, 'lg:flex')} title={cycleTitle(cycle)} aria-label={`Sprint: ${cycleTitle(cycle)}`}>
@@ -253,10 +274,16 @@ export function IssueRowView({
         <button
           type="button"
           className={iconButton}
-          aria-label={assignee ? `Assignee: ${assignee.profile?.display_name ?? 'member'}` : 'Assign'}
+          aria-label={assignee ? `Assignee: ${assignee.profile?.display_name ?? 'member'}` : issue.import_assignee ? `Imported assignee: ${issue.import_assignee}, not matched yet` : 'Assign'}
+          title={!assignee && issue.import_assignee ? `${issue.import_assignee} (from an import, not matched yet)` : undefined}
         >
           {assignee ? (
             <PersonAvatar profile={assignee.profile} className="size-5" />
+          ) : issue.import_assignee ? (
+            // Kept by an import until someone is matched: their initial in a dashed circle.
+            <span className="flex size-5 items-center justify-center rounded-full border border-dashed border-muted-foreground/60 text-[10px] text-muted-foreground uppercase">
+              {issue.import_assignee.trim()[0]}
+            </span>
           ) : (
             <CircleUserRound className="size-4 text-muted-foreground/70" />
           )}

@@ -1,7 +1,9 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
-import { CalendarDays, CircleUserRound, Gauge, GitPullRequestArrow, IterationCw, Tag, X } from 'lucide-react'
+import { CalendarDays, CircleUserRound, Gauge, GitPullRequestArrow, Goal, IterationCw, Tag, X } from 'lucide-react'
 import { useState, type ComponentProps, type ReactNode } from 'react'
 import { PersonAvatar } from '@/components/PersonRow'
+import { PlanPicker } from '@/features/plans/components/PlanPicker'
+import { PlanStatusDot } from '@/features/plans/components/PlanStatusDot'
 import { formatDate, localDateISO, timeAgo, timeSince } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { workspaceIssuesQuery, type IssueDetail } from '../api'
@@ -38,12 +40,13 @@ export function IssueProperties({
   menu: MenuKind | null
   onMenuChange: (menu: MenuKind | null) => void
 }) {
-  const { workspace, members, labels, cycles, repos, canManage, userId } = useIssueContext()
+  const { workspace, members, labels, cycles, repos, plans, canManage, userId } = useIssueContext()
   const menuFor = (kind: MenuKind) => ({
     open: menu === kind,
     onOpenChange: (open: boolean) => onMenuChange(open ? kind : null),
   })
   const cycle = cycles.find((c) => c.id === issue.cycle_id)
+  const plan = plans.find((p) => p.id === issue.plan_id)
   const repo = repos.find((r) => r.id === issue.repo_id)
   const issues = useSuspenseQuery(workspaceIssuesQuery(workspace.id)).data
   const update = useUpdateIssue()
@@ -106,6 +109,12 @@ export function IssueProperties({
                 <PersonAvatar profile={assignee.profile} className="size-4" />
                 <span className="truncate">{assignee.profile?.display_name ?? 'Unnamed member'}</span>
               </>
+            ) : issue.import_assignee ? (
+              // Kept by an import until someone is matched (Import issues → People from earlier imports).
+              <span className="flex min-w-0 items-center gap-1.5" title="From an import: not matched to anyone in DevDock yet">
+                <CircleUserRound className="size-4 shrink-0" />
+                <span className="truncate italic">{issue.import_assignee}</span>
+              </span>
             ) : (
               <>
                 <CircleUserRound className="size-4" /> Unassigned
@@ -146,6 +155,28 @@ export function IssueProperties({
             <span className="truncate">{cycle ? cycleTitle(cycle) : 'No sprint'}</span>
           </Value>
         </CyclePicker>
+      </Row>
+      <Row label="Plan">
+        {issue.parent_id ? (
+          // A sub-issue is in its parent's plan (the database keeps them together).
+          <span className="flex min-w-0 items-center gap-2 px-2 text-sm text-muted-foreground" title="A sub-issue is in its parent’s plan. Change the parent’s plan to move both.">
+            {plan ? <PlanStatusDot status={plan.status} /> : <Goal className="size-4" />}
+            <span className="truncate">{plan ? plan.name : 'No plan'}</span>
+            <span className="shrink-0 text-xs">· from parent</span>
+          </span>
+        ) : (
+          <PlanPicker
+            value={issue.plan_id}
+            plans={plans}
+            onChange={(plan_id) => update.mutate({ issue, patch: { plan_id } })}
+            {...menuFor('plan')}
+          >
+            <Value muted={!plan}>
+              {plan ? <PlanStatusDot status={plan.status} /> : <Goal className="size-4" />}
+              <span className="truncate">{plan ? plan.name : 'No plan'}</span>
+            </Value>
+          </PlanPicker>
+        )}
       </Row>
       {/* Only where repos are linked (a repo_id always is, so this covers it too). */}
       {repos.length > 0 && (

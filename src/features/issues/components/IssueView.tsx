@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { ArrowLeft, Bookmark, ChevronRight, GitBranch, Trash2 } from 'lucide-react'
+import { StarButton } from './StarButton'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { toast } from 'sonner'
@@ -182,6 +183,7 @@ export default function IssueView({ issue }: { issue: IssueDetail }) {
               </TooltipTrigger>
               <TooltipContent>Add a note about this issue</TooltipContent>
             </Tooltip>
+            <StarButton target={{ kind: 'issue', issueId: issue.id }} label="this issue" />
             {canManage && (
               <Button
                 variant="ghost"
