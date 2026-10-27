@@ -20,13 +20,13 @@ export type Diagram = DiagramSummary & {
 
 // `data` is left out of lists; it can be large.
 const SUMMARY =
-  'id, team_id, workspace_id, folder_id, title, created_at, updated_at, access, created_by, author:profiles!diagrams_created_by_fkey(display_name, avatar_url), workspace:workspaces!diagrams_workspace_team_fkey(id, title, type)'
+  'id, team_id, workspace_id, folder_id, title, created_at, updated_at, access, created_by, lesson_id, author:profiles!diagrams_created_by_fkey(display_name, avatar_url), workspace:workspaces!diagrams_workspace_team_fkey(id, title, type)'
 
 const writeErrors = { '42501': 'You don’t have permission to change whiteboards here.' }
 
 // ---------------------------------------------------------------- queries
 
-/** Files: team-wide diagrams plus diagrams of every workspace the caller can see (not lesson boards). */
+/** Files: team-wide diagrams plus diagrams of every workspace the caller can see (lessons' too: Files leaves those out for students). */
 export const teamDiagramsQuery = (teamId: string) =>
   queryOptions({
     queryKey: ['diagrams', 'team', teamId],
@@ -35,8 +35,6 @@ export const teamDiagramsQuery = (teamId: string) =>
         .from('diagrams')
         .select(SUMMARY)
         .eq('team_id', teamId)
-        // A lesson's own whiteboard lives in its lesson, not in Files.
-        .is('lesson_id', null)
         .order('updated_at', { ascending: false })
       if (error) throw toDataError('load whiteboards', error)
       return data
@@ -102,28 +100,4 @@ export async function deleteDiagram(diagramId: string) {
   const { data, error } = await supabase.from('diagrams').delete().eq('id', diagramId).select('id')
   if (error) throw toDataError('delete the whiteboard', error, writeErrors)
   requireAffected(data, 'delete whiteboard')
-}
-
-// -------------------------------------------------------------- lesson boards
-
-/** The id of a lesson's own whiteboard, or null when the teacher hasn't started one. */
-export const lessonBoardQuery = (lessonId: string) =>
-  queryOptions({
-    queryKey: ['diagrams', 'lesson', lessonId],
-    queryFn: async (): Promise<{ id: string } | null> => {
-      const { data, error } = await supabase.from('diagrams').select('id').eq('lesson_id', lessonId).maybeSingle()
-      if (error) throw toDataError('load the whiteboard', error)
-      return data
-    },
-  })
-
-/** Starts a lesson's whiteboard (teachers only; one per lesson, enforced by the database). */
-export async function createLessonBoard(input: { teamId: string; workspaceId: string; lessonId: string; title: string }): Promise<{ id: string }> {
-  const { data, error } = await supabase
-    .from('diagrams')
-    .insert({ team_id: input.teamId, workspace_id: input.workspaceId, lesson_id: input.lessonId, title: input.title.trim().slice(0, 200) || 'Whiteboard' })
-    .select('id')
-    .single()
-  if (error) throw toDataError('start the whiteboard', error, writeErrors)
-  return data
 }

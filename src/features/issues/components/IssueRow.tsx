@@ -9,7 +9,7 @@ import { IssueRowView } from './IssueRowView'
 /** A row in a project's list: `IssueRowView` fed by the project's issue context. */
 export function IssueRow({ issue, subIssues, nest }: { issue: Issue; subIssues?: { done: number; total: number }; nest?: RowNest }) {
   const { team } = useCurrentTeam()
-  const { workspace, members, labels, cycles, repos, userId } = useIssueContext()
+  const { workspace, members, labels, cycles, repos, plans, userId } = useIssueContext()
   const update = useUpdateIssue()
 
   return (
@@ -24,6 +24,7 @@ export function IssueRow({ issue, subIssues, nest }: { issue: Issue; subIssues?:
         labels,
         cycles,
         repos,
+        plans,
         userId,
         update: (patch) => update.mutate({ issue, patch }),
       }}

@@ -30,7 +30,7 @@ export function writeViewState(params: URLSearchParams, state: ViewState) {
 
 /** Reads a stored filters document defensively: unknown keys and non-string values are dropped. */
 export function parseFilters(json: Json | undefined): IssueFilters {
-  const out: IssueFilters = { status: [], priority: [], assignee: [], label: [], cycle: [], repo: [] }
+  const out: IssueFilters = { status: [], priority: [], assignee: [], label: [], plan: [], cycle: [], repo: [] }
   if (typeof json !== 'object' || json === null || Array.isArray(json)) return out
   for (const facet of FACETS) {
     const value = json[facet]

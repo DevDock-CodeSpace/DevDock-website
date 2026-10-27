@@ -15,7 +15,7 @@ import { ViewInsights } from '@/features/issues/components/ViewInsights'
 import { NestToggle } from '@/features/issues/components/NestToggle'
 import { ViewToggle } from '@/features/issues/components/ViewToggle'
 import { currentCycle } from '@/features/issues/cycles'
-import { applyFilters, hasFilters, ISSUE_TABS, readTab } from '@/features/issues/filters'
+import { applyFilters, hasFilters, ISSUE_TABS, NEW_PARAM, readTab } from '@/features/issues/filters'
 import { personOf } from '@/features/issues/views'
 import { useIssueContext, useIssueFilters, useIssueView } from '@/features/issues/hooks'
 import { isClosed } from '@/features/issues/meta'
@@ -38,10 +38,29 @@ export function WorkspaceIssuesPage() {
   const [panelOpen, setPanelOpen] = usePanelOpen()
   const [nested, setNested] = useNested()
   const all = useSuspenseQuery(workspaceIssuesQuery(workspace.id)).data
-  const [params] = useSearchParams()
+  const [params, setParams] = useSearchParams()
   const [view, setView] = useIssueView()
   const [today] = useState(() => localDateISO(new Date()))
-  const [creating, setCreating] = useState<IssueStatus | null>(null)
+  // ?new=1 (or ?new=<plan id>) arrives from the Issues hub or a plan: open New issue once, in that plan.
+  const [creating, setCreating] = useState<IssueStatus | null>(() => (params.get(NEW_PARAM) ? 'todo' : null))
+  const [newPlan, setNewPlan] = useState(() => {
+    const value = params.get(NEW_PARAM)
+    return value && value !== '1' ? value : null
+  })
+  const changeCreating = (next: IssueStatus | null) => {
+    setCreating(next)
+    if (next !== null) return
+    setNewPlan(null)
+    if (params.has(NEW_PARAM)) {
+      setParams(
+        (p) => {
+          p.delete(NEW_PARAM)
+          return p
+        },
+        { replace: true },
+      )
+    }
+  }
   const [filterOpen, setFilterOpen] = useState(false)
 
   const tab = readTab(params)
@@ -113,7 +132,8 @@ export function WorkspaceIssuesPage() {
           nested={nested}
           empty={empty}
           creating={creating}
-          onCreatingChange={setCreating}
+          planId={newPlan}
+          onCreatingChange={changeCreating}
           shortcuts={{ f: () => setFilterOpen(true) }}
         />
       </SidePanelLayout>

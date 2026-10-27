@@ -25,6 +25,8 @@ export type DocSummary = {
   access: FileAccess
   /** The owner (who made it); null if they've left. */
   created_by: string | null
+  /** Set when it's in a lesson's folder: Files leaves it out for anyone who doesn't manage the course. */
+  lesson_id: string | null
 }
 /** `body` is TipTap JSON (null = empty); `content` is its plain-text copy. */
 export type Doc = DocSummary & {
@@ -35,8 +37,8 @@ export type Doc = DocSummary & {
 }
 
 // Content is left out of lists; it can be large.
-const SUMMARY =
-  'id, team_id, workspace_id, folder_id, title, created_at, updated_at, access, created_by, author:profiles!documents_created_by_fkey(display_name, avatar_url), workspace:workspaces!documents_workspace_team_fkey(id, title, type)'
+export const DOC_SUMMARY =
+  'id, team_id, workspace_id, folder_id, title, created_at, updated_at, access, created_by, lesson_id, author:profiles!documents_created_by_fkey(display_name, avatar_url), workspace:workspaces!documents_workspace_team_fkey(id, title, type)'
 
 /** A folder of docs and diagrams, group-wide (workspace_id null) or in one workspace; depth 1–3. */
 export type DocFolder = {
@@ -49,6 +51,14 @@ export type DocFolder = {
   updated_at: string
   access: FileAccess
   created_by: string | null
+  /** The plan this folder belongs to (inside the Plans folder), or null. */
+  plan_id: string | null
+  /** The group's "Plans" folder. Plan folders follow their plans: not renamed, moved or deleted by hand. */
+  is_plans_root: boolean
+  /** The lesson this folder belongs to (inside the workspace's Lessons folder), or null. */
+  lesson_id: string | null
+  /** The workspace's "Lessons" folder. Lesson folders follow their lessons, like plan folders. */
+  is_lessons_root: boolean
 }
 
 /** Folders can nest this deep (enforced by the database). */
@@ -67,7 +77,7 @@ export const teamDocsQuery = (teamId: string) =>
     queryFn: async (): Promise<DocSummary[]> => {
       const { data, error } = await supabase
         .from('documents')
-        .select(SUMMARY)
+        .select(DOC_SUMMARY)
         .eq('team_id', teamId)
         .order('updated_at', { ascending: false })
       if (error) throw toDataError('load docs', error)
@@ -75,7 +85,7 @@ export const teamDocsQuery = (teamId: string) =>
     },
   })
 
-const FOLDER_COLUMNS = 'id, team_id, workspace_id, parent_id, name, depth, updated_at, access, created_by'
+const FOLDER_COLUMNS = 'id, team_id, workspace_id, parent_id, name, depth, updated_at, access, created_by, plan_id, is_plans_root, lesson_id, is_lessons_root'
 
 /** Folders of one scope: group-wide (workspaceId null) or one workspace's. */
 export const foldersQuery = (teamId: string, workspaceId: string | null) =>
@@ -97,7 +107,7 @@ export const documentQuery = (docId: string) =>
     queryFn: async (): Promise<Doc | null> => {
       const { data, error } = await supabase
         .from('documents')
-        .select(`${SUMMARY}, content, body, access_level`)
+        .select(`${DOC_SUMMARY}, content, body, access_level`)
         .eq('id', docId)
         .maybeSingle()
         // access_level is a computed column (public.access_level); the generated types can't see it.
@@ -150,7 +160,8 @@ export async function updateDocument(docId: string, input: { title: string; body
  * Deletes the doc's images first (Storage RLS only allows it while the doc
  * exists and the caller can edit it), then the doc itself.
  */
-export async function deleteDocument(teamId: string, docId: string) {
+/** Removes a doc's images from Storage (its folder `<team>/<doc>/`), before the doc goes. */
+export async function removeDocImages(teamId: string, docId: string) {
   const folder = `${teamId}/${docId}`
   const { data: files, error: listError } = await supabase.storage.from(IMAGE_BUCKET).list(folder, { limit: 1000 })
   if (listError) throw toDataError('delete the doc', { message: listError.message })
@@ -160,6 +171,10 @@ export async function deleteDocument(teamId: string, docId: string) {
       .remove(files.map((file) => `${folder}/${file.name}`))
     if (removeError) throw toDataError('delete the doc', { message: removeError.message })
   }
+}
+
+export async function deleteDocument(teamId: string, docId: string) {
+  await removeDocImages(teamId, docId)
   const { data, error } = await supabase.from('documents').delete().eq('id', docId).select('id')
   if (error) throw toDataError('delete the doc', error, writeErrors)
   requireAffected(data, 'delete doc')

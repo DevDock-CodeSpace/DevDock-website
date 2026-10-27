@@ -1,5 +1,5 @@
-import { useSuspenseQuery } from '@tanstack/react-query'
-import { ChevronRight, Pin, Plus } from 'lucide-react'
+import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
+import { ChevronRight, Plus, Star } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { Link, matchPath, useLocation, useParams } from 'react-router'
 import { TruncatedText } from '@/components/TruncatedText'
@@ -21,7 +21,9 @@ import {
 } from '@/components/ui/sidebar'
 import { SidebarResizer } from '@/components/SidebarResizer'
 import type { SidebarWidth } from '@/hooks/use-sidebar-width'
+import { teamIssuesQuery } from '@/features/issues/api'
 import { PinnedNav } from '@/features/issues/components/PinnedNav'
+import { teamPlansQuery } from '@/features/plans/api'
 import { useUnread } from '@/features/messaging/hooks'
 import { UserMenu } from '@/features/auth/components/UserMenu'
 import { TeamSwitcher } from '@/features/teams/components/TeamSwitcher'
@@ -32,7 +34,7 @@ import { useCollectionView } from '@/features/collections/hooks'
 import { rememberCollectionView } from '@/features/collections/view'
 import { teamWorkspacesQuery } from '@/features/workspaces/api'
 import { CreateWorkspaceDialog } from '@/features/workspaces/components/CreateWorkspaceDialog'
-import { usePins, useRecentVisits } from '@/features/workspaces/hooks'
+import { useRecentVisits, useWorkspaceStars } from '@/features/workspaces/hooks'
 import { pickSidebarItems } from '@/features/workspaces/recent'
 
 // Active item: accent background (from shadcn) + DevDock-blue icon.
@@ -55,7 +57,7 @@ export function AppSidebar({ sidebarWidth }: { sidebarWidth: SidebarWidth }) {
   const { pathname } = useLocation()
   const { workspaceId } = useParams()
   const { isMobile, setOpenMobile } = useSidebar()
-  const { pins, isPinned, setPinned } = usePins()
+  const { isStarred, setStarred } = useWorkspaceStars(team.id)
   const visits = useRecentVisits(team.id)
   // Inside a collection its own type and contents decide whether Issues shows, not the group's.
   const nav = getTeamNav(team.slug, hasTeamIssues(collection?.type ?? team.type, workspaces))
@@ -87,6 +89,14 @@ export function AppSidebar({ sidebarWidth }: { sidebarWidth: SidebarWidth }) {
     if (openCollectionId && viewId && openCollectionId !== viewId) rememberCollectionView(team.id, openCollectionId)
   }, [workspaceId, openCollectionId, viewId, team.id])
   const close = () => isMobile && setOpenMobile(false)
+  // Pointing at Issues starts what the hub's first tab needs (its data and its code), so the click
+  // rarely waits. prefetchQuery skips fresh cache entries, so hovering again costs nothing.
+  const queryClient = useQueryClient()
+  const prefetchIssues = () => {
+    void queryClient.prefetchQuery(teamIssuesQuery(team.id))
+    void queryClient.prefetchQuery(teamPlansQuery(team.id))
+    void import('@/routes/team/HubMyIssuesPage')
+  }
 
   return (
     <Sidebar collapsible="icon">
@@ -105,15 +115,13 @@ export function AppSidebar({ sidebarWidth }: { sidebarWidth: SidebarWidth }) {
           <SidebarMenu>
             <NavLinkItem item={nav.messages} onNavigate={close} badge={unreadMessages} />
             {nav.tools.map((item) => (
-              <NavLinkItem key={item.id} item={item} onNavigate={close} />
+              <NavLinkItem key={item.id} item={item} onNavigate={close} onIntent={item.id === 'issues' ? prefetchIssues : undefined} />
             ))}
           </SidebarMenu>
         </SidebarGroup>
 
-        <PinnedNav onNavigate={close} />
-
         {sections.map(({ key, title, allTitle, allHref, items }) => {
-          const { shown } = pickSidebarItems(items, pins, visits, workspaceId)
+          const { shown } = pickSidebarItems(items, visits, workspaceId)
           return (
             <SidebarGroup key={key} className="pb-0">
               {/* The title opens the full list of this type. */}
@@ -133,17 +141,17 @@ export function AppSidebar({ sidebarWidth }: { sidebarWidth: SidebarWidth }) {
                 {shown.map((workspace) => {
                   const to = workspacePath(team.slug, workspace.id)
                   const Icon = workspaceTypes[workspace.type].icon
-                  const pinned = isPinned(workspace.id)
+                  const starred = isStarred(workspace.id)
                   return (
                     <SidebarMenuItem key={workspace.id}>
                       <SidebarMenuButton
                         asChild
                         tooltip={workspace.title}
-                        // The pin only shows on hover or focus (unless pinned); keep its room free until then,
+                        // The star only shows on hover or focus (unless starred); keep its room free until then,
                         // so the name isn't cut short by an invisible button. Touch screens always show it.
                         className={cn(
                           activeIcon,
-                          !pinned &&
+                          !starred &&
                             'md:group-has-data-[sidebar=menu-action]/menu-item:pr-2 md:group-hover/menu-item:group-has-data-[sidebar=menu-action]/menu-item:pr-8 md:group-focus-within/menu-item:group-has-data-[sidebar=menu-action]/menu-item:pr-8',
                         )}
                         isActive={matchPath({ path: to, end: false }, pathname) !== null}
@@ -154,13 +162,12 @@ export function AppSidebar({ sidebarWidth }: { sidebarWidth: SidebarWidth }) {
                         </Link>
                       </SidebarMenuButton>
                       <SidebarMenuAction
-                        showOnHover={!pinned}
-                        aria-label={pinned ? `Unpin ${workspace.title}` : `Pin ${workspace.title}`}
-                        title={pinned ? 'Unpin' : 'Pin to the top'}
-                        onClick={() => setPinned(workspace.id, !pinned)}
-                        className={pinned ? 'text-muted-foreground' : undefined}
+                        showOnHover={!starred}
+                        aria-label={starred ? `Unstar ${workspace.title}` : `Star ${workspace.title}`}
+                        title={starred ? 'Unstar' : 'Star'}
+                        onClick={() => setStarred(workspace.id, !starred)}
                       >
-                        {pinned ? <Pin className="fill-current" /> : <Pin />}
+                        <Star className={starred ? 'fill-amber-400 text-amber-400' : undefined} />
                       </SidebarMenuAction>
                     </SidebarMenuItem>
                   )
@@ -201,6 +208,8 @@ export function AppSidebar({ sidebarWidth }: { sidebarWidth: SidebarWidth }) {
             <NavLinkItem item={nav.settings} onNavigate={close} />
           </SidebarMenu>
         </SidebarGroup>
+
+        <PinnedNav onNavigate={close} />
       </SidebarContent>
 
       <SidebarFooter>
@@ -211,7 +220,7 @@ export function AppSidebar({ sidebarWidth }: { sidebarWidth: SidebarWidth }) {
   )
 }
 
-function NavLinkItem({ item, onNavigate, badge = 0 }: { item: NavItem; onNavigate: () => void; badge?: number }) {
+function NavLinkItem({ item, onNavigate, onIntent, badge = 0 }: { item: NavItem; onNavigate: () => void; onIntent?: () => void; badge?: number }) {
   const { pathname } = useLocation()
   return (
     <SidebarMenuItem>
@@ -221,7 +230,7 @@ function NavLinkItem({ item, onNavigate, badge = 0 }: { item: NavItem; onNavigat
         className={activeIcon}
         isActive={isNavActive(item, pathname)}
       >
-        <Link to={item.to} onClick={onNavigate}>
+        <Link to={item.to} onClick={onNavigate} onPointerEnter={onIntent} onFocus={onIntent}>
           <item.icon />
           <span>{item.title}</span>
         </Link>

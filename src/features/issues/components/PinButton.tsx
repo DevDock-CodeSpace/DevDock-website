@@ -1,4 +1,4 @@
-import { Pin } from 'lucide-react'
+import { Star } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useCurrentTeam } from '@/features/teams/hooks'
 import { FACETS } from '../filters'
@@ -8,8 +8,8 @@ import type { PinTarget } from '../viewsApi'
 import { useActiveView, usePins } from '../viewsHooks'
 
 /**
- * Pins what's on screen to your sidebar: a saved view, one person's issues, or a built-in tab.
- * Unsaved filters can't be pinned (save them as a view first).
+ * Stars what's on screen, so it's in your sidebar's Starred list: a saved view, one person's issues,
+ * or a built-in tab. Unsaved filters can't be starred (save them as a view first).
  */
 export function PinButton() {
   const { team } = useCurrentTeam()
@@ -28,12 +28,12 @@ export function PinButton() {
         : null
 
   const existing = target ? find(workspace.id, target) : null
-  const label = !target ? 'Save this view to pin it' : existing ? 'Unpin from sidebar' : 'Pin to sidebar'
+  const label = !target ? 'Save this view to star it' : existing ? 'Unstar' : 'Star'
   return (
     <Button
       variant="ghost"
       size="icon-sm"
-      className={existing ? 'text-brand' : 'text-muted-foreground'}
+      className={existing ? undefined : 'text-muted-foreground'}
       aria-label={label}
       aria-pressed={existing !== null}
       title={label}
@@ -44,7 +44,7 @@ export function PinButton() {
         else pin.mutate({ workspaceId: workspace.id, target })
       }}
     >
-      <Pin className={existing ? 'fill-current' : undefined} />
+      <Star className={existing ? 'fill-amber-400 text-amber-400' : undefined} />
     </Button>
   )
 }

@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react'
 
-export type MenuKind = 'status' | 'priority' | 'assignee' | 'label' | 'cycle'
+export type MenuKind = 'status' | 'priority' | 'assignee' | 'label' | 'cycle' | 'plan'
 
 type IssueNav = {
   /** The focused row/card (j/k or hover), which shortcuts act on. */

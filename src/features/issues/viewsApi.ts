@@ -18,7 +18,7 @@ export const viewKeys = {
 }
 
 const VIEW_COLUMNS = 'id, team_id, workspace_id, owner_id, name, shared, layout, tab, filters, created_at, updated_at'
-const PIN_COLUMNS = 'id, user_id, team_id, workspace_id, kind, view_id, person_id, tab, cycle_id, position, created_at'
+const PIN_COLUMNS = 'id, user_id, team_id, workspace_id, kind, view_id, person_id, tab, cycle_id, issue_id, plan_id, position, created_at'
 
 const viewErrors = {
   '23505': 'You already have a view with that name.',
@@ -49,19 +49,35 @@ export const teamViewsQuery = (teamId: string) =>
     },
   })
 
-/** Your pinned views, people and tabs for the group, in sidebar order. */
+/** Everything you starred in the group (the sidebar's Starred list; `issue_pins` in code), in sidebar order. */
 export const teamPinsQuery = (teamId: string) =>
   queryOptions({
     queryKey: viewKeys.pins(teamId),
     staleTime: SETTLED_STALE_MS,
     queryFn: async (): Promise<IssuePin[]> => {
       const { data, error } = await supabase.from('issue_pins').select(PIN_COLUMNS).eq('team_id', teamId).order('position').order('created_at')
-      if (error) throw toDataError('load pins', error)
+      if (error) throw toDataError('load your starred items', error)
       return data
     },
   })
 
-/** The cycles your cycle pins point at (the sidebar needs their numbers and names). */
+/** The issues you starred (the sidebar needs their IDs, titles and status). */
+export const starredIssuesQuery = (issueIds: string[]) =>
+  queryOptions({
+    // Under the pins prefix, so a change to your stars refreshes it; NOT_LIVE (lib/live) for the titles.
+    queryKey: ['issues', 'pins', 'issues', [...issueIds].sort().join(',')] as const,
+    enabled: issueIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('issues')
+        .select('id, number, title, status, workspace_id, workspace:workspaces!issues_workspace_team_fkey(issue_key)')
+        .in('id', issueIds)
+      if (error) throw toDataError('load starred issues', error)
+      return data
+    },
+  })
+
+/** The sprints you starred point at (the sidebar needs their numbers and names). */
 export const pinnedCyclesQuery = (cycleIds: string[]) =>
   queryOptions({
     // Under the pins prefix, so a change to pins or cycles refreshes it.
@@ -133,17 +149,44 @@ export async function pinTarget(workspaceId: string, target: PinTarget) {
     ...(target.kind === 'cycle' ? { cycle_id: target.cycleId } : {}),
   }
   const { error } = await supabase.from('issue_pins').insert(row as TablesInsert<'issue_pins'>)
-  if (error) throw toDataError('pin it', error, { '23505': 'That is already pinned.', '23514': 'That person isn’t in this group.', '54000': 'You can pin at most 30 items.' })
+  if (error) throw toDataError('star it', error, { '23505': 'That is already starred.', '23514': 'That person isn’t in this group.', '54000': 'You can star at most 30 items.' })
+}
+
+/** Stars that aren't one project's issue views: a workspace, an issue, a plan, or the Issues hub's My issues. */
+export type StarTarget = { kind: 'workspace'; workspaceId: string } | { kind: 'issue'; issueId: string } | { kind: 'plan'; planId: string } | { kind: 'my_issues' }
+
+/**
+ * The group comes from the workspace, issue or plan (or is the given one, for My issues); see
+ * prepare_issue_pin. `id` is chosen by the caller, so the star can be shown (and unstarred) at once.
+ */
+export async function addStar(teamId: string, target: StarTarget, id: string) {
+  const row: Partial<TablesInsert<'issue_pins'>> = {
+    id,
+    kind: target.kind,
+    team_id: teamId,
+    ...(target.kind === 'workspace' ? { workspace_id: target.workspaceId } : {}),
+    ...(target.kind === 'issue' ? { issue_id: target.issueId } : {}),
+    ...(target.kind === 'plan' ? { plan_id: target.planId } : {}),
+  }
+  const { error } = await supabase.from('issue_pins').insert(row as TablesInsert<'issue_pins'>)
+  if (error) throw toDataError('star it', error, { '23505': 'That is already starred.', '54000': 'You can star at most 30 items.' })
+}
+
+export function starMatches(pin: IssuePin, target: StarTarget) {
+  if (target.kind === 'workspace') return pin.kind === 'workspace' && pin.workspace_id === target.workspaceId
+  if (target.kind === 'issue') return pin.kind === 'issue' && pin.issue_id === target.issueId
+  if (target.kind === 'plan') return pin.kind === 'plan' && pin.plan_id === target.planId
+  return pin.kind === 'my_issues'
 }
 
 export async function unpin(pinId: string) {
   const { error } = await supabase.from('issue_pins').delete().eq('id', pinId)
-  if (error) throw toDataError('unpin it', error)
+  if (error) throw toDataError('unstar it', error)
 }
 
 export async function reorderPins(teamId: string, ids: string[]) {
   const { error } = await supabase.rpc('reorder_issue_pins', { p_team_id: teamId, p_ids: ids })
-  if (error) throw toDataError('reorder the pins', error)
+  if (error) throw toDataError('reorder your starred items', error)
 }
 
 /** Does this pin point at the given target? (A pin is one of view / person / tab, per workspace.) */

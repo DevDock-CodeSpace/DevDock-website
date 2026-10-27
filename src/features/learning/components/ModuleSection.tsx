@@ -223,12 +223,12 @@ export function ModuleSection({ module, index }: { module: OutlineModule; index:
         open={dialog === 'delete'}
         onOpenChange={(o) => !o && setDialog(null)}
         title={`Delete “${module.title}”?`}
-        description={`Its ${module.lessons.length} ${module.lessons.length === 1 ? 'lesson' : 'lessons'} and everyone’s progress on them are deleted too. This can’t be undone.`}
+        description={`Its ${module.lessons.length} ${module.lessons.length === 1 ? 'lesson' : 'lessons'}, their files (the text, whiteboards and anything else in their folders) and everyone’s progress on them are deleted too. This can’t be undone.`}
         confirmLabel="Delete module"
         pending={busy}
         onConfirm={async () => {
           setBusy(true)
-          await run(() => deleteModule(module.id))
+          await run(() => deleteModule(team.id, module.id, module.lessons.map((l) => l.id)))
           setBusy(false)
           setDialog(null)
         }}
@@ -237,13 +237,13 @@ export function ModuleSection({ module, index }: { module: OutlineModule; index:
         open={deletingLesson !== null}
         onOpenChange={(o) => !o && setDeletingLesson(null)}
         title={`Delete “${deletingLesson?.title}”?`}
-        description="Everyone’s progress on it is deleted too. This can’t be undone."
+        description="Its files (the text, the whiteboard and anything else in its folder) and everyone’s progress on it are deleted too. This can’t be undone."
         confirmLabel="Delete lesson"
         pending={busy}
         onConfirm={async () => {
           if (!deletingLesson) return
           setBusy(true)
-          await run(() => deleteLesson(deletingLesson.id))
+          await run(() => deleteLesson(team.id, deletingLesson.id))
           setBusy(false)
           setDeletingLesson(null)
         }}

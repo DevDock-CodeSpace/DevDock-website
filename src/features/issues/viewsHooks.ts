@@ -8,6 +8,8 @@ import { FACETS } from './filters'
 import {
   createView,
   deleteView,
+  addStar,
+  starMatches,
   pinMatches,
   pinTarget,
   reorderPins,
@@ -16,7 +18,9 @@ import {
   updateView,
   viewKeys,
   workspaceViewsQuery,
+  type IssuePin,
   type IssueView,
+  type StarTarget,
   type PinTarget,
   type ViewPatch,
 } from './viewsApi'
@@ -68,15 +72,46 @@ export function useViewMutations() {
   }
 }
 
-/** Your pins for the group, with toggle / unpin / move. */
+/**
+ * What you starred in the group, with star / unstar / move. Starring and unstarring show at once
+ * (the sidebar's star flips on click) and roll back with a toast if the server says no. A new star
+ * gets its id here, and star and unstar run one at a time, so unstarring something starred a moment
+ * ago deletes it once it exists instead of being lost.
+ */
 export function usePins(teamId: string) {
   const queryClient = useQueryClient()
+  const key = viewKeys.pins(teamId)
   const pins = useQuery(teamPinsQuery(teamId)).data
-  const refresh = () => queryClient.invalidateQueries({ queryKey: viewKeys.pins(teamId) })
+  const refresh = () => queryClient.invalidateQueries({ queryKey: key })
   const onError = (error: unknown) => toast.error(errorMessage(error))
+  // Optimistic: change the cached list first, put it back on failure.
+  const optimistic = (change: (old: IssuePin[]) => IssuePin[]) => async () => {
+    await queryClient.cancelQueries({ queryKey: key })
+    const previous = queryClient.getQueryData<IssuePin[]>(key)
+    queryClient.setQueryData<IssuePin[]>(key, (old = []) => change(old))
+    return { previous }
+  }
+  const rollback = (error: unknown, _vars: unknown, context: { previous?: IssuePin[] } | undefined) => {
+    queryClient.setQueryData(key, context?.previous)
+    onError(error)
+  }
 
   const pin = useMutation({ mutationFn: ({ workspaceId, target }: { workspaceId: string; target: PinTarget }) => pinTarget(workspaceId, target), onSuccess: refresh, onError })
-  const remove = useMutation({ mutationFn: (pinId: string) => unpin(pinId), onSuccess: refresh, onError })
+  const order = { id: `stars:${teamId}` }
+  const star = useMutation({
+    scope: order,
+    mutationFn: ({ target, id }: { target: StarTarget; id: string }) => addStar(teamId, target, id),
+    onMutate: ({ target, id }) => optimistic((old) => [...old, newStar(teamId, target, id, old)])(),
+    onError: rollback,
+    onSettled: refresh,
+  })
+  const remove = useMutation({
+    scope: order,
+    mutationFn: (pinId: string) => unpin(pinId),
+    onMutate: (pinId) => optimistic((old) => old.filter((item) => item.id !== pinId))(),
+    onError: rollback,
+    onSettled: refresh,
+  })
   const reorder = useMutation({ mutationFn: (ids: string[]) => reorderPins(teamId, ids), onSuccess: refresh, onError })
 
   return {
@@ -85,5 +120,26 @@ export function usePins(teamId: string) {
     remove,
     reorder,
     find: (workspaceId: string, target: PinTarget) => (pins ?? []).find((item) => pinMatches(item, workspaceId, target)) ?? null,
+    star: (target: StarTarget) => star.mutate({ target, id: crypto.randomUUID() }),
+    findStar: (target: StarTarget) => (pins ?? []).find((item) => starMatches(item, target)) ?? null,
+  }
+}
+
+/** The row a new star will be, shown until the refetch brings the server's (same id). */
+function newStar(teamId: string, target: StarTarget, id: string, old: IssuePin[]): IssuePin {
+  return {
+    id,
+    user_id: '',
+    team_id: teamId,
+    kind: target.kind,
+    workspace_id: target.kind === 'workspace' ? target.workspaceId : null,
+    issue_id: target.kind === 'issue' ? target.issueId : null,
+    plan_id: target.kind === 'plan' ? target.planId : null,
+    view_id: null,
+    person_id: null,
+    tab: null,
+    cycle_id: null,
+    position: Math.max(0, ...old.map((item) => item.position)) + 1,
+    created_at: new Date().toISOString(),
   }
 }

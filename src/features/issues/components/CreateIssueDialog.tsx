@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronRight, CircleUserRound, ImagePlus, IterationCw, LoaderCircle, Tag, X } from 'lucide-react'
+import { ChevronRight, CircleUserRound, Goal, ImagePlus, IterationCw, LoaderCircle, Tag, X } from 'lucide-react'
 import { useEffect, useRef, useState, type ComponentProps, type FormEvent, type ReactNode } from 'react'
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
@@ -17,6 +17,8 @@ import { imageNode, removeIssueImages, uploadIssueImage } from '../images'
 import { issueIdentifier, priorityLabel, statusLabel } from '../meta'
 import { AssigneePicker } from './AssigneePicker'
 import { CyclePicker } from './CyclePicker'
+import { PlanPicker } from '@/features/plans/components/PlanPicker'
+import { PlanStatusDot } from '@/features/plans/components/PlanStatusDot'
 import { LabelChip } from './LabelChip'
 import { LabelPicker } from './LabelPicker'
 import { RepoPicker } from './RepoPicker'
@@ -52,9 +54,11 @@ type CreateIssueDialogProps = {
   /** Starting status (e.g. the list group or board column it was opened from). */
   status?: IssueStatus
   /** Creates a sub-issue of this issue (starting in the same repo). */
-  parent?: Pick<Issue, 'id' | 'number' | 'title' | 'repo_id'>
+  parent?: Pick<Issue, 'id' | 'number' | 'title' | 'repo_id' | 'plan_id'>
   /** Starting cycle (e.g. opened from a cycle's page). */
   cycleId?: string | null
+  /** Starting plan (e.g. "New issue" on a plan's page). */
+  planId?: string | null
 }
 
 /** Linear's "New issue" modal: title, description, and property chips. ⌘/Ctrl+Enter creates. */
@@ -64,9 +68,10 @@ export function CreateIssueDialog({
   status: initialStatus = 'todo',
   parent,
   cycleId: initialCycle = null,
+  planId: initialPlan = null,
 }: CreateIssueDialogProps) {
   const { team } = useCurrentTeam()
-  const { workspace, members, labels, cycles, repos, canManage, userId } = useIssueContext()
+  const { workspace, members, labels, cycles, repos, plans, canManage, userId } = useIssueContext()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
 
@@ -78,6 +83,8 @@ export function CreateIssueDialog({
   const [labelIds, setLabelIds] = useState<string[]>([])
   const [cycleId, setCycleId] = useState<string | null>(initialCycle)
   const [repoId, setRepoId] = useState<string | null>(parent?.repo_id ?? null)
+  // A sub-issue is in its parent's plan (the database sets it either way).
+  const [planId, setPlanId] = useState<string | null>(parent ? parent.plan_id : initialPlan)
 
   // Screenshots: pasted, dropped or picked. They're only uploaded on Create,
   // so cancelling leaves nothing behind.
@@ -127,6 +134,7 @@ export function CreateIssueDialog({
     setLabelIds([])
     setCycleId(initialCycle)
     setRepoId(parent?.repo_id ?? null)
+    setPlanId(parent ? parent.plan_id : initialPlan)
   }
 
   const create = useMutation({
@@ -147,6 +155,7 @@ export function CreateIssueDialog({
           parentId: parent?.id ?? null,
           cycleId,
           repoId,
+          planId,
           labelIds,
         })
         // Refetched below, so its own live-update echo (the issue, its labels, its first activity) isn't needed.
@@ -183,6 +192,7 @@ export function CreateIssueDialog({
   const assignee = members.find((m) => m.user_id === assigneeId)
   const chosenLabels = labels.filter((l) => labelIds.includes(l.id))
   const cycle = cycles.find((c) => c.id === cycleId)
+  const plan = plans.find((p) => p.id === planId)
   const repo = repos.find((r) => r.id === repoId)
 
   return (
@@ -320,6 +330,20 @@ export function CreateIssueDialog({
                 </Chip>
               </CyclePicker>
             )}
+            {parent
+              ? plan && (
+                  <span className="inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-xs text-muted-foreground" title="A sub-issue is in its parent’s plan">
+                    <PlanStatusDot status={plan.status} /> {plan.name}
+                  </span>
+                )
+              : plans.length > 0 && (
+                  <PlanPicker value={planId} plans={plans} onChange={setPlanId}>
+                    <Chip>
+                      {plan ? <PlanStatusDot status={plan.status} /> : <Goal className="size-3.5 text-muted-foreground" />}
+                      {plan ? plan.name : 'Plan'}
+                    </Chip>
+                  </PlanPicker>
+                )}
             {repos.length > 0 && (
               <RepoPicker value={repoId} repos={repos} onChange={setRepoId}>
                 <Chip>

@@ -11,7 +11,7 @@ export function setLiveConnected(value: boolean) {
 }
 
 /** Roots whose tables are all in the `supabase_realtime` publication (see AFFECTS in realtime.ts). */
-const LIVE_ROOTS = new Set(['teams', 'workspaces', 'documents', 'diagrams', 'issues', 'repos', 'learning', 'messaging', 'reminders'])
+const LIVE_ROOTS = new Set(['teams', 'workspaces', 'documents', 'diagrams', 'issues', 'repos', 'learning', 'messaging', 'reminders', 'plans'])
 
 /** Queries under those roots that no event refreshes: tables left out of the publication, GitHub, signed URLs, search. */
 const NOT_LIVE: ((key: readonly unknown[]) => boolean)[] = [
@@ -21,6 +21,12 @@ const NOT_LIVE: ((key: readonly unknown[]) => boolean)[] = [
   (key) => key[0] === 'messaging' && (key[1] === 'search' || key[1] === 'image-urls'),
   // Reads issues, whose events don't reach this key.
   (key) => key[0] === 'reminders' && key[1] === 'issue-options',
+  // A plan's page carries its Brief's text; doc events don't reach this key.
+  (key) => key[0] === 'plans' && key[1] === 'detail',
+  // issue_import_people isn't published.
+  (key) => key[0] === 'issues' && key[1] === 'import-people',
+  // Issue titles in Starred: issue events refresh lists and the open issue, not this.
+  (key) => key[0] === 'issues' && key[1] === 'pins' && key[2] === 'issues',
 ]
 
 export function keptLive(key: readonly unknown[]): boolean {

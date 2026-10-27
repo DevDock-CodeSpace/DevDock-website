@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { useAuth } from '@/features/auth/hooks'
+import { teamPlansQuery } from '@/features/plans/api'
 import { workspaceReposQuery } from '@/features/repos/api'
 import { useCurrentWorkspace } from '@/features/teams/hooks'
 import { workspaceMembersQuery } from '@/features/workspaces/api'
@@ -31,10 +32,16 @@ export function useIssueContext() {
   const { user } = useAuth()
   const { workspace, can } = useCurrentWorkspace()
   // One batch: separate useSuspenseQuery calls in a row would each wait for the one before (a waterfall).
-  const [{ data: members }, { data: labels }, { data: cycles }, { data: repos }] = useSuspenseQueries({
-    queries: [workspaceMembersQuery(workspace.id), labelsQuery(workspace.id), cyclesQuery(workspace.id), workspaceReposQuery(workspace.id)],
+  const [{ data: members }, { data: labels }, { data: cycles }, { data: repos }, { data: plans }] = useSuspenseQueries({
+    queries: [
+      workspaceMembersQuery(workspace.id),
+      labelsQuery(workspace.id),
+      cyclesQuery(workspace.id),
+      workspaceReposQuery(workspace.id),
+      teamPlansQuery(workspace.team_id),
+    ],
   })
-  return { workspace, members, labels, cycles, repos, canManage: can.canEdit, userId: user.id }
+  return { workspace, members, labels, cycles, repos, plans, canManage: can.canEdit, userId: user.id }
 }
 
 type UpdateVars = { issue: Pick<Issue, 'id' | 'number'>; patch?: IssuePatch; labelIds?: string[] }
