@@ -25,7 +25,7 @@ export function useCurrentTeam() {
   const { teamSlug } = useParams()
   const membership = useMyTeams().find((m) => m.team.slug === teamSlug)
   if (!membership) throw gone('Group not found, or you’re not a member.')
-  return { team: membership.team, role: membership.role, can: teamPermissions(membership.role) }
+  return { team: membership.team, role: membership.role, can: teamPermissions(membership.role), features: membership.features }
 }
 
 /** The workspace in the URL, the user's role in it (if any), and what they may do. */

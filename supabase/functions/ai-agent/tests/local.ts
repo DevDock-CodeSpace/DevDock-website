@@ -79,6 +79,7 @@ export async function createFixture(): Promise<Fixture> {
     const team = must(await owner.db.from('teams').insert({ name: `ZZ AI ${tag}`, slug: `zz-ai-${tag}`, type: 'general' }).select('id').single(), 'create group')
     const teamId = (team as { id: string }).id
     must(await admin.from('team_members').insert([kumar, reddy].map((p) => ({ team_id: teamId, user_id: p.id, role: 'member' }))).select('user_id'), 'add members')
+    must(await admin.from('team_feature_flags').insert({ team_id: teamId, flag: 'ask_devdock', enabled: true }).select('flag'), 'switch Ask DevDock on')
 
     async function project(title: string) {
       const id = must(

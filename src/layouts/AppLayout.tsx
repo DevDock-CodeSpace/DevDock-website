@@ -5,6 +5,7 @@ import { AppSidebar } from '@/components/AppSidebar'
 import { NavigationSpinner } from '@/components/NavigationSpinner'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { AskDevDockButton } from '@/features/ai/components/AskDevDockButton'
+import { useFeature } from '@/features/flags/hooks'
 import { NotificationBell } from '@/features/messaging/components/NotificationBell'
 import { NotePopups } from '@/features/reminders/components/NotePopups'
 import { NotesButton } from '@/features/reminders/components/NotesButton'
@@ -52,6 +53,7 @@ export function AppLayout() {
 function AppShell() {
   const { workspaceId } = useParams()
   const fullBleed = useFullBleed()
+  const askDevDock = useFeature('ask_devdock')
   const sidebarWidth = useSidebarWidth()
   return (
     // --sidebar-width is what every part of the sidebar (and the page beside it) is sized from.
@@ -65,7 +67,8 @@ function AppShell() {
           <Separator orientation="vertical" className="mr-2 h-4 data-vertical:self-center md:hidden" />
           {workspaceId ? <WorkspaceBreadcrumb /> : <TeamBreadcrumb />}
           <div className="ml-auto flex items-center gap-1">
-            <AskDevDockButton />
+            {/* A feature flag per group (/admin/flags); the ai-agent function checks it again. */}
+            {askDevDock && <AskDevDockButton />}
             <NotesButton />
             <NotificationBell />
             <ThemeToggle />
