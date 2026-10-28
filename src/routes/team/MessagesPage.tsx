@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient, useSuspenseQueries } from '@tanstack/react-query'
 import { ChevronRight, MessageCircle, Plus, Search } from 'lucide-react'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router'
@@ -30,9 +30,10 @@ export function MessagesPage() {
   const { team, can } = useCurrentTeam()
   const { user } = useAuth()
   const queryClient = useQueryClient()
-  const conversations = useSuspenseQuery(teamConversationsQuery(team.id)).data
-  const people = useSuspenseQuery(teamMembersQuery(team.id)).data
-  const conversationMembers = useSuspenseQuery(teamConversationMembersQuery(team.id)).data
+  // One batch (messagesLoader starts them with the group): in a row, each waited for the one before.
+  const [{ data: conversations }, { data: people }, { data: conversationMembers }] = useSuspenseQueries({
+    queries: [teamConversationsQuery(team.id), teamMembersQuery(team.id), teamConversationMembersQuery(team.id)],
+  })
   const unread = useUnread(team.id)
   const sectionState = useCollapsedSections()
   const [search, setSearch] = useState('')
