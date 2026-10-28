@@ -1,7 +1,7 @@
 import { createBrowserRouter, Outlet, redirect } from 'react-router'
 import { AuthLoading } from '@/features/auth/components/AuthLoading'
 import { InactivityGuard } from '@/features/auth/components/InactivityGuard'
-import { adminFlagsLoader, adminGroupsLoader, adminLoader, adminOverviewLoader, adminUsersLoader } from '@/features/admin/loaders'
+import { adminFeedbackLoader, adminFlagsLoader, adminGroupsLoader, adminLoader, adminOverviewLoader, adminUsersLoader } from '@/features/admin/loaders'
 import { authCallbackLoader, loginLoader } from '@/features/auth/loaders'
 import { watchAuthIdentity } from '@/features/auth/session'
 import { diagramLoader } from '@/features/diagrams/loaders'
@@ -97,6 +97,7 @@ export const router = createBrowserRouter([
           { index: true, loader: adminOverviewLoader, lazy: async () => ({ Component: (await import('@/routes/admin')).AdminOverviewPage }) },
           { path: 'groups', loader: adminGroupsLoader, lazy: async () => ({ Component: (await import('@/routes/admin')).AdminGroupsPage }) },
           { path: 'users', loader: adminUsersLoader, lazy: async () => ({ Component: (await import('@/routes/admin')).AdminUsersPage }) },
+          { path: 'feedback', loader: adminFeedbackLoader, lazy: async () => ({ Component: (await import('@/routes/admin')).AdminFeedbackPage }) },
           { path: 'flags', loader: adminFlagsLoader, lazy: async () => ({ Component: (await import('@/routes/admin')).AdminFlagsPage }) },
         ],
       },

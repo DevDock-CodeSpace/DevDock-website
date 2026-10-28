@@ -55,7 +55,11 @@ export function PrivacyPage() {
               matches it to someone;
             </li>
             <li>the GitHub repositories your group uses (their names and GitHub ids) and which projects use them;</li>
-            <li>notes you keep for yourself: their title, details, the time you want them to pop up (if any) and the workspace or issue they are about.</li>
+            <li>notes you keep for yourself: their title, details, the time you want them to pop up (if any) and the workspace or issue they are about;</li>
+            <li>
+              feedback you send with the Feedback button: what you wrote, its kind, the page you were on, your group, and
+              your browser, window size and light or dark theme. Only the people who run DevDock read it, not your group.
+            </li>
           </ul>
           <p>
             This content is only visible to people in your group or workspace, according to their role (for example,
