@@ -7,13 +7,16 @@ import type { Database, Tables } from '@/types/database.types'
 export type TeamRole = Database['public']['Enums']['team_role']
 export type TeamType = Database['public']['Enums']['team_type']
 export type Team = Pick<Tables<'teams'>, 'id' | 'name' | 'slug' | 'type' | 'logo_path'>
-export type TeamMembership = { role: TeamRole; joinedAt: string; team: Team }
+/** `features`: the keys of the feature flags switched on for the group (features/flags). */
+export type TeamMembership = { role: TeamRole; joinedAt: string; team: Team; features: readonly string[] }
 export type Invite = Pick<
   Tables<'team_invites'>,
   'id' | 'code' | 'created_at' | 'expires_at' | 'max_uses' | 'use_count'
 >
 export type PersonProfile = { display_name: string | null; avatar_url: string | null } | null
 export type TeamMember = { user_id: string; role: TeamRole; joined_at: string; profile: PersonProfile }
+
+type MembershipRow = { role: TeamRole; joined_at: string; team: Team & { enabled_features: string[] | null } }
 
 export const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/
 
@@ -27,11 +30,19 @@ export const myTeamsQuery = (userId: string) =>
     queryFn: async (): Promise<TeamMembership[]> => {
       const { data, error } = await supabase
         .from('team_members')
-        .select('role, joined_at, team:teams(id, name, slug, type, logo_path)')
+        // enabled_features is a computed column (public.enabled_features): the group's flags ride along
+        // with the groups, so they cost no request of their own. The generated types can't see it.
+        .select('role, joined_at, team:teams(id, name, slug, type, logo_path, enabled_features)')
         .eq('user_id', userId)
         .order('joined_at')
+        .overrideTypes<MembershipRow[], { merge: false }>()
       if (error) throw toDataError('load your groups', error)
-      return data.map((row) => ({ role: row.role, joinedAt: row.joined_at, team: row.team }))
+      return data.map(({ role, joined_at, team: { enabled_features, ...team } }) => ({
+        role,
+        joinedAt: joined_at,
+        team,
+        features: enabled_features ?? [],
+      }))
     },
   })
 

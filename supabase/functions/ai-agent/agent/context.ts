@@ -20,11 +20,15 @@ export type ContextInput = {
   now?: Date
 }
 
-export type ContextResult = { ok: true; context: AiExecutionContext } | { ok: false; status: 400 | 404; code: 'bad_request' | 'not_found' }
+export type ContextResult =
+  | { ok: true; context: AiExecutionContext }
+  | { ok: false; status: 400 | 403 | 404; code: 'bad_request' | 'not_found' | 'not_enabled' }
 
 const bad: ContextResult = { ok: false, status: 400, code: 'bad_request' }
 // One answer for "doesn't exist" and "not yours": the difference is not the caller's to learn.
 const notFound: ContextResult = { ok: false, status: 404, code: 'not_found' }
+// The group hasn't been given Ask DevDock (the ask_devdock feature flag, switched per group by the platform admin).
+const notEnabled: ContextResult = { ok: false, status: 403, code: 'not_enabled' }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -67,12 +71,13 @@ export async function buildContext(input: ContextInput): Promise<ContextResult> 
   if (!isUuid(teamId)) return bad
   if (workspaceId !== undefined && workspaceId !== null && !isUuid(workspaceId)) return bad
 
-  // The membership row brings the group's name and the person's own name with it: one request, not two.
+  // The membership row brings the group's name, its feature flags (the computed column
+  // teams.enabled_features) and the person's own name with it: one request, not three.
   // An embed RLS hides comes back null rather than as an error, so a missing name never refuses the request.
   const [membership, workspace, entity] = await Promise.all([
     db
       .from('team_members')
-      .select('team:teams(id, name), profile:profiles(display_name)')
+      .select('team:teams(id, name, enabled_features), profile:profiles(display_name)')
       .eq('team_id', teamId)
       .eq('user_id', userId)
       .maybeSingle(),
@@ -80,11 +85,12 @@ export async function buildContext(input: ContextInput): Promise<ContextResult> 
     resolveEntity(db, teamId, body.currentEntity),
   ])
   const member = membership.data as unknown as {
-    team: { id: string; name: string } | null
+    team: { id: string; name: string; enabled_features: string[] | null } | null
     profile: { display_name: string | null } | null
   } | null
   const team = member?.team
   if (membership.error || !team) return notFound
+  if (!team.enabled_features?.includes('ask_devdock')) return notEnabled
 
   const open = workspace?.data as { id: string; title: string; team_id: string } | null | undefined
   // Asked for a workspace that isn't visible, or belongs to another group: refuse the request.

@@ -47,6 +47,7 @@ const httpErrors: Record<string, string> = {
   not_found: 'You don’t have access to this group or project anymore.',
   rate_limited: 'That’s a lot of requests. Wait a minute and try again.',
   disabled: 'DevDock AI is switched off.',
+  not_enabled: 'DevDock AI isn’t switched on for this group.',
   not_configured: 'DevDock AI isn’t set up yet. The group owner needs to add its key.',
   bad_request: 'That request couldn’t be read. Try a shorter message.',
 }
