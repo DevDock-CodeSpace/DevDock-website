@@ -4,11 +4,11 @@ export type LoginErrorCode = 'cancelled' | 'oauth' | 'callback' | 'session' | 'u
 
 export const loginErrorMessages: Record<LoginErrorCode, string> = {
   cancelled: 'Sign-in was cancelled. You can try again whenever you’re ready.',
-  oauth: 'Google couldn’t complete the sign-in. Please try again.',
+  oauth: 'The sign-in couldn’t be completed. Please try again.',
   callback: 'We couldn’t finish signing you in. Please try again.',
   session: 'Your session couldn’t be restored. Please sign in again.',
   unavailable: 'DevDock can’t reach the sign-in service right now. Check your connection and try again.',
-  'not-configured': 'Google sign-in isn’t configured for this environment yet.',
+  'not-configured': 'That way of signing in isn’t set up here yet. Try another one.',
   credentials: 'That email or password isn’t right.',
 }
 
