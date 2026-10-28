@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query'
 import { LoaderCircle, LogOut } from 'lucide-react'
 import { Suspense } from 'react'
 import { NavLink, Outlet } from 'react-router'
@@ -5,6 +6,7 @@ import { LogoWordmark } from '@/components/Logo'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { adminFeedbackQuery } from '@/features/admin/api'
 import { useSignOut, useUserIdentity } from '@/features/auth/hooks'
 import { cn } from '@/lib/utils'
 
@@ -13,6 +15,7 @@ const NAV = [
   { to: '/admin/groups', label: 'Groups', end: false },
   { to: '/admin/users', label: 'Users', end: false },
   { to: '/admin/flags', label: 'Feature flags', end: false },
+  { to: '/admin/feedback', label: 'Feedback', end: false },
 ]
 
 /**
@@ -22,6 +25,9 @@ const NAV = [
 export function AdminLayout() {
   const { email } = useUserIdentity()
   const signOut = useSignOut()
+  // How the admin hears about new feedback (there's no email yet): a count on its tab, on every console page.
+  // useQuery, so the tabs never wait for it; adminLoader started it.
+  const newFeedback = useQuery(adminFeedbackQuery()).data?.filter((f) => f.status === 'new').length ?? 0
 
   return (
     <div className="flex min-h-svh flex-col bg-background">
@@ -52,6 +58,12 @@ export function AdminLayout() {
               }
             >
               {item.label}
+              {item.to === '/admin/feedback' && newFeedback > 0 && (
+                <span data-new-feedback={newFeedback} className="ml-1.5 rounded-full bg-brand px-1.5 py-px font-mono text-[11px] text-white tabular-nums">
+                  {newFeedback}
+                  <span className="sr-only"> new</span>
+                </span>
+              )}
             </NavLink>
           ))}
         </nav>

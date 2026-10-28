@@ -55,12 +55,28 @@ export type AdminFlag = {
   overrides: { team_id: string; enabled: boolean }[]
 }
 
+export type AdminFeedback = {
+  id: string
+  kind: 'problem' | 'idea' | 'other'
+  message: string
+  page: string | null
+  context: { browser?: string; screen?: string; theme?: string }
+  status: 'new' | 'done'
+  created_at: string
+  done_at: string | null
+  sender_id: string | null
+  sender_name: string | null
+  sender_email: string | null
+  team_name: string | null
+}
+
 export const adminKeys = {
   me: (userId: string) => ['admin', 'me', userId] as const,
   overview: ['admin', 'overview'] as const,
   groups: ['admin', 'groups'] as const,
   users: ['admin', 'users'] as const,
   flags: ['admin', 'flags'] as const,
+  feedback: ['admin', 'feedback'] as const,
 }
 
 /** Is the signed-in person a platform admin? Asked only where it matters (no groups, /admin). */
@@ -130,4 +146,20 @@ export async function setTeamFlag(teamId: string, key: string, enabled: boolean 
     p_enabled: enabled as boolean,
   })
   if (error) throw toDataError('change the flag', error, { P0002: 'That group or flag no longer exists. Reload the page.' })
+}
+
+/** Feedback from the app's Feedback button, newest first (the latest 500). The console's tab counts the new ones. */
+export const adminFeedbackQuery = () =>
+  queryOptions({
+    queryKey: adminKeys.feedback,
+    queryFn: async (): Promise<AdminFeedback[]> => {
+      const { data, error } = await supabase.rpc('admin_feedback')
+      if (error) throw toDataError('load the feedback', error)
+      return data as unknown as AdminFeedback[]
+    },
+  })
+
+export async function setFeedbackStatus(id: string, status: 'new' | 'done') {
+  const { error } = await supabase.rpc('admin_set_feedback_status', { p_id: id, p_status: status })
+  if (error) throw toDataError('update the feedback', error, { P0002: 'That feedback no longer exists. Reload the page.' })
 }
