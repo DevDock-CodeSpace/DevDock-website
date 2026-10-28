@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useRouteLoaderData } from 'react-router'
 import { APP_ROUTE_ID, type appLoader } from '@/layouts/app-loader'
-import { profileQuery, signInWithGoogle, signInWithPassword, signOut } from './api'
+import { profileQuery, signInWithPassword, signInWithProvider, signOut, type SignInProvider } from './api'
 
 /** The signed-in user. Only usable inside the authenticated app layout. */
 export function useAuth() {
@@ -35,8 +35,9 @@ export function useUserIdentity() {
   }
 }
 
-export function useSignInWithGoogle(next: string) {
-  return useMutation({ mutationFn: (remember: boolean) => signInWithGoogle(next, remember) })
+/** Google or Microsoft sign-in (the browser leaves for the provider on success). */
+export function useSignInWithProvider(next: string) {
+  return useMutation({ mutationFn: ({ provider, remember }: { provider: SignInProvider; remember: boolean }) => signInWithProvider(provider, next, remember) })
 }
 
 /** The admin account's sign-in (see signInWithPassword); goes to `next` once signed in. */
