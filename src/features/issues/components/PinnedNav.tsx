@@ -39,7 +39,8 @@ export function PinnedNav({ onNavigate }: { onNavigate: () => void }) {
   const views = useQuery(teamViewsQuery(team.id)).data
   // Pins follow the collection being looked at, like the rest of the sidebar.
   const { workspaces } = useCollectionView()
-  const people = useQuery(teamMembersQuery(team.id)).data
+  // Only to name starred people: without one, the sidebar doesn't ask for the group's people on every load.
+  const people = useQuery({ ...teamMembersQuery(team.id), enabled: pins.some((pin) => pin.kind === 'person') }).data
   const cycles = useQuery(pinnedCyclesQuery(pins.flatMap((pin) => (pin.cycle_id ? [pin.cycle_id] : [])))).data
   const issues = useQuery(starredIssuesQuery(pins.flatMap((pin) => (pin.kind === 'issue' && pin.issue_id ? [pin.issue_id] : [])))).data
   const plans = useQuery({ ...teamPlansQuery(team.id), enabled: pins.some((pin) => pin.kind === 'plan') }).data

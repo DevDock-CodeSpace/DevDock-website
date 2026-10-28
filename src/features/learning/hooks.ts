@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
+import { useMutation, useQueryClient, useSuspenseQueries } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { useAuth } from '@/features/auth/hooks'
 import { useCurrentWorkspace } from '@/features/teams/hooks'
@@ -23,9 +23,10 @@ export type OutlineModule = LearningModule & { lessons: LessonSummary[] }
 export function useLearning() {
   const { user } = useAuth()
   const { workspace, can } = useCurrentWorkspace()
-  const modules = useSuspenseQuery(modulesQuery(workspace.id)).data
-  const lessons = useSuspenseQuery(lessonsQuery(workspace.id)).data
-  const doneIds = useSuspenseQuery(myProgressQuery(workspace.id, user.id)).data
+  // One batch (learningLoader starts them too): in a row, each waited for the one before.
+  const [{ data: modules }, { data: lessons }, { data: doneIds }] = useSuspenseQueries({
+    queries: [modulesQuery(workspace.id), lessonsQuery(workspace.id), myProgressQuery(workspace.id, user.id)],
+  })
 
   const outline: OutlineModule[] = modules.map((m) => ({
     ...m,

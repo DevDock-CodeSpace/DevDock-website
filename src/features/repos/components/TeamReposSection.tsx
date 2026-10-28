@@ -1,4 +1,4 @@
-import { useSuspenseQuery } from '@tanstack/react-query'
+import { useSuspenseQueries, useSuspenseQuery } from '@tanstack/react-query'
 import { ExternalLink, FolderGit2, LoaderCircle, Plus, X } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { toast } from 'sonner'
@@ -32,8 +32,11 @@ import { NotConnectedBadge } from './NotConnectedBadge'
  */
 export function TeamReposSection() {
   const { team, can } = useCurrentTeam()
-  const repos = useSuspenseQuery(teamReposQuery(team.id)).data
-  const installations = useSuspenseQuery(githubInstallationsQuery(team.id)).data
+  // One batch: in a row, the install waited for the repos.
+  const [{ data: repos }, { data: installations }] = useSuspenseQueries({
+    queries: [teamReposQuery(team.id), githubInstallationsQuery(team.id)],
+  })
+  // The shell's cached workspace list (a select over its own cache entry), so no request.
   const workspaces = useSuspenseQuery(teamWorkspacesQuery(team.id)).data
   const [confirm, setConfirm] = useState<TeamRepo | null>(null)
   const remove = useDeleteRepo()

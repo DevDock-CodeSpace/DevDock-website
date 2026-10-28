@@ -9,10 +9,11 @@ import { docLoader, filesLoader, filesShouldRevalidate } from '@/features/docs/l
 import { cycleLoader, issueLoader, issuesLoader } from '@/features/issues/loaders'
 import { issueImportLoader, workspaceSettingsLoader } from '@/features/issues/import/loaders'
 import { hubSettingsLoader, hubSprintsLoader, hubViewsLoader, issuesHubLoader, planLoader } from '@/features/issues/hub/loaders'
-import { lessonLoader } from '@/features/learning/loaders'
+import { learningLoader, lessonLoader } from '@/features/learning/loaders'
 import { liveSessionLoader } from '@/features/live/loaders'
-import { githubCallbackLoader } from '@/features/repos/loaders'
-import { appIndexLoader, onboardingLoader, teamLoader, teamStartLoader, workspaceLoader } from '@/features/teams/loaders'
+import { githubCallbackLoader, githubTabLoader } from '@/features/repos/loaders'
+import { appIndexLoader, onboardingLoader, teamLoader, teamMembersLoader, teamStartLoader, workspaceLoader } from '@/features/teams/loaders'
+import { messagesLoader } from '@/features/messaging/loaders'
 import { AppLayout } from '@/layouts/AppLayout'
 import { APP_ROUTE_ID, appLoader } from '@/layouts/app-loader'
 import { queryClient } from '@/lib/query-client'
@@ -40,7 +41,6 @@ import { WorkspaceTabPage } from '@/routes/workspace/WorkspaceTabPage'
 import { WorkspaceToolGate } from '@/routes/workspace/WorkspaceToolGate'
 import { DiagramsRedirect } from '@/routes/DiagramsRedirect'
 import { meetingCalendar } from '@/features/live/screens'
-import { conversationView } from '@/features/messaging/screens'
 
 export const router = createBrowserRouter([
   { path: '/', loader: () => redirect('/app') },
@@ -118,10 +118,10 @@ export const router = createBrowserRouter([
             children: [
               { index: true, element: <TeamWorkspacesPage /> },
               // The open conversation's view (TipTap composer) starts downloading with the page, so it renders at once.
-              { path: 'messages', handle: FULL_BLEED, loader: () => { void conversationView.preload(); return null }, element: <MessagesPage /> },
+              { path: 'messages', handle: FULL_BLEED, loader: messagesLoader, element: <MessagesPage /> },
               // Where the group opens (after sign-in, or switching group or collection): its loader redirects.
               { path: 'start', loader: teamStartLoader },
-              { path: 'members', element: <TeamMembersPage /> },
+              { path: 'members', loader: teamMembersLoader, element: <TeamMembersPage /> },
               { path: 'settings', lazy: async () => ({ Component: (await import('@/routes/team/TeamSettingsPage')).TeamSettingsPage }) },
               // Team → Files (URL docs): group-wide docs and diagrams + those of every workspace the user can see.
               // Lazy page; filesLoader starts its queries alongside the chunk.
@@ -215,6 +215,7 @@ export const router = createBrowserRouter([
                   {
                     // Course outline, lessons and class progress.
                     path: 'learning',
+                    loader: learningLoader,
                     element: <WorkspaceToolGate tool="learning" />,
                     children: [
                       { index: true, element: <WorkspaceLearningPage /> },
@@ -234,6 +235,7 @@ export const router = createBrowserRouter([
                   {
                     // The repos linked to this project (group repos; issues point at them).
                     path: 'github',
+                    loader: githubTabLoader,
                     element: <WorkspaceToolGate tool="github" />,
                     children: [{ index: true, lazy: async () => ({ Component: (await import('@/routes/workspace/WorkspaceGitHubPage')).WorkspaceGitHubPage }) }],
                   },

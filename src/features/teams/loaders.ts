@@ -4,10 +4,10 @@ import { requireUser } from '@/features/auth/loaders'
 import { teamPinsQuery, teamViewsQuery } from '@/features/issues/viewsApi'
 import { notificationsQuery, unreadCountsQuery } from '@/features/messaging/api'
 import { availableCollections, pickCollection, readCollectionView } from '@/features/collections/view'
-import { myWorkspaceRolesQuery, teamContentsQuery, teamWorkspacesQuery, workspaceQuery } from '@/features/workspaces/api'
+import { myWorkspaceRolesQuery, teamContentsQuery, teamWorkspacesQuery, workspaceMembersQuery, workspaceQuery } from '@/features/workspaces/api'
 import { readRecentVisits } from '@/features/workspaces/recent'
 import { queryClient } from '@/lib/query-client'
-import { myTeamsQuery } from './api'
+import { invitesQuery, myTeamsQuery, teamMembersQuery } from './api'
 import { lastTeam, rememberTeam } from './last-team'
 import { landingPath, startPath } from './landing'
 
@@ -68,6 +68,8 @@ export async function teamLoader({ request, params }: LoaderFunctionArgs) {
 /** /t/:teamSlug/w/:workspaceId: visible to team owners/admins and workspace members (RLS). */
 export async function workspaceLoader({ request, params }: LoaderFunctionArgs) {
   const user = await requireUser(request)
+  // The header's people (most tabs read them too) start beside the workspace, not after the layout renders.
+  void queryClient.prefetchQuery(workspaceMembersQuery(params.workspaceId ?? ''))
   const [memberships, workspace] = await Promise.all([
     queryClient.ensureQueryData(myTeamsQuery(user.id)),
     queryClient.ensureQueryData(workspaceQuery(params.workspaceId ?? '')),
@@ -76,6 +78,18 @@ export async function workspaceLoader({ request, params }: LoaderFunctionArgs) {
   if (!workspace || !team || workspace.team_id !== team.id) {
     throw data('Workspace not found, or you don’t have access to it.', { status: 404 })
   }
+  return null
+}
+
+/** /t/:teamSlug/members: the people and (for owners/admins) the invite codes, side by side. */
+export async function teamMembersLoader({ request, params }: LoaderFunctionArgs) {
+  const user = await requireUser(request)
+  const memberships = await queryClient.ensureQueryData(myTeamsQuery(user.id))
+  const membership = memberships.find((m) => m.team.slug === params.teamSlug)
+  if (!membership) return null
+  const isAdmin = membership.role === 'owner' || membership.role === 'admin'
+  void queryClient.prefetchQuery(teamMembersQuery(membership.team.id))
+  if (isAdmin) void queryClient.prefetchQuery(invitesQuery(membership.team.id))
   return null
 }
 

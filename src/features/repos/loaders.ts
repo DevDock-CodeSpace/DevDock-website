@@ -2,7 +2,32 @@ import { redirect, type LoaderFunctionArgs } from 'react-router'
 import { requireUser } from '@/features/auth/loaders'
 import { errorMessage } from '@/lib/errors'
 import { queryClient } from '@/lib/query-client'
-import { connectGitHub, repoKeys } from './api'
+import { workspaceIssuesQuery } from '@/features/issues/api'
+import { myTeamsQuery } from '@/features/teams/api'
+import { workspaceQuery } from '@/features/workspaces/api'
+import { connectGitHub, githubInstallationsQuery, repoKeys, teamReposQuery, workspaceReposQuery } from './api'
+
+/**
+ * …/w/:workspaceId/github: the project's repos, the group's, the GitHub install and (with the Issues tool)
+ * the issues for the counts, all at once. They used to start one after another as the page rendered.
+ */
+export async function githubTabLoader({ request, params }: LoaderFunctionArgs) {
+  const user = await requireUser(request)
+  const workspaceId = params.workspaceId ?? ''
+  void queryClient.prefetchQuery(workspaceReposQuery(workspaceId))
+  // The group from the URL (cached memberships), so these don't wait for the workspace row.
+  void queryClient.ensureQueryData(myTeamsQuery(user.id)).then((memberships) => {
+    const team = memberships.find((m) => m.team.slug === params.teamSlug)?.team
+    if (!team) return
+    void queryClient.prefetchQuery(teamReposQuery(team.id))
+    void queryClient.prefetchQuery(githubInstallationsQuery(team.id))
+  }, () => {}) // a failure shows on the page, which reads the same queries
+  // The open-issue counts, only with the Issues tool (that needs the workspace row).
+  void queryClient.ensureQueryData(workspaceQuery(workspaceId)).then((workspace) => {
+    if (workspace?.modules.includes('issues')) void queryClient.prefetchQuery(workspaceIssuesQuery(workspaceId))
+  }, () => {})
+  return null
+}
 
 /** What /github/callback shows when it doesn't redirect straight back to Group settings. */
 export type GitHubCallbackResult =
