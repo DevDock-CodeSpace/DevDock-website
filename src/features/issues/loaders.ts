@@ -3,7 +3,8 @@ import { requireUser } from '@/features/auth/loaders'
 import { queryClient } from '@/lib/query-client'
 import { teamPlansQuery } from '@/features/plans/api'
 import { workspaceReposQuery } from '@/features/repos/api'
-import { workspaceMembersQuery, workspaceQuery } from '@/features/workspaces/api'
+import { myTeamsQuery } from '@/features/teams/api'
+import { workspaceMembersQuery } from '@/features/workspaces/api'
 import {
   activityQuery,
   commentsQuery,
@@ -54,23 +55,25 @@ export async function cycleLoader({ request, params }: LoaderFunctionArgs) {
 /**
  * …/w/:workspaceId/issues/*: starts everything the Issues pages need at once, so the page doesn't discover
  * its data one request at a time. All of these are independent, so they run in parallel with each other
- * (and with the child route's own loader). A single issue's page doesn't need the whole list, so it's skipped there.
+ * (and with the child route's own loader). A single issue's page reads the whole list too (sub-issues,
+ * the parent picker, activity), so it's loaded there as well: skipping it only made it a later round.
  * Failures are left to the page, which shows them where they belong.
  */
 export async function issuesLoader({ request, params }: LoaderFunctionArgs) {
-  await requireUser(request)
+  const user = await requireUser(request)
   const workspaceId = params.workspaceId ?? ''
-  const workspace = await queryClient.ensureQueryData(workspaceQuery(workspaceId))
-  if (!workspace?.modules.includes('issues')) return null
-  const onIssuePage = /\/issues\/\d+\/?$/.test(new URL(request.url).pathname)
-  await Promise.all([
+  // These start at once, not after the workspace row: it only told us the group (the URL does, through the
+  // cached memberships) and whether Issues is on (WorkspaceToolGate 404s otherwise, the one case they're wasted).
+  const workspaceReads = [
     queryClient.prefetchQuery(workspaceMembersQuery(workspaceId)),
     queryClient.prefetchQuery(labelsQuery(workspaceId)),
     queryClient.prefetchQuery(cyclesQuery(workspaceId)),
     queryClient.prefetchQuery(workspaceReposQuery(workspaceId)),
-    queryClient.prefetchQuery(teamPlansQuery(workspace.team_id)),
     queryClient.prefetchQuery(workspaceViewsQuery(workspaceId)),
-    ...(onIssuePage ? [] : [queryClient.prefetchQuery(workspaceIssuesQuery(workspaceId))]),
-  ])
+    queryClient.prefetchQuery(workspaceIssuesQuery(workspaceId)),
+  ]
+  const memberships = await queryClient.ensureQueryData(myTeamsQuery(user.id))
+  const team = memberships.find((m) => m.team.slug === params.teamSlug)?.team
+  await Promise.all([...workspaceReads, ...(team ? [queryClient.prefetchQuery(teamPlansQuery(team.id))] : [])])
   return null
 }

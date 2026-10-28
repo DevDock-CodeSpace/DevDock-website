@@ -1,4 +1,4 @@
-import { useSuspenseQuery } from '@tanstack/react-query'
+import { useSuspenseQueries } from '@tanstack/react-query'
 import { ArrowLeft } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
@@ -20,8 +20,9 @@ import { cn } from '@/lib/utils'
 export function LearningProgressPage() {
   const { team } = useCurrentTeam()
   const { workspace, outline, ordered, canManage } = useLearning()
-  const members = useSuspenseQuery(workspaceMembersQuery(workspace.id)).data
-  const progress = useSuspenseQuery(allProgressQuery(workspace.id)).data
+  const [{ data: members }, { data: progress }] = useSuspenseQueries({
+    queries: [workspaceMembersQuery(workspace.id), allProgressQuery(workspace.id)],
+  })
   const [now] = useState(Date.now)
 
   if (!canManage) {

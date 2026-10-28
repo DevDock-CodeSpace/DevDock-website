@@ -1,4 +1,4 @@
-import { useQuery, useSuspenseQuery } from '@tanstack/react-query'
+import { useQuery, useSuspenseQueries } from '@tanstack/react-query'
 import { ExternalLink, FolderGit2, MoreHorizontal } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
@@ -33,9 +33,10 @@ import { errorMessage } from '@/lib/errors'
 export function WorkspaceGitHubPage() {
   const { team, can: teamCan } = useCurrentTeam()
   const { workspace, can } = useCurrentWorkspace()
-  const repos = useSuspenseQuery(workspaceReposQuery(workspace.id)).data
-  const teamRepos = useSuspenseQuery(teamReposQuery(team.id)).data
-  const installations = useSuspenseQuery(githubInstallationsQuery(team.id)).data
+  // One batch (githubTabLoader starts them with the workspace): in a row, each waited for the one before.
+  const [{ data: repos }, { data: teamRepos }, { data: installations }] = useSuspenseQueries({
+    queries: [workspaceReposQuery(workspace.id), teamReposQuery(team.id), githubInstallationsQuery(team.id)],
+  })
   const hasIssues = workspace.modules.includes('issues')
   // Open-issue counts, only when the Issues tool is on here.
   const issues = useQuery({ ...workspaceIssuesQuery(workspace.id), enabled: hasIssues }).data ?? []

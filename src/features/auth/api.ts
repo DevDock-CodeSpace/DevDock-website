@@ -35,22 +35,27 @@ export function rememberedChoice(): boolean {
   return authStorage().remembered()
 }
 
+/** The sign-in providers on /login. `azure` is Supabase's name for Microsoft (work, school and personal accounts). */
+export type SignInProvider = 'google' | 'azure'
+
 /**
- * Starts the Google OAuth redirect. Resolves just before the browser leaves the page.
+ * Starts the OAuth redirect to Google or Microsoft. Resolves just before the browser leaves the page.
  * `remember` decides where the session will be kept (lib/auth-storage); it is set
  * before the redirect because the PKCE verifier is stored the same way.
  */
-export async function signInWithGoogle(next: string, remember: boolean): Promise<void> {
-  await assertGoogleProviderEnabled()
+export async function signInWithProvider(provider: SignInProvider, next: string, remember: boolean): Promise<void> {
+  await assertProviderEnabled(provider)
   rememberNextPath(next)
   authStorage().setRemembered(remember)
 
   const { error } = await supabase.auth.signInWithOAuth({
-    provider: 'google',
+    provider,
     options: {
       // Fixed callback URL (must be in Supabase's Redirect URLs allow list);
       // the post-login destination travels in sessionStorage instead.
       redirectTo: `${window.location.origin}${AUTH_CALLBACK_PATH}`,
+      // Microsoft sends the email only when asked for it; DevDock matches people by email.
+      ...(provider === 'azure' ? { scopes: 'openid email profile' } : {}),
       queryParams: { prompt: 'select_account' },
     },
   })
@@ -170,11 +175,11 @@ export const profileQuery = (userId: string) =>
   })
 
 /**
- * If the Google provider is disabled, Supabase answers the OAuth redirect with a
+ * If a provider is disabled, Supabase answers the OAuth redirect with a
  * raw JSON error page. Check the public auth settings first so we can show a
  * readable message instead.
  */
-async function assertGoogleProviderEnabled(): Promise<void> {
+async function assertProviderEnabled(provider: SignInProvider): Promise<void> {
   let settings: unknown
   try {
     const response = await fetch(`${supabaseUrl}/auth/v1/settings`, {
@@ -191,7 +196,7 @@ async function assertGoogleProviderEnabled(): Promise<void> {
     typeof settings === 'object' && settings !== null && 'external' in settings
       ? settings.external
       : null
-  const googleEnabled =
-    typeof external === 'object' && external !== null && 'google' in external && external.google === true
-  if (!googleEnabled) throw new AuthFlowError('not-configured')
+  const enabled =
+    typeof external === 'object' && external !== null && provider in external && (external as Record<string, unknown>)[provider] === true
+  if (!enabled) throw new AuthFlowError('not-configured')
 }

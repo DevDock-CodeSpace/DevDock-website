@@ -30,16 +30,16 @@ export function PrivacyPage() {
           small group of students. This page explains what DevDock stores about you and why.
         </p>
 
-        <Section title="What we get when you sign in with Google">
-          <p>When you sign in with Google, DevDock receives and stores:</p>
+        <Section title="What we get when you sign in with Google or Microsoft">
+          <p>When you sign in with Google or Microsoft, DevDock receives and stores:</p>
           <ul>
             <li>your name,</li>
             <li>your email address,</li>
-            <li>a link to your Google profile photo, shown as your avatar to people in your group.</li>
+            <li>a link to your Google profile photo (Microsoft doesn’t share one), shown as your avatar to people in your group.</li>
           </ul>
           <p>
-            DevDock never sees your Google password and has no access to your Gmail, Drive, Calendar or anything else in
-            your Google account.
+            DevDock never sees your Google or Microsoft password and has no access to your email, files, calendar or
+            anything else in those accounts.
           </p>
         </Section>
 
@@ -127,6 +127,9 @@ export function PrivacyPage() {
             <li>
               <strong>Google</strong>: the “Sign in with Google” step, and the AI model behind Ask DevDock when you use
               it;
+            </li>
+            <li>
+              <strong>Microsoft</strong>: the “Continue with Microsoft” step, if you use it;
             </li>
             <li>
               <strong>GitHub</strong>: only if your group connects it, for the repositories it was given access to.

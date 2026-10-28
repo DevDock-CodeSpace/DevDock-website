@@ -2,8 +2,23 @@ import { data, type LoaderFunctionArgs } from 'react-router'
 import { requireUser } from '@/features/auth/loaders'
 import { queryClient } from '@/lib/query-client'
 import { documentQuery } from '@/features/docs/api'
-import { lessonQuery } from './api'
+import { allProgressQuery, lessonQuery, lessonsQuery, modulesQuery, myProgressQuery } from './api'
 import { lessonView } from './screens'
+
+/**
+ * …/w/:workspaceId/learning/*: the outline and your progress start with the workspace (useLearning reads
+ * them on every Learning page, lessons included), and Class progress adds everyone's. They used to start
+ * one after another as each rendered.
+ */
+export async function learningLoader({ request, params }: LoaderFunctionArgs) {
+  const user = await requireUser(request)
+  const workspaceId = params.workspaceId ?? ''
+  void queryClient.prefetchQuery(modulesQuery(workspaceId))
+  void queryClient.prefetchQuery(lessonsQuery(workspaceId))
+  void queryClient.prefetchQuery(myProgressQuery(workspaceId, user.id))
+  if (new URL(request.url).pathname.endsWith('/learning/progress')) void queryClient.prefetchQuery(allProgressQuery(workspaceId))
+  return null
+}
 
 /** …/w/:workspaceId/learning/:lessonId: 404 unless the lesson exists in this workspace (RLS hides others). */
 export async function lessonLoader({ request, params }: LoaderFunctionArgs) {
