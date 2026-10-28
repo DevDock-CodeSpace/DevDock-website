@@ -11,6 +11,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useAuth } from '@/features/auth/hooks'
+import { useFeature } from '@/features/flags/hooks'
+import { NinetySection } from '@/features/ninety/components/NinetySection'
 import { TeamReposSection } from '@/features/repos/components/TeamReposSection'
 import {
   deleteTeam,
@@ -28,6 +30,7 @@ import { errorMessage } from '@/lib/errors'
 
 export function TeamSettingsPage() {
   const { team, role, can } = useCurrentTeam()
+  const ninety = useFeature('ninety_sync')
 
   return (
     <>
@@ -37,6 +40,8 @@ export function TeamSettingsPage() {
         <BrandingSection />
         {can.canManageWorkspaces && <CollectionsSection />}
         <TeamReposSection />
+        {/* A feature flag per group (/admin/flags); owners and admins connect it. */}
+        {ninety && can.isAdmin && <NinetySection />}
         {(can.canLeave || can.canDelete) && <DangerSection />}
       </div>
     </>

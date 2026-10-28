@@ -401,3 +401,8 @@ verify_jwt = false
 # (auth.getUser), then runs every tool as that caller under RLS.
 [functions.ai-agent]
 verify_jwt = false
+
+# Ninety (EOS) sync. People's calls are checked by the function itself (auth.getUser, group admin,
+# the ninety_sync flag); pg_cron's call carries a Vault secret (x-ninety-cron) instead of a JWT.
+[functions.ninety-sync]
+verify_jwt = false

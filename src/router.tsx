@@ -147,6 +147,9 @@ export const router = createBrowserRouter([
                   { path: 'settings', loader: hubSettingsLoader, lazy: async () => ({ Component: (await import('@/routes/team/HubSettingsPage')).HubSettingsPage }) },
                 ],
               },
+              // Group → Ninety (ninety_sync flag; the page 404s without it): what's in Ninety now. No loader: one
+              // regrouped the build (+1 KB first load); the page asks for its data as it renders.
+              { path: 'ninety', lazy: async () => ({ Component: (await import('@/routes/team/NinetyPage')).NinetyPage }) },
               // Group → Live: video sessions (Jitsi via JaaS) for the group and its workspaces.
               // The calendar (the default view) loads with the page, so it renders without waiting on its code.
               { path: 'live', loader: () => meetingCalendar.preload().then(() => null), element: <TeamLivePage /> },

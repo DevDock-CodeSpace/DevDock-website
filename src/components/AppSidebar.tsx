@@ -1,5 +1,5 @@
 import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
-import { ChevronRight, Plus, Star } from 'lucide-react'
+import { ChevronRight, Plus, Star, Target } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { Link, matchPath, useLocation, useParams } from 'react-router'
 import { TruncatedText } from '@/components/TruncatedText'
@@ -28,6 +28,7 @@ import { useUnread } from '@/features/messaging/hooks'
 import { UserMenu } from '@/features/auth/components/UserMenu'
 import { TeamSwitcher } from '@/features/teams/components/TeamSwitcher'
 import { useCurrentTeam } from '@/features/teams/hooks'
+import { useFeature } from '@/features/flags/hooks'
 import { getTeamNav, hasTeamIssues, isNavActive, teamPath, workspacePath, type NavItem } from '@/features/teams/nav'
 import { collectionTypeOrder, workspaceTypeOrder, workspaceTypes } from '@/features/teams/permissions'
 import { useCollectionView } from '@/features/collections/hooks'
@@ -62,6 +63,9 @@ export function AppSidebar({ sidebarWidth }: { sidebarWidth: SidebarWidth }) {
   // Inside a collection its own type and contents decide whether Issues shows, not the group's.
   const nav = getTeamNav(team.slug, hasTeamIssues(collection?.type ?? team.type, workspaces))
   const unreadMessages = useUnread(team.id).total
+  // EOS (the Ninety sync; the UI says EOS, code and URL say ninety) is a feature flag per group (/admin/flags). No hover prefetch for it: the dynamic imports
+  // that needs regrouped the build (+1 KB first load), and the page waits on Ninety (~2 s) anyway.
+  const ninety = useFeature('ninety_sync')
   // One section per workspace type that has items; the collection's type (else the group's) decides
   // which comes first.
   const base = teamPath(team.slug)
@@ -117,6 +121,7 @@ export function AppSidebar({ sidebarWidth }: { sidebarWidth: SidebarWidth }) {
             {nav.tools.map((item) => (
               <NavLinkItem key={item.id} item={item} onNavigate={close} onIntent={item.id === 'issues' ? prefetchIssues : undefined} />
             ))}
+            {ninety && <NavLinkItem item={{ title: 'EOS', to: `${base}/ninety`, icon: Target }} onNavigate={close} />}
           </SidebarMenu>
         </SidebarGroup>
 

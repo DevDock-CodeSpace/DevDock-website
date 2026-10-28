@@ -2052,6 +2052,294 @@ export type Database = {
           },
         ]
       }
+      ninety_config: {
+        Row: {
+          cron_secret_id: string
+          function_url: string | null
+          id: boolean
+        }
+        Insert: {
+          cron_secret_id: string
+          function_url?: string | null
+          id?: boolean
+        }
+        Update: {
+          cron_secret_id?: string
+          function_url?: string | null
+          id?: boolean
+        }
+        Relationships: []
+      }
+      ninety_connections: {
+        Row: {
+          app_url: string
+          connected_at: string
+          connected_by: string | null
+          last_error: string | null
+          last_error_at: string | null
+          last_sync_at: string | null
+          ninety_company_id: string | null
+          ninety_owner_id: string | null
+          ninety_owner_name: string | null
+          rocks_ninety_team_id: string | null
+          rocks_ninety_team_name: string | null
+          team_id: string
+          token_hint: string
+          token_secret_id: string
+        }
+        Insert: {
+          app_url: string
+          connected_at?: string
+          connected_by?: string | null
+          last_error?: string | null
+          last_error_at?: string | null
+          last_sync_at?: string | null
+          ninety_company_id?: string | null
+          ninety_owner_id?: string | null
+          ninety_owner_name?: string | null
+          rocks_ninety_team_id?: string | null
+          rocks_ninety_team_name?: string | null
+          team_id: string
+          token_hint: string
+          token_secret_id: string
+        }
+        Update: {
+          app_url?: string
+          connected_at?: string
+          connected_by?: string | null
+          last_error?: string | null
+          last_error_at?: string | null
+          last_sync_at?: string | null
+          ninety_company_id?: string | null
+          ninety_owner_id?: string | null
+          ninety_owner_name?: string | null
+          rocks_ninety_team_id?: string | null
+          rocks_ninety_team_name?: string | null
+          team_id?: string
+          token_hint?: string
+          token_secret_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ninety_connections_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: true
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ninety_links: {
+        Row: {
+          completed: boolean
+          issue_id: string
+          linked_rock_id: string | null
+          ninety_todo_id: string
+          sent_hash: string
+          synced_at: string
+          team_id: string
+        }
+        Insert: {
+          completed?: boolean
+          issue_id: string
+          linked_rock_id?: string | null
+          ninety_todo_id: string
+          sent_hash: string
+          synced_at?: string
+          team_id: string
+        }
+        Update: {
+          completed?: boolean
+          issue_id?: string
+          linked_rock_id?: string | null
+          ninety_todo_id?: string
+          sent_hash?: string
+          synced_at?: string
+          team_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ninety_links_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ninety_milestone_links: {
+        Row: {
+          issue_id: string
+          ninety_milestone_id: string
+          ninety_rock_id: string
+          removed: boolean
+          sent_hash: string
+          synced_at: string
+          team_id: string
+        }
+        Insert: {
+          issue_id: string
+          ninety_milestone_id: string
+          ninety_rock_id: string
+          removed?: boolean
+          sent_hash: string
+          synced_at?: string
+          team_id: string
+        }
+        Update: {
+          issue_id?: string
+          ninety_milestone_id?: string
+          ninety_rock_id?: string
+          removed?: boolean
+          sent_hash?: string
+          synced_at?: string
+          team_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ninety_milestone_links_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ninety_outbox: {
+        Row: {
+          attempts: number
+          issue_id: string
+          last_error: string | null
+          queued_at: string
+          team_id: string
+        }
+        Insert: {
+          attempts?: number
+          issue_id: string
+          last_error?: string | null
+          queued_at?: string
+          team_id: string
+        }
+        Update: {
+          attempts?: number
+          issue_id?: string
+          last_error?: string | null
+          queued_at?: string
+          team_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ninety_outbox_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ninety_plan_outbox: {
+        Row: {
+          attempts: number
+          last_error: string | null
+          plan_id: string
+          queued_at: string
+          team_id: string
+        }
+        Insert: {
+          attempts?: number
+          last_error?: string | null
+          plan_id: string
+          queued_at?: string
+          team_id: string
+        }
+        Update: {
+          attempts?: number
+          last_error?: string | null
+          plan_id?: string
+          queued_at?: string
+          team_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ninety_plan_outbox_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ninety_rock_links: {
+        Row: {
+          ninety_rock_id: string
+          plan_id: string
+          sent_hash: string
+          synced_at: string
+          team_id: string
+        }
+        Insert: {
+          ninety_rock_id: string
+          plan_id: string
+          sent_hash: string
+          synced_at?: string
+          team_id: string
+        }
+        Update: {
+          ninety_rock_id?: string
+          plan_id?: string
+          sent_hash?: string
+          synced_at?: string
+          team_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ninety_rock_links_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ninety_workspace_teams: {
+        Row: {
+          ninety_team_id: string
+          ninety_team_name: string
+          team_id: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          ninety_team_id: string
+          ninety_team_name: string
+          team_id: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          ninety_team_id?: string
+          ninety_team_name?: string
+          team_id?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ninety_workspace_teams_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ninety_workspace_teams_workspace_id_team_id_fkey"
+            columns: ["workspace_id", "team_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id", "team_id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           conversation_id: string | null
@@ -3121,6 +3409,53 @@ export type Database = {
         Args: { p_from: string; p_to: string }
         Returns: number
       }
+      ninety_cron_secret: { Args: never; Returns: string }
+      ninety_disconnect: { Args: { p_team: string }; Returns: undefined }
+      ninety_member_emails: {
+        Args: { p_team: string }
+        Returns: {
+          display_name: string
+          email: string
+          user_id: string
+        }[]
+      }
+      ninety_queue_plan_issues: {
+        Args: { p_plan: string; p_team: string }
+        Returns: undefined
+      }
+      ninety_queue_team_now: { Args: { p_team: string }; Returns: number }
+      ninety_save_connection: {
+        Args: {
+          p_app_url: string
+          p_company_id: string
+          p_connected_by: string
+          p_function_url: string
+          p_owner_id: string
+          p_owner_name: string
+          p_team: string
+          p_token: string
+        }
+        Returns: undefined
+      }
+      ninety_set_rocks_team: {
+        Args: {
+          p_ninety_team_id: string
+          p_ninety_team_name: string
+          p_team: string
+        }
+        Returns: undefined
+      }
+      ninety_set_workspace_team: {
+        Args: {
+          p_ninety_team_id: string
+          p_ninety_team_name: string
+          p_workspace: string
+        }
+        Returns: undefined
+      }
+      ninety_status: { Args: { p_team: string }; Returns: Json }
+      ninety_team_active: { Args: { p_team: string }; Returns: boolean }
+      ninety_token: { Args: { p_team: string }; Returns: string }
       plan_files: {
         Args: { p_plan_id: string }
         Returns: {

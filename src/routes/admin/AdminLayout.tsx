@@ -38,7 +38,7 @@ export function AdminLayout() {
             </Button>
           </div>
         </div>
-        <nav aria-label="Admin" className="flex gap-1 overflow-x-auto px-2 sm:px-4">
+        <nav aria-label="Admin" className="flex gap-1 overflow-x-auto overflow-y-hidden px-2 sm:px-4">
           {NAV.map((item) => (
             <NavLink
               key={item.to}
@@ -46,7 +46,7 @@ export function AdminLayout() {
               end={item.end}
               className={({ isActive }) =>
                 cn(
-                  '-mb-px shrink-0 border-b-2 px-2.5 py-2 text-sm transition-colors',
+                  'shrink-0 border-b-2 px-2.5 py-2 text-sm transition-colors',
                   isActive ? 'border-brand font-medium text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground',
                 )
               }
