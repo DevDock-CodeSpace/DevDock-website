@@ -1,6 +1,7 @@
 import { createBrowserRouter, Outlet, redirect } from 'react-router'
 import { AuthLoading } from '@/features/auth/components/AuthLoading'
 import { InactivityGuard } from '@/features/auth/components/InactivityGuard'
+import { adminFlagsLoader, adminGroupsLoader, adminLoader, adminOverviewLoader, adminUsersLoader } from '@/features/admin/loaders'
 import { authCallbackLoader, loginLoader } from '@/features/auth/loaders'
 import { watchAuthIdentity } from '@/features/auth/session'
 import { diagramLoader } from '@/features/diagrams/loaders'
@@ -85,6 +86,20 @@ export const router = createBrowserRouter([
       // Redirects to the last/first team, or /onboarding when there are none.
       { path: 'app', loader: appIndexLoader, element: <AuthLoading /> },
       { path: 'onboarding', loader: onboardingLoader, element: <OnboardingPage /> },
+      {
+        // The platform admin console: counts, names and feature flags, outside every group. 404 for
+        // anyone who isn't a platform admin (adminLoader); every read is checked again by the database.
+        path: 'admin',
+        loader: adminLoader,
+        lazy: async () => ({ Component: (await import('@/routes/admin')).AdminLayout }),
+        errorElement: <RouteErrorPage />,
+        children: [
+          { index: true, loader: adminOverviewLoader, lazy: async () => ({ Component: (await import('@/routes/admin')).AdminOverviewPage }) },
+          { path: 'groups', loader: adminGroupsLoader, lazy: async () => ({ Component: (await import('@/routes/admin')).AdminGroupsPage }) },
+          { path: 'users', loader: adminUsersLoader, lazy: async () => ({ Component: (await import('@/routes/admin')).AdminUsersPage }) },
+          { path: 'flags', loader: adminFlagsLoader, lazy: async () => ({ Component: (await import('@/routes/admin')).AdminFlagsPage }) },
+        ],
+      },
       // Back from installing the DevDock GitHub App (verified by the github Edge Function).
       {
         path: 'github/callback',

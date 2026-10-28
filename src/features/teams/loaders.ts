@@ -1,4 +1,5 @@
 import { data, redirect, type LoaderFunctionArgs } from 'react-router'
+import { amPlatformAdminQuery } from '@/features/admin/api'
 import { requireUser } from '@/features/auth/loaders'
 import { teamPinsQuery, teamViewsQuery } from '@/features/issues/viewsApi'
 import { notificationsQuery, unreadCountsQuery } from '@/features/messaging/api'
@@ -10,20 +11,33 @@ import { myTeamsQuery } from './api'
 import { lastTeam, rememberTeam } from './last-team'
 import { landingPath, startPath } from './landing'
 
-/** /app: send the user to onboarding (no teams) or where their last/first team opens (`teamStartLoader`). */
+/**
+ * /app: send the user where their last/first team opens (`teamStartLoader`); with no team, the platform
+ * admin to its console and everyone else to onboarding. Only people without a group pay for the check.
+ */
 export async function appIndexLoader({ request }: LoaderFunctionArgs) {
   const user = await requireUser(request)
   const memberships = await queryClient.fetchQuery(myTeamsQuery(user.id))
-  if (memberships.length === 0) throw redirect('/onboarding')
+  if (memberships.length === 0) {
+    const isAdmin = await queryClient.fetchQuery(amPlatformAdminQuery(user.id))
+    throw redirect(isAdmin ? '/admin' : '/onboarding')
+  }
   const last = lastTeam()
   const target = memberships.find((m) => m.team.slug === last) ?? memberships[0]
   throw redirect(startPath(target.team.slug))
 }
 
-/** /onboarding: open to everyone signed in (new users, and existing users adding a team). */
+/**
+ * /onboarding: open to everyone signed in (new users, and existing users adding a team), except the
+ * platform admin, which belongs to no group and goes to its console.
+ */
 export async function onboardingLoader({ request }: LoaderFunctionArgs) {
   const user = await requireUser(request)
-  await queryClient.ensureQueryData(myTeamsQuery(user.id))
+  const [, isAdmin] = await Promise.all([
+    queryClient.ensureQueryData(myTeamsQuery(user.id)),
+    queryClient.ensureQueryData(amPlatformAdminQuery(user.id)),
+  ])
+  if (isAdmin) throw redirect('/admin')
   return null
 }
 

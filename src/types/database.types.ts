@@ -618,6 +618,30 @@ export type Database = {
           },
         ]
       }
+      feature_flags: {
+        Row: {
+          created_at: string
+          default_enabled: boolean
+          description: string
+          key: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          default_enabled?: boolean
+          description: string
+          key: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          default_enabled?: boolean
+          description?: string
+          key?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       file_shares: {
         Row: {
           created_at: string
@@ -2197,6 +2221,21 @@ export type Database = {
           },
         ]
       }
+      platform_admins: {
+        Row: {
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -2349,6 +2388,45 @@ export type Database = {
           },
           {
             foreignKeyName: "repos_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      team_feature_flags: {
+        Row: {
+          enabled: boolean
+          flag: string
+          team_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          enabled: boolean
+          flag: string
+          team_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          enabled?: boolean
+          flag?: string
+          team_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_feature_flags_flag_fkey"
+            columns: ["flag"]
+            isOneToOne: false
+            referencedRelation: "feature_flags"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "team_feature_flags_team_id_fkey"
             columns: ["team_id"]
             isOneToOne: false
             referencedRelation: "teams"
@@ -2823,6 +2901,54 @@ export type Database = {
         }
         Returns: string
       }
+      admin_feature_flags: {
+        Args: never
+        Returns: {
+          default_enabled: boolean
+          description: string
+          key: string
+          overrides: Json
+          updated_at: string
+        }[]
+      }
+      admin_groups: {
+        Args: never
+        Returns: {
+          created_at: string
+          enabled_features: string[]
+          id: string
+          last_activity: string
+          member_count: number
+          name: string
+          owner_email: string
+          owner_name: string
+          slug: string
+          type: Database["public"]["Enums"]["team_type"]
+          workspace_count: number
+        }[]
+      }
+      admin_overview: { Args: never; Returns: Json }
+      admin_set_flag_default: {
+        Args: { p_enabled: boolean; p_key: string }
+        Returns: undefined
+      }
+      admin_set_team_flag: {
+        Args: { p_enabled: boolean; p_key: string; p_team: string }
+        Returns: undefined
+      }
+      admin_users: {
+        Args: never
+        Returns: {
+          created_at: string
+          display_name: string
+          email: string
+          groups: Json
+          id: string
+          is_platform_admin: boolean
+          last_sign_in_at: string
+        }[]
+      }
+      am_platform_admin: { Args: never; Returns: boolean }
       brief_excerpt: {
         Args: { p: Database["public"]["Tables"]["plans"]["Row"] }
         Returns: string
@@ -2901,6 +3027,10 @@ export type Database = {
       edit_message: {
         Args: { p_body: Json; p_content: string; p_message_id: string }
         Returns: undefined
+      }
+      enabled_features: {
+        Args: { t: Database["public"]["Tables"]["teams"]["Row"] }
+        Returns: string[]
       }
       ensure_general_channel: { Args: { p_team_id: string }; Returns: string }
       find_existing_group: {

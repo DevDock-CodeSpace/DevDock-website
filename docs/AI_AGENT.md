@@ -118,8 +118,10 @@ Edge Function secrets (`supabase secrets set NAME=value`):
 | `AI_PROVIDER` | optional; `gemini` is the only entry in `providers/index.ts` today |
 | `AI_ENABLED` | `false` switches the function off without removing anything |
 
-Browser: nothing to configure. The header button is always shown; `AI_ENABLED=false` on the function is the off
-switch (the panel then says the assistant is switched off).
+Per group: Ask DevDock is the `ask_devdock` feature flag (since 2026-10-27), switched by the platform admin at
+`/admin/flags`. Without it the header button is hidden and the function answers 403 `not_enabled` (`buildContext`
+reads `teams.enabled_features` in the membership query it already makes). `AI_ENABLED=false` on the function is
+the off switch for everyone (the panel then says the assistant is switched off).
 
 Moving from the free tier to a paid key is a change of `GEMINI_API_KEY` only. Moving to another model family is a
 new file in `providers/` and one entry in `providers/index.ts`.

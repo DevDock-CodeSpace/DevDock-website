@@ -13,8 +13,9 @@ const AskDevDockPanel = panel.Component
 const isMac = typeof navigator !== 'undefined' && /mac|iphone|ipad/i.test(navigator.platform)
 
 /**
- * The header's Ask DevDock button (⌘K / Ctrl+K). Always shown: there is no build-time switch. To turn
- * the assistant off, set the function's AI_ENABLED secret to "false"; the panel then says so.
+ * The header's Ask DevDock button (⌘K / Ctrl+K). Shown only in groups with the ask_devdock feature flag
+ * (AppLayout; the platform admin switches it per group). To turn the assistant off everywhere, set the
+ * function's AI_ENABLED secret to "false"; the panel then says so.
  */
 export function AskDevDockButton() {
   const { team } = useCurrentTeam()
