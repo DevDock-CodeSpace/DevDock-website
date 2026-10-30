@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { errorMessage } from '@/lib/errors'
 import { createInvite, invitesQuery, revokeInvite, type Invite } from '../api'
 import { useCurrentTeam } from '../hooks'
+import { EmailInvitesDialog } from './EmailInvitesDialog'
 
 const dateFormat = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 
@@ -46,7 +47,10 @@ export function InvitesPanel() {
             Anyone with a valid code can join as a <strong className="font-medium">member</strong>. Share it privately.
           </p>
         </div>
-        <CreateInviteDialog />
+        <div className="flex shrink-0 gap-2">
+          <EmailInvitesDialog />
+          <CreateInviteDialog />
+        </div>
       </div>
 
       {invites.length === 0 ? (

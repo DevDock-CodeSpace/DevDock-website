@@ -1,6 +1,6 @@
 # Calsko: project status
 
-_Last updated: 2026-10-29. The full phase-by-phase history is in git (`git log -- docs/STATUS.md`)._
+_Last updated: 2026-10-30. The full phase-by-phase history is in git (`git log -- docs/STATUS.md`)._
 
 ## Where things stand
 
@@ -22,6 +22,7 @@ unless it says otherwise. Conventions live in [CLAUDE.md](../CLAUDE.md); setup i
 | Platform admin console, per-group feature flags | Built |
 | Feedback button, read in the admin console | On `dev`, not yet on `prod` |
 | Calsko name, logo, favicons, whirl spinner | On `dev`, not yet on `prod` |
+| Invite emails: Members → Email invites, a single-use code per address, sent with Resend (`invite-email`) | Branch `feat/invite-emails` |
 
 ## Next
 
@@ -43,4 +44,9 @@ unless it says otherwise. Conventions live in [CLAUDE.md](../CLAUDE.md); setup i
 ## Environments
 
 Live Supabase `ejqrrxxiatvvdiyxtvid`, Dev `aktqcsncvbmkbleghipb` (see [DEV_ENVIRONMENT.md](DEV_ENVIRONMENT.md)). GitHub repo
-`DevDock-CodeSpace/calsko-website`. Request counts are tested from the private `DevDock-request-tests` repo after each `prod` push.
+`DevDock-CodeSpace/calsko-website`.
+
+Email: calsko.com sends through **Resend** (DKIM/SPF on the `send` subdomain, verified) and receives through **ImprovMX**
+(root MX; the `support@` alias forwards to the owner, and more recipients are added in ImprovMX). DMARC is `p=none`. App
+email goes out from `invites@calsko.com` with Reply-To `support@calsko.com`. Function secrets: `RESEND_API_KEY` (both
+projects), optional `INVITE_FROM` and `EMAIL_REPLY_TO`. Request counts are tested from the private `DevDock-request-tests` repo after each `prod` push.

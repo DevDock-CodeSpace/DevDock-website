@@ -1,3 +1,4 @@
+import { FunctionsHttpError } from '@supabase/supabase-js'
 import { queryOptions } from '@tanstack/react-query'
 import { DataError, requireAffected, toDataError } from '@/lib/errors'
 import { SETTLED_STALE_MS } from '@/lib/query-client'
@@ -203,4 +204,33 @@ export async function revokeInvite(inviteId: string) {
   const { data, error } = await supabase.from('team_invites').delete().eq('id', inviteId).select('id')
   if (error) throw toDataError('revoke the invite', error)
   requireAffected(data, 'revoke invite')
+}
+
+const inviteEmailErrors: Record<string, string> = {
+  bad_email: 'One of those email addresses doesn’t look right.',
+  bad_request: 'Enter between 1 and 20 email addresses.',
+  forbidden: 'Only group owners and admins can send invites.',
+  not_configured: 'Email isn’t set up yet. Share an invite code instead.',
+  send_failed: 'The emails couldn’t be sent. Please try again.',
+}
+
+/** Emails each address its own single-use invite code (7 days), through the `invite-email` Edge Function. */
+export async function emailInvites(teamId: string, emails: string[]): Promise<number> {
+  const { data, error } = await supabase.functions.invoke<{ sent: number }>('invite-email', {
+    body: { teamId, emails },
+  })
+  if (error || !data) {
+    let code: string | undefined
+    if (error instanceof FunctionsHttpError) {
+      code = await (error.context as Response)
+        .json()
+        .then((body: { error?: string }) => body.error)
+        .catch(() => undefined)
+    }
+    console.error('[teams] invite-email failed', code ?? error)
+    throw new DataError((code && inviteEmailErrors[code]) ?? 'The invites couldn’t be sent. Please try again.', code, {
+      cause: error,
+    })
+  }
+  return data.sent
 }
