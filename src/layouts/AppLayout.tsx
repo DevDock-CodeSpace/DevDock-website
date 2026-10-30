@@ -5,7 +5,6 @@ import { AppSidebar } from '@/components/AppSidebar'
 import { NavigationSpinner } from '@/components/NavigationSpinner'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { AskDevDockButton } from '@/features/ai/components/AskDevDockButton'
-import { FeedbackButton } from '@/features/feedback/components/FeedbackButton'
 import { useFeature } from '@/features/flags/hooks'
 import { NotificationBell } from '@/features/messaging/components/NotificationBell'
 import { NotePopups } from '@/features/reminders/components/NotePopups'
@@ -31,6 +30,7 @@ import { issueIdentifier } from '@/features/issues/meta'
 import { useCurrentTeam, useCurrentWorkspace } from '@/features/teams/hooks'
 import { getTeamNav, getWorkspaceTabs, isNavActive, teamIssuesPath, teamPath, workspacePath, type NavItem } from '@/features/teams/nav'
 import { workspaceQuery } from '@/features/workspaces/api'
+import { CreateWorkspaceDialog } from '@/features/workspaces/components/CreateWorkspaceDialog'
 import { useRealtimeSync } from '@/hooks/use-realtime-sync'
 import { useSidebarWidth } from '@/hooks/use-sidebar-width'
 import { useFullBleed } from './full-bleed'
@@ -71,13 +71,13 @@ function AppShell() {
             {/* A feature flag per group (/admin/flags); the ai-agent function checks it again. */}
             {askDevDock && <AskDevDockButton />}
             <NotesButton />
-            <FeedbackButton />
             <NotificationBell />
             <ThemeToggle />
           </div>
         </header>
         <NavigationSpinner />
         <NotePopups />
+        <NewWorkspaceListener />
         <PageArea fullBleed={fullBleed}>
           <Outlet />
         </PageArea>
@@ -87,6 +87,12 @@ function AppShell() {
 }
 
 type Crumb = { label: string; to: string }
+
+/** The New dialog that lazy pages open with `openNewWorkspace()` (the Issues hub's "New project and import"). */
+function NewWorkspaceListener() {
+  const { can } = useCurrentTeam()
+  return can.canManageWorkspaces ? <CreateWorkspaceDialog listen /> : null
+}
 
 function TeamBreadcrumb() {
   const { team } = useCurrentTeam()

@@ -148,7 +148,7 @@ export async function setTeamFlag(teamId: string, key: string, enabled: boolean 
   if (error) throw toDataError('change the flag', error, { P0002: 'That group or flag no longer exists. Reload the page.' })
 }
 
-/** Feedback from the app's Feedback button, newest first (the latest 500). The console's tab counts the new ones. */
+/** Feedback sent from the profile menu (Send feedback), newest first (the latest 500). The console's tab counts the new ones. */
 export const adminFeedbackQuery = () =>
   queryOptions({
     queryKey: adminKeys.feedback,

@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils'
 import { FEEDBACK_KINDS, FEEDBACK_MAX, sendFeedback, type FeedbackKind } from '../api'
 
 /**
- * The Feedback form (lazy, from FeedbackButton). What's typed stays while the dialog is closed, so
+ * The Feedback form (lazy, from LazyFeedbackDialog, opened from the profile menu). What's typed stays while the dialog is closed, so
  * closing it by accident loses nothing; sending clears it.
  */
 export function FeedbackDialog({ open, onOpenChange, teamId }: { open: boolean; onOpenChange: (open: boolean) => void; teamId: string | null }) {

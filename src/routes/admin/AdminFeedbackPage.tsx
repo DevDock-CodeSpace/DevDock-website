@@ -22,7 +22,7 @@ const FILTERS = [
 ] as const
 type Filter = (typeof FILTERS)[number]['id']
 
-/** /admin/feedback: what people sent with the app's Feedback button, newest first. Mark each done once handled. */
+/** /admin/feedback: what people sent with Send feedback (profile menu), newest first. Mark each done once handled. */
 export function AdminFeedbackPage() {
   const feedback = useSuspenseQuery(adminFeedbackQuery()).data
   const [now] = useState(Date.now)
@@ -74,7 +74,7 @@ export function AdminFeedbackPage() {
 
       {shown.length === 0 ? (
         <p className="py-16 text-center text-sm text-muted-foreground">
-          {feedback.length === 0 ? 'No feedback yet. It appears here when someone uses the Feedback button in the app’s header.' : filter === 'new' ? 'All caught up.' : 'Nothing here.'}
+          {feedback.length === 0 ? 'No feedback yet. It appears here when someone picks Send feedback in their profile menu (bottom left).' : filter === 'new' ? 'All caught up.' : 'Nothing here.'}
         </p>
       ) : (
         <ul className="divide-y">
