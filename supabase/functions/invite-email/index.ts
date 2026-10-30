@@ -19,6 +19,9 @@
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { button, type Email, escapeHtml, layout, LIVE_ORIGIN, oneLine, panel, para, ResendError, sendBatch } from '../_shared/email.ts'
+import { startErrorReporting } from '../_shared/report-errors.ts'
+
+startErrorReporting('invite-email')
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

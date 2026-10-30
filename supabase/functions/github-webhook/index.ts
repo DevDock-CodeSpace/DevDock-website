@@ -26,6 +26,9 @@
 // value as the App's webhook secret on GitHub.
 
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
+import { startErrorReporting } from '../_shared/report-errors.ts'
+
+startErrorReporting('github-webhook')
 
 type Repo = { id: number; default_branch?: string }
 type PullRequest = {

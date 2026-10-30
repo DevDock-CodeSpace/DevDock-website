@@ -17,6 +17,9 @@
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { importPKCS8, SignJWT } from 'npm:jose@6'
+import { startErrorReporting } from '../_shared/report-errors.ts'
+
+startErrorReporting('jaas-token')
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
