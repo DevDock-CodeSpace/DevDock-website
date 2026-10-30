@@ -3,7 +3,7 @@ import { Link } from 'react-router'
 import { LogoMark, LogoWordmark } from '@/components/Logo'
 import { ThemeToggle } from '@/components/ThemeToggle'
 
-const UPDATED = 'October 18, 2026'
+const UPDATED = 'October 30, 2026'
 
 /**
  * Public privacy policy at /privacy (no sign-in needed; linked from the login
@@ -136,6 +136,11 @@ export function PrivacyPage() {
               <strong>Resend</strong>: sends Calsko’s emails: group invites, your note reminders, meeting invites and
               changes, and feedback to the people who read it. Your address and the email’s content are passed on to
               deliver it. You can turn reminder and meeting emails off from your name in the sidebar → Email;
+            </li>
+            <li>
+              <strong>PostHog</strong>: error reports. When something breaks in Calsko, the technical details of the
+              error, the page address, your browser and your user id (not your name or email) are sent so it can be
+              fixed. Nothing else you do in Calsko is tracked;
             </li>
             <li>
               <strong>Microsoft</strong>: the “Continue with Microsoft” step, if you use it;

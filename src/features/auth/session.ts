@@ -1,3 +1,4 @@
+import { setErrorUser } from '@/lib/error-tracking'
 import { supabase } from '@/lib/supabase'
 
 /**
@@ -16,6 +17,7 @@ export function watchAuthIdentity(onChange: () => void): () => void {
       setTimeout(onChange, 0)
     }
     currentUserId = nextUserId
+    setErrorUser(nextUserId)
   })
 
   return () => data.subscription.unsubscribe()
