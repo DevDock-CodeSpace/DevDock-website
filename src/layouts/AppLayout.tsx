@@ -31,6 +31,7 @@ import { issueIdentifier } from '@/features/issues/meta'
 import { useCurrentTeam, useCurrentWorkspace } from '@/features/teams/hooks'
 import { getTeamNav, getWorkspaceTabs, isNavActive, teamIssuesPath, teamPath, workspacePath, type NavItem } from '@/features/teams/nav'
 import { workspaceQuery } from '@/features/workspaces/api'
+import { CreateWorkspaceDialog } from '@/features/workspaces/components/CreateWorkspaceDialog'
 import { useRealtimeSync } from '@/hooks/use-realtime-sync'
 import { useSidebarWidth } from '@/hooks/use-sidebar-width'
 import { useFullBleed } from './full-bleed'
@@ -78,6 +79,7 @@ function AppShell() {
         </header>
         <NavigationSpinner />
         <NotePopups />
+        <NewWorkspaceListener />
         <PageArea fullBleed={fullBleed}>
           <Outlet />
         </PageArea>
@@ -87,6 +89,12 @@ function AppShell() {
 }
 
 type Crumb = { label: string; to: string }
+
+/** The New dialog that lazy pages open with `openNewWorkspace()` (the Issues hub's "New project and import"). */
+function NewWorkspaceListener() {
+  const { can } = useCurrentTeam()
+  return can.canManageWorkspaces ? <CreateWorkspaceDialog listen /> : null
+}
 
 function TeamBreadcrumb() {
   const { team } = useCurrentTeam()
