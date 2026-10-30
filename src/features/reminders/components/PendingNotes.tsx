@@ -23,7 +23,7 @@ const time = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-di
 
 /**
  * The open notes, in three shapes: **Due now** (its time has come: big cards with Done and Snooze,
- * where DevDock opens the panel), **Coming up** (a timeline by day) and **Anytime** (notes without a
+ * where Calsko opens the panel), **Coming up** (a timeline by day) and **Anytime** (notes without a
  * time, as small cards). One list from the server, already in that order (time soonest first,
  * no time last), split here.
  */
@@ -47,7 +47,7 @@ export function PendingNotes({ teamId, userId, now, highlight }: Props) {
         </span>
         <p className="text-sm font-medium">Nothing on your mind?</p>
         <p className="mt-1 max-w-64 text-xs text-muted-foreground">
-          Write anything above. Give it a time and DevDock opens it for you when that time comes.
+          Write anything above. Give it a time and Calsko opens it for you when that time comes.
         </p>
       </div>
     )

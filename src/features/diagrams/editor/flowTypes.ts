@@ -12,7 +12,7 @@ import { ShapeNode } from './ShapeNode'
 export const nodeTypes = { shape: ShapeNode, icon: IconNode, container: ContainerNode, block: BlockNode, ink: InkNode }
 export const edgeTypes = { connector: ConnectorEdge }
 
-// React Flow's own colors, pointed at DevDock's theme tokens.
+// React Flow's own colors, pointed at Calsko's theme tokens.
 export const flowStyle = {
   '--xy-background-color': 'var(--background)',
   '--xy-selection-background-color': 'color-mix(in oklab, var(--brand) 8%, transparent)',

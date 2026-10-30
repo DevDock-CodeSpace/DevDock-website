@@ -1,4 +1,4 @@
-// ai-agent: Ask DevDock. The person's request goes to a language model with a
+// ai-agent: Calsko AI. The person's request goes to a language model with a
 // small set of tool definitions; the tools the model picks run here, as that
 // person, through the same tables, RPCs and functions the app uses.
 //
@@ -74,11 +74,11 @@ function overLimit(userId: string, now: number): boolean {
   return false
 }
 
-const UNAVAILABLE = 'DevDock AI is temporarily unavailable. Your other DevDock features are unaffected.'
+const UNAVAILABLE = 'Calsko AI is temporarily unavailable. Your other Calsko features are unaffected.'
 
 const providerMessages: Record<AiProviderError['kind'], string> = {
-  not_configured: 'DevDock AI isn’t set up correctly yet. The group owner needs to check its key and model.',
-  rate_limited: 'DevDock AI is busy right now. Try again in a minute.',
+  not_configured: 'Calsko AI isn’t set up correctly yet. The group owner needs to check its key and model.',
+  rate_limited: 'Calsko AI is busy right now. Try again in a minute.',
   unavailable: UNAVAILABLE,
   timeout: 'That took too long. Try again, or ask for one thing at a time.',
   bad_response: UNAVAILABLE,
@@ -122,7 +122,7 @@ Deno.serve(async (req) => {
     return json({ error: 'rate_limited' }, 429)
   }
 
-  /** Another DevDock function, as the caller (the github function's create_branch). */
+  /** Another Calsko function, as the caller (the github function's create_branch). */
   const callFunction: AiExecutionContext['callFunction'] = async (name, payload) => {
     try {
       const response = await fetch(`${url}/functions/v1/${name}`, {

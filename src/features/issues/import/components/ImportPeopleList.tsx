@@ -9,7 +9,7 @@ const NOBODY = 'nobody'
 
 /**
  * "People from imports" for one project: each name an imported file used for an assignee, who it is
- * in DevDock, and how many issues still wait for someone. Changing a person assigns those issues,
+ * in Calsko, and how many issues still wait for someone. Changing a person assigns those issues,
  * and later imports match the name by themselves. Nothing when no import has named anyone.
  */
 export function ImportPeopleList({ workspaceId, people, members }: { workspaceId: string; people: ImportPerson[]; members: WorkspaceMember[] }) {
@@ -35,7 +35,7 @@ export function ImportPeopleList({ workspaceId, people, members }: { workspaceId
       <p className="mt-1 text-sm text-muted-foreground">
         {waiting > 0
           ? `${waiting === 1 ? '1 issue is' : `${waiting} issues are`} waiting for someone to be chosen. Add the person to the project, then pick them here.`
-          : 'Each name from an imported file, and who it is in DevDock. Later imports use these matches.'}
+          : 'Each name from an imported file, and who it is in Calsko. Later imports use these matches.'}
       </p>
       <div className="mt-3 divide-y border-y">
         {people.map((p) => (

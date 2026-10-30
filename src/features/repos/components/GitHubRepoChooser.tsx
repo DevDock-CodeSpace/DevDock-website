@@ -45,7 +45,7 @@ export function GitHubRepoChooser({
         </p>
       ) : available.length === 0 ? (
         <p className="py-3 text-sm text-muted-foreground">
-          {q ? 'No matching repositories.' : 'Every repository DevDock can see is already in this group.'}
+          {q ? 'No matching repositories.' : 'Every repository Calsko can see is already in this group.'}
         </p>
       ) : (
         <ul className="max-h-56 divide-y overflow-y-auto rounded-md border">
@@ -69,7 +69,7 @@ export function GitHubRepoChooser({
         </ul>
       )}
       <p className="text-xs text-muted-foreground">
-        Missing one? Give DevDock access to it on GitHub:{' '}
+        Missing one? Give Calsko access to it on GitHub:{' '}
         {installations.map((i, n) => (
           <span key={i.installation_id}>
             {n > 0 && ', '}

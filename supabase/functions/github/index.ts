@@ -1,4 +1,4 @@
-// github: DevDock's side of the DevDock GitHub App. The App's private key and
+// github: Calsko's side of the Calsko GitHub App. The App's private key and
 // OAuth client secret never leave this function.
 //
 // POST { action, … } with the user's Supabase access token:
@@ -75,7 +75,7 @@ async function github<T>(path: string, token: string, init: RequestInit = {}): P
       Accept: 'application/vnd.github+json',
       Authorization: `Bearer ${token}`,
       'X-GitHub-Api-Version': '2022-11-28',
-      'User-Agent': 'DevDock',
+      'User-Agent': 'Calsko',
       ...init.headers,
     },
   })
@@ -139,7 +139,7 @@ async function installationRepos(token: string): Promise<GitHubRepo[]> {
 async function userToken(config: AppConfig, code: string) {
   const res = await fetch('https://github.com/login/oauth/access_token', {
     method: 'POST',
-    headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'User-Agent': 'DevDock' },
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'User-Agent': 'Calsko' },
     body: JSON.stringify({ client_id: config.clientId, client_secret: config.clientSecret, code }),
   })
   const body = (await res.json().catch(() => ({}))) as { access_token?: string; error?: string }
@@ -371,7 +371,7 @@ async function createBranch(
     Accept: 'application/vnd.github+json',
     Authorization: `Bearer ${token}`,
     'X-GitHub-Api-Version': '2022-11-28',
-    'User-Agent': 'DevDock',
+    'User-Agent': 'Calsko',
   }
   const baseRef = await fetch(`https://api.github.com/repos/${fullName}/git/ref/heads/${refPath(base)}`, { headers })
   if (baseRef.status === 404) throw new HttpError(409, 'base_missing')

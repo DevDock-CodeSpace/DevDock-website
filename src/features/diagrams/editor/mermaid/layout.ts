@@ -1,4 +1,4 @@
-// A parsed Mermaid graph → a DevDock diagram in its saved format ({ nodes, edges }, the shape
+// A parsed Mermaid graph → a Calsko diagram in its saved format ({ nodes, edges }, the shape
 // of `diagrams.data`): sizes from the labels, positions from dagre, subgraphs as containers,
 // ER entities as table blocks. The editor feeds the result through model.parse() like any
 // paste, so nothing here is trusted. This module (and dagre) loads only when importing.

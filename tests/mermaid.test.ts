@@ -70,7 +70,7 @@ Deno.test('recognises other Mermaid types so it can say they are not supported',
 
 // ------------------------------------------------------------ flowchart nodes
 
-Deno.test('every bracket form becomes the nearest DevDock shape', () => {
+Deno.test('every bracket form becomes the nearest Calsko shape', () => {
   const g = graphOf(`flowchart TD
     a[Rect]
     b(Rounded)
@@ -285,7 +285,7 @@ Deno.test('a stray end is reported, the rest still imports', () => {
 
 // ------------------------------------------------------------ styles
 
-Deno.test('classDef, class, :::, style and the default class map to DevDock colors', () => {
+Deno.test('classDef, class, :::, style and the default class map to Calsko colors', () => {
   const g = graphOf(`flowchart TD
     classDef default fill:#f0f0f0,stroke:#999
     classDef danger fill:#ffcccc,stroke:#cc0000,stroke-width:2px

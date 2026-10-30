@@ -48,11 +48,11 @@ export function OnboardingPage() {
           )}
 
           <h1 className="text-[1.75rem] leading-tight font-semibold tracking-tight">
-            {isFirstTeam ? 'Welcome to DevDock' : 'Create or join a group'}
+            {isFirstTeam ? 'Welcome to Calsko' : 'Create or join a group'}
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
             {isFirstTeam
-              ? 'Everything in DevDock happens inside a group. Join yours, or start a new one.'
+              ? 'Everything in Calsko happens inside a group. Join yours, or start a new one.'
               : 'You can belong to several groups, with a different role in each.'}
           </p>
 

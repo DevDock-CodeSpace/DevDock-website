@@ -122,7 +122,7 @@ export function ValueChoicesSection({
   return (
     <section aria-labelledby="import-values">
       <h2 id="import-values" className="text-sm font-semibold">Values</h2>
-      <p className="mt-1 text-sm text-muted-foreground">What each value in the file becomes in DevDock. The ones we couldn’t match are marked.</p>
+      <p className="mt-1 text-sm text-muted-foreground">What each value in the file becomes in Calsko. The ones we couldn’t match are marked.</p>
       <div className="mt-3 grid gap-x-8 gap-y-5 lg:grid-cols-2">
         {shown.map(({ field, values }) => (
           <div key={field}>

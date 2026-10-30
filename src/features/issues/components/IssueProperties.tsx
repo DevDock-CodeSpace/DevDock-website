@@ -111,7 +111,7 @@ export function IssueProperties({
               </>
             ) : issue.import_assignee ? (
               // Kept by an import until someone is matched (Import issues → People from earlier imports).
-              <span className="flex min-w-0 items-center gap-1.5" title="From an import: not matched to anyone in DevDock yet">
+              <span className="flex min-w-0 items-center gap-1.5" title="From an import: not matched to anyone in Calsko yet">
                 <CircleUserRound className="size-4 shrink-0" />
                 <span className="truncate italic">{issue.import_assignee}</span>
               </span>

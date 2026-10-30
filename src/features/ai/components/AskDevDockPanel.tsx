@@ -42,7 +42,7 @@ function toHistory(turns: Turn[]): AiHistoryTurn[] {
 
 const EXAMPLES = ['Show me my open issues', 'What meetings do I have today?', 'Remind me tomorrow at 9 to review my PRs']
 
-/** The Ask DevDock side panel. Lazy-loaded by AskDevDockButton; default export for `lazy()`. */
+/** The Calsko AI side panel. Lazy-loaded by AskDevDockButton; default export for `lazy()`. */
 export default function AskDevDockPanel({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const { team } = useCurrentTeam()
   const location = useLocation()
@@ -126,7 +126,7 @@ export default function AskDevDockPanel({ open, onOpenChange }: { open: boolean;
       <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-md">
         <SheetHeader className="flex-row items-center justify-between border-b py-3 pr-12">
           <div>
-            <SheetTitle className="text-sm">Ask DevDock</SheetTitle>
+            <SheetTitle className="text-sm">Calsko AI</SheetTitle>
             <SheetDescription className="text-xs">Issues, meetings and messages in {team.name}.</SheetDescription>
           </div>
           {turns.length > 0 && (
@@ -152,7 +152,7 @@ export default function AskDevDockPanel({ open, onOpenChange }: { open: boolean;
                 </button>
               ))}
               <p className="mt-2 text-xs text-muted-foreground">
-                Your request and the DevDock details needed to answer it are sent to an AI model. It can only do what you
+                Your request and the Calsko details needed to answer it are sent to an AI model. It can only do what you
                 are allowed to do, and it asks before sending a message.
               </p>
             </div>
@@ -203,8 +203,8 @@ export default function AskDevDockPanel({ open, onOpenChange }: { open: boolean;
               rows={2}
               value={draft}
               maxLength={AI_MESSAGE_MAX}
-              placeholder="Ask DevDock…  (Shift+Enter for a new line)"
-              aria-label="Ask DevDock"
+              placeholder="Ask anything…  (Shift+Enter for a new line)"
+              aria-label="Calsko AI"
               className="block max-h-40 min-h-[50px] w-full resize-none bg-transparent px-3 pt-2.5 text-sm outline-none [field-sizing:content] placeholder:text-muted-foreground/70"
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={onKeyDown}

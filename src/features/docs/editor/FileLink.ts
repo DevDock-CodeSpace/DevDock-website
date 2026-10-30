@@ -15,7 +15,7 @@ declare module '@tiptap/core' {
 }
 
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
-/** A DevDock doc or diagram URL (group or workspace view): …/t/<group>/(w/<id>/)?(docs|diagrams)/<id>. */
+/** A Calsko doc or diagram URL (group or workspace view): …/t/<group>/(w/<id>/)?(docs|diagrams)/<id>. */
 const FILE_URL = new RegExp(`^/t/[a-z0-9-]+/(?:w/${UUID}/)?(docs|diagrams)/(${UUID})/?$`)
 
 /** The doc or diagram a pasted URL points at, when it's this site's and nothing else was pasted. */
@@ -36,7 +36,7 @@ export function fileFromUrl(text: string, origin: string): { kind: FileLinkKind;
  * An inline link to a doc or diagram (Files). It stores only the kind and the id, never a title:
  * the view shows the current title from the group's lists (one cached query per kind, whatever the
  * number of links), and someone who can't open the item sees that, not its name. Typed with `[[`
- * (FileLinkPicker), added from the + menu, or made by pasting a DevDock doc/diagram URL.
+ * (FileLinkPicker), added from the + menu, or made by pasting a Calsko doc/diagram URL.
  */
 export const FileLink = Node.create({
   name: 'fileLink',
@@ -101,7 +101,7 @@ export const FileLink = Node.create({
       new Plugin({
         key: new PluginKey('fileLink'),
         props: {
-          // Pasting a DevDock doc or diagram URL makes a link to it.
+          // Pasting a Calsko doc or diagram URL makes a link to it.
           handlePaste: (view, event) => {
             const text = event.clipboardData?.getData('text/plain') ?? ''
             const file = fileFromUrl(text, window.location.origin)
