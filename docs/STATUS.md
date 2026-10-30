@@ -66,8 +66,8 @@ Secrets per project: function secrets `RESEND_API_KEY`, `EMAIL_WORKER_SECRET`, o
 Without the Vault secrets the queue waits; nothing is lost.
 
 Error tracking: **PostHog** (`src/lib/error-tracking.ts`), errors only (no pageviews, clicks or replay). Vercel variable
-`POSTHOG_KEY` (the project's public `phc_` key, passed to the bundle by name in `vite.config.ts`), set for Production and
-Preview; the host is US (`us.i.posthog.com`). Only production builds send. posthog-js (~100 KB gz) loads only when a page's first error happens, so a session
+`POSTHOG_KEY` (the project's public `phc_` key, passed to the bundle by name in `vite.config.ts`), set for Production
+only (previews and Dev don't report); the host is US (`us.i.posthog.com`). Only production builds send. posthog-js (~100 KB gz) loads only when a page's first error happens, so a session
 without errors downloads and sends nothing. Reported: uncaught errors and rejections, route error pages, React root errors
 and failed Supabase calls (`toDataError`, skipped offline); `supabase_project` tells Dev from live; people are identified
 by user id only. Stack traces are minified until source maps are uploaded to PostHog (not set up yet).
