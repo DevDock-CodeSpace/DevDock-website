@@ -133,6 +133,11 @@ export function PrivacyPage() {
               it;
             </li>
             <li>
+              <strong>Resend</strong>: sends Calsko’s emails: group invites, your note reminders, meeting invites and
+              changes, and feedback to the people who read it. Your address and the email’s content are passed on to
+              deliver it. You can turn reminder and meeting emails off from your name in the sidebar → Email;
+            </li>
+            <li>
               <strong>Microsoft</strong>: the “Continue with Microsoft” step, if you use it;
             </li>
             <li>

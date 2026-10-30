@@ -401,3 +401,13 @@ verify_jwt = false
 # (auth.getUser), then runs every tool as that caller under RLS.
 [functions.ai-agent]
 verify_jwt = false
+
+# Invite emails. Same as jaas-token: the function checks the caller itself
+# (auth.getUser), then creates the codes as that caller under RLS.
+[functions.invite-email]
+verify_jwt = false
+
+# The email worker. Called by pg_cron through pg_net, never by a browser: it checks the
+# x-worker-secret header (EMAIL_WORKER_SECRET, also in Vault as email_worker_secret).
+[functions.send-emails]
+verify_jwt = false

@@ -3,6 +3,7 @@ import { redirect, type LoaderFunctionArgs } from 'react-router'
 import { ensureSessionClock, sessionExpired, startSessionClock } from '@/lib/auth-storage'
 import { activityExpired, startActivityClock, wasIdleSignOut } from '@/lib/inactivity'
 import { EXPIRED_REASON, INACTIVE_REASON, INACTIVITY_LIMIT_MS } from '@/lib/inactivity-config'
+import { saveMyTimeZone } from '@/features/email/api'
 import { getCurrentSession, signOutForInactivity, signOutForSessionLimit } from './api'
 import { captureCalendarToken, clearCalendarToken } from './google-calendar'
 import { isLoginErrorCode, type LoginErrorCode } from './errors'
@@ -93,6 +94,10 @@ export async function authCallbackLoader({ request }: LoaderFunctionArgs) {
   // Signing in is activity: an old timestamp must not sign them straight back out.
   startActivityClock()
   // A new sign-in starts the session's time limit; connecting Google Calendar doesn't extend it.
-  if (!calendarOnly) startSessionClock()
+  if (!calendarOnly) {
+    startSessionClock()
+    // Emails write times in the reader's zone.
+    saveMyTimeZone()
+  }
   throw redirect(next)
 }
