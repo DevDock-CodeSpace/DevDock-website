@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useFeature } from '@/features/flags/hooks'
 import { errorMessage } from '@/lib/errors'
 import { createInvite, invitesQuery, revokeInvite, type Invite } from '../api'
 import { useCurrentTeam } from '../hooks'
@@ -26,6 +27,7 @@ const dateFormat = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'nu
 export function InvitesPanel() {
   const { team } = useCurrentTeam()
   const invites = useSuspenseQuery(invitesQuery(team.id)).data
+  const emailInvites = useFeature('email_invites')
   const queryClient = useQueryClient()
   const [now] = useState(Date.now)
 
@@ -48,7 +50,7 @@ export function InvitesPanel() {
           </p>
         </div>
         <div className="flex shrink-0 gap-2">
-          <EmailInvitesDialog />
+          {emailInvites && <EmailInvitesDialog />}
           <CreateInviteDialog />
         </div>
       </div>

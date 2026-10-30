@@ -3,6 +3,7 @@ import { queryOptions } from '@tanstack/react-query'
 import { SETTLED_STALE_MS } from '@/lib/query-client'
 import { authStorage, clearSessionClock, startSessionClock } from '@/lib/auth-storage'
 import { clearActivityClock, markIdleSignOut, startActivityClock } from '@/lib/inactivity'
+import { saveMyTimeZone } from '@/features/email/api'
 import { supabase, supabasePublishableKey, supabaseUrl } from '@/lib/supabase'
 import type { Tables } from '@/types/database.types'
 import { AuthFlowError } from './errors'
@@ -105,6 +106,7 @@ export async function signInWithPassword(email: string, password: string, rememb
   }
   startActivityClock()
   startSessionClock()
+  saveMyTimeZone()
 }
 
 /** Signs out this browser only. Other devices keep their sessions. */

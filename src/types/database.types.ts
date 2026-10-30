@@ -618,29 +618,121 @@ export type Database = {
           },
         ]
       }
+      email_outbox: {
+        Row: {
+          attempts: number
+          claimed_at: string | null
+          created_at: string
+          dedupe_key: string
+          id: string
+          kind: string
+          last_error: string | null
+          payload: Json
+          recipient_id: string | null
+          recipients: number
+          ref_id: string
+          send_after: string
+          sent_at: string | null
+          status: string
+        }
+        Insert: {
+          attempts?: number
+          claimed_at?: string | null
+          created_at?: string
+          dedupe_key: string
+          id?: string
+          kind: string
+          last_error?: string | null
+          payload?: Json
+          recipient_id?: string | null
+          recipients?: number
+          ref_id: string
+          send_after?: string
+          sent_at?: string | null
+          status?: string
+        }
+        Update: {
+          attempts?: number
+          claimed_at?: string | null
+          created_at?: string
+          dedupe_key?: string
+          id?: string
+          kind?: string
+          last_error?: string | null
+          payload?: Json
+          recipient_id?: string | null
+          recipients?: number
+          ref_id?: string
+          send_after?: string
+          sent_at?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
+      email_settings: {
+        Row: {
+          chat: boolean
+          meetings: boolean
+          reminders: boolean
+          time_zone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          chat?: boolean
+          meetings?: boolean
+          reminders?: boolean
+          time_zone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          chat?: boolean
+          meetings?: boolean
+          reminders?: boolean
+          time_zone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       feature_flags: {
         Row: {
           created_at: string
           default_enabled: boolean
           description: string
+          details: string
           key: string
+          parent: string | null
           updated_at: string
         }
         Insert: {
           created_at?: string
           default_enabled?: boolean
           description: string
+          details?: string
           key: string
+          parent?: string | null
           updated_at?: string
         }
         Update: {
           created_at?: string
           default_enabled?: boolean
           description?: string
+          details?: string
           key?: string
+          parent?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "feature_flags_parent_fkey"
+            columns: ["parent"]
+            isOneToOne: false
+            referencedRelation: "feature_flags"
+            referencedColumns: ["key"]
+          },
+        ]
       }
       feedback: {
         Row: {
@@ -2953,8 +3045,10 @@ export type Database = {
         Returns: {
           default_enabled: boolean
           description: string
+          details: string
           key: string
           overrides: Json
+          parent: string
           updated_at: string
         }[]
       }
@@ -3096,6 +3190,19 @@ export type Database = {
         Args: { p_body: Json; p_content: string; p_message_id: string }
         Returns: undefined
       }
+      email_claim_batch: {
+        Args: { p_daily_cap?: number; p_limit?: number }
+        Returns: {
+          data: Json
+          kind: string
+          outbox_id: string
+          reply_to: string
+          time_zone: string
+          to_email: string
+        }[]
+      }
+      email_finish_batch: { Args: { p_results: Json }; Returns: undefined }
+      email_prepare_batch: { Args: never; Returns: undefined }
       enabled_features: {
         Args: { t: Database["public"]["Tables"]["teams"]["Row"] }
         Returns: string[]
@@ -3208,6 +3315,15 @@ export type Database = {
       }
       reorder_lessons: {
         Args: { p_ids: string[]; p_module_id: string }
+        Returns: undefined
+      }
+      save_email_settings: {
+        Args: {
+          p_chat?: boolean
+          p_meetings?: boolean
+          p_reminders?: boolean
+          p_time_zone?: string
+        }
         Returns: undefined
       }
       search_messages: {

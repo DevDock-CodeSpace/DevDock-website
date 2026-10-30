@@ -10,7 +10,8 @@ type GroupSetting = 'default' | 'on' | 'off'
 
 /**
  * /admin/flags: each flag's default for every group, and each group's own setting (on, off, or follow
- * the default). Flags are added by migrations; this page only switches them.
+ * the default). Flags are added by migrations; this page only switches them. Sub-features (a flag with a
+ * `parent`) sit indented under their parent, and only count for a group while the parent is on too.
  */
 export function AdminFlagsPage() {
   const [{ data: flags }, { data: groups }] = useSuspenseQueries({ queries: [adminFlagsQuery(), adminGroupsQuery()] })
@@ -26,7 +27,12 @@ export function AdminFlagsPage() {
       ) : (
         <div>
           {flags.map((flag) => (
-            <FlagSection key={flag.key} flag={flag} groups={groups} />
+            <FlagSection
+              key={flag.key}
+              flag={flag}
+              parent={flag.parent ? flags.find((f) => f.key === flag.parent) : undefined}
+              groups={groups}
+            />
           ))}
         </div>
       )}
@@ -34,10 +40,15 @@ export function AdminFlagsPage() {
   )
 }
 
-function FlagSection({ flag, groups }: { flag: AdminFlag; groups: AdminGroup[] }) {
+const ownSetting = (flag: AdminFlag, teamId: string) =>
+  flag.overrides.find((o) => o.team_id === teamId)?.enabled ?? flag.default_enabled
+
+function FlagSection({ flag, parent, groups }: { flag: AdminFlag; parent?: AdminFlag; groups: AdminGroup[] }) {
   const queryClient = useQueryClient()
   const own = new Map(flag.overrides.map((o) => [o.team_id, o.enabled]))
-  const onCount = groups.filter((g) => own.get(g.id) ?? flag.default_enabled).length
+  // A sub-feature is only really on where its parent is on as well.
+  const parentOn = (teamId: string) => !parent || ownSetting(parent, teamId)
+  const onCount = groups.filter((g) => (own.get(g.id) ?? flag.default_enabled) && parentOn(g.id)).length
 
   // Optimistic: the page shows the change at once and puts it back if the database refuses it.
   const patchFlag = (change: (f: AdminFlag) => AdminFlag) => {
@@ -87,11 +98,16 @@ function FlagSection({ flag, groups }: { flag: AdminFlag; groups: AdminGroup[] }
 
   const defaultLabel = flag.default_enabled ? 'On' : 'Off'
 
-  return (
+  const section = (
     <SettingsSection
       title={flag.key}
       description={
         <>
+          {parent && (
+            <span className="mb-1 block text-xs">
+              Sub-feature of <span className="font-mono text-foreground">{parent.key}</span>: works only where that is on too.
+            </span>
+          )}
           {flag.description}
           <span className="mt-2 block">
             On for <span className="font-mono tabular-nums">{onCount}</span> of <span className="font-mono tabular-nums">{groups.length}</span>{' '}
@@ -101,6 +117,16 @@ function FlagSection({ flag, groups }: { flag: AdminFlag; groups: AdminGroup[] }
       }
     >
       <div data-flag={flag.key} className="space-y-5">
+        {flag.details && (
+          <div className="rounded-md bg-muted/40 px-4 py-3">
+            <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">What happens</p>
+            <ul className="mt-2 list-disc space-y-1 pl-4 text-sm leading-relaxed text-muted-foreground marker:text-muted-foreground/60">
+              {flag.details.split('\n').filter(Boolean).map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          </div>
+        )}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm font-medium">Default for every group</p>
@@ -125,7 +151,10 @@ function FlagSection({ flag, groups }: { flag: AdminFlag; groups: AdminGroup[] }
                 <li key={g.id} data-flag-group={g.slug} className="flex flex-col gap-2 py-2.5 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
                     <p className="truncate text-sm">{g.name}</p>
-                    <p className="font-mono text-xs text-muted-foreground">{g.slug}</p>
+                    <p className="font-mono text-xs text-muted-foreground">
+                      {g.slug}
+                      {!parentOn(g.id) && ` · off: ${parent?.key} is off`}
+                    </p>
                   </div>
                   <Select
                     value={setting}
@@ -149,4 +178,6 @@ function FlagSection({ flag, groups }: { flag: AdminFlag; groups: AdminGroup[] }
       </div>
     </SettingsSection>
   )
+
+  return parent ? <div className="border-l-2 pl-4 sm:ml-4 sm:pl-6">{section}</div> : section
 }
