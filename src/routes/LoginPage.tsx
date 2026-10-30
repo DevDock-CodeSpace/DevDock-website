@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { rememberedChoice } from '@/features/auth/api'
 import { AuthShell } from '@/features/auth/components/AuthShell'
 import { GoogleIcon } from '@/features/auth/components/GoogleIcon'
+import { GitHubIcon } from '@/features/auth/components/GitHubIcon'
 import { MicrosoftIcon } from '@/features/auth/components/MicrosoftIcon'
 import { RememberMe } from '@/features/auth/components/RememberMe'
 import { AuthFlowError, loginErrorMessages } from '@/features/auth/errors'
@@ -12,7 +13,7 @@ import type { SignInProvider } from '@/features/auth/api'
 import { useSignInWithProvider } from '@/features/auth/hooks'
 import type { loginLoader } from '@/features/auth/loaders'
 
-/** /login: sign in with Google or Microsoft (AuthShell draws the page). */
+/** /login: sign in with Google, Microsoft or GitHub (AuthShell draws the page). */
 export function LoginPage() {
   const { next, error, inactive, expired } = useLoaderData<typeof loginLoader>()
   const signIn = useSignInWithProvider(next)
@@ -68,10 +69,14 @@ export function LoginPage() {
           {going === 'azure' ? <LoaderCircle className="animate-spin" /> : <MicrosoftIcon className="size-4" />}
           {going === 'azure' ? 'Redirecting to Microsoft…' : 'Continue with Microsoft'}
         </Button>
+        <Button size="lg" variant="outline" className="h-11 w-full gap-2.5 text-sm" disabled={redirecting} onClick={() => start('github')}>
+          {going === 'github' ? <LoaderCircle className="animate-spin" /> : <GitHubIcon className="size-4" />}
+          {going === 'github' ? 'Redirecting to GitHub…' : 'Continue with GitHub'}
+        </Button>
       </div>
       <p className="mt-2.5 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
         <ShieldCheck className="size-3.5 shrink-0" />
-        Calsko never sees your Google or Microsoft password.
+        Calsko never sees your Google, Microsoft or GitHub password.
       </p>
 
       <RememberMe checked={remember} onChange={setRemember} disabled={redirecting} className="mt-5" />

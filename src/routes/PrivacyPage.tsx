@@ -30,16 +30,16 @@ export function PrivacyPage() {
           small group of students. This page explains what Calsko stores about you and why.
         </p>
 
-        <Section title="What we get when you sign in with Google or Microsoft">
-          <p>When you sign in with Google or Microsoft, Calsko receives and stores:</p>
+        <Section title="What we get when you sign in with Google, Microsoft or GitHub">
+          <p>When you sign in with Google, Microsoft or GitHub, Calsko receives and stores:</p>
           <ul>
-            <li>your name,</li>
+            <li>your name (or, on GitHub, your username when your profile has no name),</li>
             <li>your email address,</li>
-            <li>a link to your Google profile photo (Microsoft doesn’t share one), shown as your avatar to people in your group.</li>
+            <li>a link to your Google or GitHub profile photo (Microsoft doesn’t share one), shown as your avatar to people in your group.</li>
           </ul>
           <p>
-            Calsko never sees your Google or Microsoft password and has no access to your email, files, calendar or
-            anything else in those accounts.
+            Calsko never sees your Google, Microsoft or GitHub password and has no access to your email, files, calendar,
+            repositories or anything else in those accounts.
           </p>
         </Section>
 
@@ -141,7 +141,8 @@ export function PrivacyPage() {
               <strong>Microsoft</strong>: the “Continue with Microsoft” step, if you use it;
             </li>
             <li>
-              <strong>GitHub</strong>: only if your group connects it, for the repositories it was given access to.
+              <strong>GitHub</strong>: the “Continue with GitHub” step, if you use it; and, only if your group connects it, the
+              repositories it was given access to.
             </li>
           </ul>
           <p>
