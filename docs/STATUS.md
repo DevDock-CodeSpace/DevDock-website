@@ -70,7 +70,10 @@ Error tracking: **PostHog** (`src/lib/error-tracking.ts`), errors only (no pagev
 only (previews and Dev don't report); the host is US (`us.i.posthog.com`). Only production builds send. posthog-js (~100 KB gz) loads only when a page's first error happens, so a session
 without errors downloads and sends nothing. Reported: uncaught errors and rejections, route error pages, React root errors
 and failed Supabase calls (`toDataError`, skipped offline); `supabase_project` tells Dev from live; people are identified
-by user id only. Stack traces are minified until source maps are uploaded to PostHog (not set up yet).
+by user id only. The browser sends through `/_relay` on our own domain (a `vercel.json` rewrite to `us.i.posthog.com`), so
+ad blockers don't drop reports. Edge Functions report too (`supabase/functions/_shared/report-errors.ts`, one
+`startErrorReporting('<name>')` per function): every `console.error` and anything uncaught, sent in the background with
+`EdgeRuntime.waitUntil`, tagged `function`; needs the function secret `POSTHOG_KEY` (live only). Stack traces are minified until source maps are uploaded to PostHog (not set up yet).
 
 Each email kind is a sub-feature of the `email` flag, per group (/admin → Feature flags): checked when it is queued and
 again when it is sent. `email_meetings` is off by default: meeting invites go through Google Calendar for now, and Calsko's

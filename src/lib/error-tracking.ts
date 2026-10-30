@@ -58,7 +58,9 @@ export function startErrorTracking(): void {
 async function loadPostHog(): Promise<void> {
   const { posthog } = await import('posthog-js')
   posthog.init(key, {
-    api_host: 'https://us.i.posthog.com',
+    // Through our own domain (vercel.json forwards /_relay to us.i.posthog.com): ad blockers block PostHog's.
+    api_host: '/_relay',
+    ui_host: 'https://us.posthog.com',
     // Errors only. Our own listeners above report uncaught errors, so PostHog's autocapture stays off.
     capture_exceptions: false,
     autocapture: false,

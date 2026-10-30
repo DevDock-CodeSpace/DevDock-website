@@ -18,6 +18,9 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { type Email, LIVE_ORIGIN, sendBatch } from '../_shared/email.ts'
 import { type Message, render } from './templates.ts'
+import { startErrorReporting } from '../_shared/report-errors.ts'
+
+startErrorReporting('send-emails')
 
 /** Resend's batch limit. A claim never returns more outbox rows than this many emails' worth in practice. */
 const MAX_PER_REQUEST = 100
