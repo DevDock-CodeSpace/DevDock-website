@@ -71,14 +71,16 @@ async function loadPostHog(): Promise<void> {
     disable_web_experiments: true,
     advanced_disable_flags: true,
     disable_external_dependency_loading: true,
-    // No cookies or localStorage: the user id ties errors to a person.
+    // No cookies or localStorage. PostHog starts as the signed-in user (it loads at the first error, when that's
+    // usually known), so no throwaway id is merged into the person on every page load. Signed out, each page
+    // load is anonymous and makes no person (identified_only).
     persistence: 'memory',
+    bootstrap: { distinctID: userId ?? crypto.randomUUID(), isIdentifiedID: Boolean(userId) },
     person_profiles: 'identified_only',
     save_referrer: false,
   })
   // Tells DevDock Dev's errors from live's in one PostHog project.
   posthog.register({ supabase_project: supabaseProject() })
-  if (userId) posthog.identify(userId)
   client = posthog
   const pending = queue
   queue = []
