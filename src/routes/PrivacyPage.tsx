@@ -57,7 +57,7 @@ export function PrivacyPage() {
             <li>the GitHub repositories your group uses (their names and GitHub ids) and which projects use them;</li>
             <li>notes you keep for yourself: their title, details, the time you want them to pop up (if any) and the workspace or issue they are about;</li>
             <li>
-              feedback you send with the Feedback button: what you wrote, its kind, the page you were on, your group, and
+              feedback you send with Send feedback in your profile menu: what you wrote, its kind, the page you were on, your group, and
               your browser, window size and light or dark theme. Only the people who run Calsko read it, not your group.
             </li>
           </ul>
