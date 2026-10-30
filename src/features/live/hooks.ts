@@ -6,6 +6,7 @@ import { useCanWriteDocs } from '@/features/docs/hooks'
 import { errorMessage } from '@/lib/errors'
 import { liveSessionQuery, seriesSessionsQuery, type LiveSession } from './api'
 import { flushCalendarQueue, refreshRsvps, runCalendarOps, type CalendarOp } from './calendar'
+import { logError } from '@/lib/error-tracking'
 
 /**
  * Who may schedule, edit and cancel sessions in a scope. The live_sessions
@@ -81,7 +82,7 @@ export function useRefreshRsvps(session: LiveSession, enabled: boolean) {
       (updated) => {
         if (updated) void queryClient.invalidateQueries({ queryKey: ['live', session.id] })
       },
-      (error: unknown) => console.error('[live] Could not refresh invite replies', error),
+      (error: unknown) => logError('[live] Could not refresh invite replies', error),
     )
   }, [enabled, session, queryClient])
 }

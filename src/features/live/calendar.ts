@@ -10,6 +10,7 @@ import {
   type LiveSession,
 } from './api'
 import { toRdate } from './recurrence'
+import { logError } from '@/lib/error-tracking'
 
 // Google Calendar sync for live sessions. The organizer's own calendar holds
 // the event; everyone the session is for is an attendee, and Google emails
@@ -151,7 +152,7 @@ export async function refreshRsvps(session: LiveSession): Promise<boolean> {
 
 async function googleError(response: Response): Promise<DataError> {
   const detail = await response.text().catch(() => '')
-  console.error('[calendar] Google Calendar API error', response.status, detail)
+  logError('[calendar] Google Calendar API error', response.status, detail)
   const message =
     response.status === 403
       ? 'Google Calendar refused the change. Make sure you allowed Calsko to manage calendar events.'

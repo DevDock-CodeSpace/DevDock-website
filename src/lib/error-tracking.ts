@@ -39,6 +39,35 @@ export function reportError(error: unknown, properties: Record<string, unknown> 
   }
 }
 
+/**
+ * console.error plus a report, for failures the app catches and handles (shows a message, retries later).
+ * The issue is the first Error among `details`, else the message; the message and other values go along
+ * as `context` and `detail`, so one kind of failure stays one issue.
+ */
+export function logError(message: string, ...details: unknown[]): void {
+  console.error(message, ...details)
+  const error = details.find((d) => d instanceof Error)
+  const others = details.filter((d) => d !== error)
+  reportError(error ?? new Error(message), {
+    source: 'caught',
+    context: error ? message : undefined,
+    detail: others.length ? describe(others) : undefined,
+  })
+}
+
+function describe(values: unknown[]): string {
+  const text = values
+    .map((v) => {
+      try {
+        return typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v)
+      } catch {
+        return String(v)
+      }
+    })
+    .join(' ')
+  return text.length > 1000 ? `${text.slice(0, 1000)}…` : text
+}
+
 /** Who errors belong to (the signed-in user's id, or null after sign-out). Called by `watchAuthIdentity`. */
 export function setErrorUser(id: string | null): void {
   if (id === userId) return

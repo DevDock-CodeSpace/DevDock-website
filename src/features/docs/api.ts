@@ -5,6 +5,7 @@ import { DataError, requireAffected, toDataError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
 import type { Json, TablesInsert } from '@/types/database.types'
 import type { FileAccess } from './sharing'
+import { logError } from '@/lib/error-tracking'
 
 // Documents: workspace_id null = team-wide, otherwise assigned to that workspace.
 // RLS decides who sees what; these queries just ask for "everything I can see".
@@ -290,7 +291,7 @@ export function uploadDocImage(teamId: string, docId: string, file: File): Promi
 export async function removeImages(paths: string[]) {
   if (paths.length === 0) return
   const { error } = await supabase.storage.from(IMAGE_BUCKET).remove(paths)
-  if (error) console.error('[data] Failed to remove images', error)
+  if (error) logError('[data] Failed to remove images', error)
 }
 
 const SIGNED_URL_SECONDS = 60 * 60

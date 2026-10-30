@@ -4,6 +4,7 @@ import { DataError, requireAffected, toDataError } from '@/lib/errors'
 import { SETTLED_STALE_MS } from '@/lib/query-client'
 import { supabase } from '@/lib/supabase'
 import type { Database, Tables } from '@/types/database.types'
+import { logError } from '@/lib/error-tracking'
 
 export type TeamRole = Database['public']['Enums']['team_role']
 export type TeamType = Database['public']['Enums']['team_type']
@@ -228,7 +229,7 @@ export async function emailInvites(teamId: string, emails: string[]): Promise<nu
         .then((body: { error?: string }) => body.error)
         .catch(() => undefined)
     }
-    console.error('[teams] invite-email failed', code ?? error)
+    logError('[teams] invite-email failed', code ?? error)
     throw new DataError((code && inviteEmailErrors[code]) ?? 'The invites couldn’t be sent. Please try again.', code, {
       cause: error,
     })
