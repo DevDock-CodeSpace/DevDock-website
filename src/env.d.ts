@@ -12,3 +12,6 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv
 }
+
+/** POSTHOG_KEY at build time (PostHog's public phc_ project key, for error tracking); '' when unset. See vite.config.ts. */
+declare const __POSTHOG_KEY__: string

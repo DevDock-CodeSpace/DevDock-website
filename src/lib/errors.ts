@@ -1,5 +1,7 @@
 // Turn Supabase/PostgREST errors into messages that are safe to show users.
-// The raw error is always logged; it is never rendered.
+// The raw error is always logged (and reported to error tracking); it is never rendered.
+
+import { reportError } from '@/lib/error-tracking'
 
 type PostgrestLikeError = { code?: string; message?: string }
 
@@ -33,7 +35,10 @@ export function toDataError(
   const code = error.code
   const message =
     (code && (overrides[code] ?? byCode[code])) ?? `Couldn’t ${action}. Please try again.`
-  return new DataError(message, code, { cause: error })
+  const dataError = new DataError(message, code, { cause: error })
+  // Offline is the person's network, not a bug.
+  if (navigator.onLine) reportError(dataError, { source: 'data', action, code, detail: error.message })
+  return dataError
 }
 
 /** RLS turns forbidden UPDATE/DELETE into "0 rows affected" instead of an error. */
