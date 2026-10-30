@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { isRouteErrorResponse, Link, useRouteError } from 'react-router'
 import { Button } from '@/components/ui/button'
+import { reportError } from '@/lib/error-tracking'
 import { isStaleBuildError, reloadForNewVersion } from '@/lib/stale-build'
 import { cn } from '@/lib/utils'
 
@@ -26,8 +27,11 @@ export function RouteErrorPage({ inline = false }: { inline?: boolean }) {
       typeof error.data === 'string' && error.data ? error.data : error.status === 404 ? "This page doesn't exist." : 'Something went wrong.'
     return <ErrorScreen code={String(error.status)} message={message} inline={inline} />
   }
-  // Log the details; never show raw error text.
-  if (error instanceof Error) console.error('[route] Unhandled error', error)
+  // Log and report the details; never show raw error text.
+  if (error instanceof Error) {
+    console.error('[route] Unhandled error', error)
+    reportError(error, { source: 'route' })
+  }
   return <ErrorScreen code="error" message="Something went wrong." inline={inline} />
 }
 
