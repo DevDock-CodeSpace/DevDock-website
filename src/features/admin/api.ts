@@ -48,7 +48,11 @@ export type AdminUser = {
 
 export type AdminFlag = {
   key: string
+  /** The flag this one is a sub-feature of (one level); it only counts while that one is on too. */
+  parent: string | null
   description: string
+  /** What turning it on or off does, one point per line (shown as a list). */
+  details: string
   default_enabled: boolean
   updated_at: string
   /** Groups with their own setting; every other group follows the default. */

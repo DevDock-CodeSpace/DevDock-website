@@ -210,6 +210,7 @@ const inviteEmailErrors: Record<string, string> = {
   bad_email: 'One of those email addresses doesn’t look right.',
   bad_request: 'Enter between 1 and 20 email addresses.',
   forbidden: 'Only group owners and admins can send invites.',
+  disabled: 'Invite emails are switched off for this group. Share an invite code instead.',
   not_configured: 'Email isn’t set up yet. Share an invite code instead.',
   send_failed: 'The emails couldn’t be sent. Please try again.',
 }

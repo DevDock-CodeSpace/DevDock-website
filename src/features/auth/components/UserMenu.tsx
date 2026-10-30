@@ -1,4 +1,4 @@
-import { Check, LogOut, MessageSquareText, ShieldCheck } from 'lucide-react'
+import { Check, LogOut, Mail, MessageSquareText, ShieldCheck } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -13,6 +13,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { EmailMenu, useEmailOptions } from '@/features/email/components/EmailMenu'
 import { LazyFeedbackDialog, preloadFeedbackDialog } from '@/features/feedback/components/LazyFeedbackDialog'
 import { StatusDot, StatusMark } from '@/features/status/components/StatusDot'
 import { CHOOSABLE, statusLabel, writeChosen } from '@/features/status/status'
@@ -33,6 +34,7 @@ export function UserMenu() {
   const chosen = useChosenStatus()
   const status = useUserStatus(user.id)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const emailOptions = useEmailOptions()
   const [feedbackWanted, setFeedbackWanted] = useState(false)
 
   const avatar = (
@@ -101,6 +103,18 @@ export function UserMenu() {
                 ))}
               </DropdownMenuSubContent>
             </DropdownMenuSub>
+            {/* Which emails you get (features/email); read only when this opens, shown while a flag allows one. */}
+            {emailOptions.length > 0 && (
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <Mail />
+                  Email
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="min-w-56">
+                  <EmailMenu />
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onPointerEnter={preloadFeedbackDialog}

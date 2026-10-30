@@ -23,6 +23,8 @@ unless it says otherwise. Conventions live in [CLAUDE.md](../CLAUDE.md); setup i
 | Feedback button, read in the admin console | On `dev`, not yet on `prod` |
 | Calsko name, logo, favicons, whirl spinner | On `dev`, not yet on `prod` |
 | Invite emails: Members → Email invites, a single-use code per address, sent with Resend (`invite-email`) | Branch `feat/invite-emails` |
+| Email notifications: note reminders, new feedback (to support@), meeting invites/changes/cancellations and unread chat (built, flags off); Email settings in the profile menu | Branch `feat/email-notifications` |
+| Feature flags can have sub-features (`feature_flags.parent`, one level; on only while the parent is on); `email` → `email_invites`, `email_reminders`, `email_feedback`, `email_meetings`, `email_chat` | Branch `feat/email-notifications` |
 
 ## Next
 
@@ -47,6 +49,23 @@ Live Supabase `ejqrrxxiatvvdiyxtvid`, Dev `aktqcsncvbmkbleghipb` (see [DEV_ENVIR
 `DevDock-CodeSpace/calsko-website`.
 
 Email: calsko.com sends through **Resend** (DKIM/SPF on the `send` subdomain, verified) and receives through **ImprovMX**
-(root MX; the `support@` alias forwards to the owner, and more recipients are added in ImprovMX). DMARC is `p=none`. App
-email goes out from `invites@calsko.com` with Reply-To `support@calsko.com`. Function secrets: `RESEND_API_KEY` (both
-projects), optional `INVITE_FROM` and `EMAIL_REPLY_TO`. Request counts are tested from the private `DevDock-request-tests` repo after each `prod` push.
+(root MX; the `support@` alias forwards to the owner, and more recipients are added in ImprovMX). DMARC is `p=none`. Invites
+go out from `invites@calsko.com`, everything else from `notifications@calsko.com`, all with Reply-To `support@calsko.com`
+(feedback emails reply to the sender).
+
+How notifications are sent: triggers queue one row per event in `email_outbox` (service role only); the pg_cron job
+`kick-email-worker` calls the `send-emails` function through pg_net, only when something is due; the function claims a batch
+(`email_claim_batch`, which reads recipients, settings and addresses at send time), sends through Resend and reports back
+(`email_finish_batch`, two retries). Meeting emails wait 2 minutes so quick edits become one email; meetings synced to Google
+Calendar are left to Google's invites. At most 90 recipients a day (Resend free plan: 100). People switch reminder and
+meeting emails off in `email_settings` (profile menu → Email), which also keeps their time zone, saved at sign-in.
+
+Secrets per project: function secrets `RESEND_API_KEY`, `EMAIL_WORKER_SECRET`, optional `APP_URL` (Dev:
+`http://localhost:5173`), `EMAIL_FROM`, `INVITE_FROM`, `EMAIL_REPLY_TO`, `FEEDBACK_EMAIL_TO`; Vault secrets
+`email_worker_url` (`https://<ref>.supabase.co/functions/v1/send-emails`) and `email_worker_secret` (= `EMAIL_WORKER_SECRET`).
+Without the Vault secrets the queue waits; nothing is lost.
+
+Each email kind is a sub-feature of the `email` flag, per group (/admin → Feature flags): checked when it is queued and
+again when it is sent. `email_meetings` is off by default: meeting invites go through Google Calendar for now, and Calsko's
+own would double them. `email_chat` is off by default too: one email per conversation for mentions, DMs and replies
+still unread after 30 minutes (reading them first cancels it; muted conversations never email). Request counts are tested from the private `DevDock-request-tests` repo after each `prod` push.
