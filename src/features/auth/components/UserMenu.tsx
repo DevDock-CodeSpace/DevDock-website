@@ -1,4 +1,5 @@
-import { LogOut, ShieldCheck } from 'lucide-react'
+import { LogOut, MessageSquareText, ShieldCheck } from 'lucide-react'
+import { useState } from 'react'
 import { Link } from 'react-router'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
@@ -9,17 +10,21 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { LazyFeedbackDialog, preloadFeedbackDialog } from '@/features/feedback/components/LazyFeedbackDialog'
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar'
 import { initials } from '@/lib/utils'
 import { useSignOut, useUserIdentity } from '../hooks'
 
 /**
  * Signed-in user in the sidebar footer: avatar + name, which opens the account
- * menu upward, as wide as the button, with the email in its header and Sign out. Collapsed to icons, only the avatar shows.
+ * menu upward, as wide as the button, with the email in its header, Send feedback, Privacy policy and Sign out.
+ * Collapsed to icons, only the avatar shows.
  */
 export function UserMenu() {
   const { name, email, avatarUrl, profileUnavailable } = useUserIdentity()
   const signOut = useSignOut()
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const [feedbackWanted, setFeedbackWanted] = useState(false)
 
   const avatar = (
     <Avatar className="size-5 rounded-full">
@@ -67,6 +72,17 @@ export function UserMenu() {
               </p>
             )}
             <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onPointerEnter={preloadFeedbackDialog}
+              onFocus={preloadFeedbackDialog}
+              onSelect={() => {
+                setFeedbackWanted(true)
+                setFeedbackOpen(true)
+              }}
+            >
+              <MessageSquareText />
+              Send feedback
+            </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <Link to="/privacy">
                 <ShieldCheck />
@@ -80,6 +96,7 @@ export function UserMenu() {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        {feedbackWanted && <LazyFeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />}
         {signOut.isError && (
           <p role="alert" className="basis-full px-2 pt-1 text-xs text-destructive">
             {signOut.error.message}

@@ -5,7 +5,6 @@ import { AppSidebar } from '@/components/AppSidebar'
 import { NavigationSpinner } from '@/components/NavigationSpinner'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { AskDevDockButton } from '@/features/ai/components/AskDevDockButton'
-import { FeedbackButton } from '@/features/feedback/components/FeedbackButton'
 import { useFeature } from '@/features/flags/hooks'
 import { NotificationBell } from '@/features/messaging/components/NotificationBell'
 import { NotePopups } from '@/features/reminders/components/NotePopups'
@@ -72,7 +71,6 @@ function AppShell() {
             {/* A feature flag per group (/admin/flags); the ai-agent function checks it again. */}
             {askDevDock && <AskDevDockButton />}
             <NotesButton />
-            <FeedbackButton />
             <NotificationBell />
             <ThemeToggle />
           </div>
