@@ -1,6 +1,6 @@
 {
   "rewrites": [
-    { "source": "/_relay/:path*", "destination": "https://us.i.posthog.com/:path*" },
+    { "source": "/_relay/:path(.*)", "destination": "https://us.i.posthog.com/:path" },
     { "source": "/((?!assets/).*)", "destination": "/index.html" }
   ]
 }
