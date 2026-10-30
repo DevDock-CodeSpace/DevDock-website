@@ -69,7 +69,7 @@ export function MessagesPage() {
   const titleOf = (conversation: { id: string; kind: string; name: string | null }) =>
     conversationTitle(conversation.kind, conversation.name, people, user.id, participants.get(conversation.id))
   const otherPerson = (conversation: { id: string; kind: string }) =>
-    conversation.kind === 'dm' ? people.find((person) => person.user_id !== user.id && participants.get(conversation.id)?.includes(person.user_id))?.profile : undefined
+    conversation.kind === 'dm' ? people.find((person) => person.user_id !== user.id && participants.get(conversation.id)?.includes(person.user_id)) : undefined
   const visible = conversations.filter((conversation) => titleOf(conversation).toLowerCase().includes(search.trim().toLowerCase()))
   const sections = [
     { kind: 'channel', label: 'Channels', items: visible.filter((conversation) => conversation.kind === 'channel') },
@@ -143,7 +143,8 @@ export function MessagesPage() {
                     key={conversation.id}
                     kind={conversation.kind}
                     title={titleOf(conversation)}
-                    profile={otherPerson(conversation)}
+                    profile={otherPerson(conversation)?.profile}
+                    personId={otherPerson(conversation)?.user_id}
                     active={conversation.id === selected?.id}
                     unread={counts?.unread_count ?? 0}
                     mentions={counts?.mention_count ?? 0}

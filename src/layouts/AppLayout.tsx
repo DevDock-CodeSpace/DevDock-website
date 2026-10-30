@@ -30,6 +30,7 @@ import { issueIdentifier } from '@/features/issues/meta'
 import { useCurrentTeam, useCurrentWorkspace } from '@/features/teams/hooks'
 import { getTeamNav, getWorkspaceTabs, isNavActive, teamIssuesPath, teamPath, workspacePath, type NavItem } from '@/features/teams/nav'
 import { workspaceQuery } from '@/features/workspaces/api'
+import { useStatusSync } from '@/features/status/useStatusSync'
 import { CreateWorkspaceDialog } from '@/features/workspaces/components/CreateWorkspaceDialog'
 import { useRealtimeSync } from '@/hooks/use-realtime-sync'
 import { useSidebarWidth } from '@/hooks/use-sidebar-width'
@@ -77,6 +78,7 @@ function AppShell() {
         </header>
         <NavigationSpinner />
         <NotePopups />
+        <StatusSync />
         <NewWorkspaceListener />
         <PageArea fullBleed={fullBleed}>
           <Outlet />
@@ -92,6 +94,13 @@ type Crumb = { label: string; to: string }
 function NewWorkspaceListener() {
   const { can } = useCurrentTeam()
   return can.canManageWorkspaces ? <CreateWorkspaceDialog listen /> : null
+}
+
+/** Shares this tab's status with the group and receives everyone's (features/status). Renders nothing. */
+function StatusSync() {
+  const { team } = useCurrentTeam()
+  useStatusSync(team.id)
+  return null
 }
 
 function TeamBreadcrumb() {

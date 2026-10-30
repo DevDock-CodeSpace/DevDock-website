@@ -10,6 +10,8 @@ type Props = {
   title: string
   /** The other person, for a direct message. */
   profile?: PersonProfile
+  /** The other person's id, for their live status. */
+  personId?: string
   active: boolean
   unread: number
   mentions: number
@@ -18,7 +20,7 @@ type Props = {
   className?: string
 }
 
-export function ConversationItem({ kind, title, profile, active, unread, mentions, muted, onClick, className }: Props) {
+export function ConversationItem({ kind, title, profile, personId, active, unread, mentions, muted, onClick, className }: Props) {
   const hasUnread = unread > 0 && !active
   const ref = useRef<HTMLButtonElement>(null)
   // On a phone the list is a scrolling strip: keep the open conversation in view.
@@ -41,7 +43,7 @@ export function ConversationItem({ kind, title, profile, active, unread, mention
       {kind === 'channel' ? (
         <Hash className={cn('size-4 shrink-0', active && 'text-brand')} />
       ) : kind === 'dm' ? (
-        <PersonAvatar profile={profile ?? null} className="size-5" />
+        <PersonAvatar profile={profile ?? null} userId={personId} className="size-5" />
       ) : (
         <Users className={cn('size-4 shrink-0', active && 'text-brand')} />
       )}
