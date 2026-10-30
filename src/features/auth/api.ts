@@ -9,6 +9,7 @@ import type { Tables } from '@/types/database.types'
 import { AuthFlowError } from './errors'
 import { CALENDAR_SCOPE, clearCalendarToken, markCalendarConnecting } from './google-calendar'
 import { rememberNextPath } from './redirect'
+import { logError } from '@/lib/error-tracking'
 
 export type Profile = Tables<'profiles'>
 
@@ -21,7 +22,7 @@ export const AUTH_CALLBACK_PATH = '/auth/callback'
 export async function getCurrentSession(): Promise<Session | null> {
   const { data, error } = await supabase.auth.getSession()
   if (error) {
-    console.error('[auth] Failed to restore session', error)
+    logError('[auth] Failed to restore session', error)
     throw new AuthFlowError('session', { cause: error })
   }
   return data.session
@@ -64,7 +65,7 @@ export async function signInWithProvider(provider: SignInProvider, next: string,
     },
   })
   if (error) {
-    console.error('[auth] signInWithOAuth failed', error)
+    logError('[auth] signInWithOAuth failed', error)
     throw new AuthFlowError('oauth', { cause: error })
   }
 }
@@ -88,7 +89,7 @@ export async function connectGoogleCalendar(next: string, email: string | undefi
   })
   if (error) {
     clearCalendarToken()
-    console.error('[auth] connectGoogleCalendar failed', error)
+    logError('[auth] connectGoogleCalendar failed', error)
     throw new AuthFlowError('oauth', { cause: error })
   }
 }
@@ -117,7 +118,7 @@ export async function signOut(): Promise<void> {
   clearCalendarToken()
   const { error } = await supabase.auth.signOut({ scope: 'local' })
   if (error) {
-    console.error('[auth] signOut failed', error)
+    logError('[auth] signOut failed', error)
     throw new Error('Couldn’t sign out. Check your connection and try again.', { cause: error })
   }
   clearActivityClock()
@@ -164,7 +165,7 @@ export async function getCurrentProfile(userId: string): Promise<Profile | null>
     .eq('id', userId)
     .maybeSingle()
   if (error) {
-    console.error('[auth] Failed to load profile', error)
+    logError('[auth] Failed to load profile', error)
     throw new Error('Couldn’t load your profile.', { cause: error })
   }
   return data
@@ -193,7 +194,7 @@ async function assertProviderEnabled(provider: SignInProvider): Promise<void> {
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
     settings = await response.json()
   } catch (error) {
-    console.error('[auth] Could not read auth settings', error)
+    logError('[auth] Could not read auth settings', error)
     throw new AuthFlowError('unavailable', { cause: error })
   }
 

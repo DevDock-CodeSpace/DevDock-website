@@ -2,6 +2,7 @@ import { queryOptions } from '@tanstack/react-query'
 import { toDataError } from '@/lib/errors'
 import { SETTLED_STALE_MS } from '@/lib/query-client'
 import { supabase } from '@/lib/supabase'
+import { logError } from '@/lib/error-tracking'
 
 /** Which emails you get. No row yet means all of them. */
 export type EmailSettings = { reminders: boolean; meetings: boolean; chat: boolean }
@@ -46,6 +47,6 @@ export function saveMyTimeZone() {
   }
   if (!zone) return
   void supabase.rpc('save_email_settings', { p_time_zone: zone }).then(({ error }) => {
-    if (error) console.error('[email] saving the time zone failed', error)
+    if (error) logError('[email] saving the time zone failed', error)
   })
 }

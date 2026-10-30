@@ -2,6 +2,7 @@ import { queryOptions } from '@tanstack/react-query'
 import { FunctionsHttpError } from '@supabase/supabase-js'
 import { DataError, requireAffected, toDataError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
+import { logError } from '@/lib/error-tracking'
 
 // GitHub repositories belong to the group and are linked to any number of its
 // projects. Issues stay in their workspace and can point at one linked repo.
@@ -227,7 +228,7 @@ export async function callGitHub<T>(action: string, body: Record<string, unknown
         .then((b: { error?: string }) => b.error)
         .catch(() => undefined)
     }
-    console.error(`[github] ${action} failed`, code ?? error)
+    logError(`[github] ${action} failed`, code ?? error)
     throw new DataError((code && githubErrors[code]) ?? 'Something went wrong talking to GitHub. Please try again.', code, {
       cause: error,
     })

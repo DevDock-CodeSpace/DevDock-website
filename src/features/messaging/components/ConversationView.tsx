@@ -33,6 +33,7 @@ import { displayName, formatDay, GROUP_WINDOW_MS, isPendingMessage, sameDay } fr
 import { AddGroupMemberDialog } from './AddGroupMemberDialog'
 import { MessageComposer } from './MessageComposer'
 import { MessageItem } from './MessageItem'
+import { logError } from '@/lib/error-tracking'
 
 type Props = {
   conversationId: string
@@ -144,7 +145,7 @@ export function ConversationView({ conversationId, kind, description, teamId, te
           }
         })
         .catch((error: unknown) => {
-          console.error('[messaging] Could not mark read', error)
+          logError('[messaging] Could not mark read', error)
           markedId.current = undefined
           void queryClient.invalidateQueries({ queryKey: unreadKey })
         })
@@ -159,7 +160,7 @@ export function ConversationView({ conversationId, kind, description, teamId, te
     const batch = here.length > 0 ? here.map((notice) => notice.id).join() : notices.length >= NOTIFICATION_LIMIT ? `latest:${latest.id}` : ''
     if (!batch || batch === clearedNotices.current) return
     clearedNotices.current = batch
-    markConversationNotificationsRead(conversationId, user.id).catch((error: unknown) => console.error('[messaging] Could not clear notifications', error))
+    markConversationNotificationsRead(conversationId, user.id).catch((error: unknown) => logError('[messaging] Could not clear notifications', error))
   }, [messages, conversationId, teamId, user.id, unreadHere, notices, queryClient])
 
   useLayoutEffect(() => {

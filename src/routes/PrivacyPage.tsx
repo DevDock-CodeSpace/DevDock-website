@@ -138,9 +138,11 @@ export function PrivacyPage() {
               deliver it. You can turn reminder and meeting emails off from your name in the sidebar → Email;
             </li>
             <li>
-              <strong>PostHog</strong>: error reports. When something breaks in Calsko, the technical details of the
-              error, the page address, your browser and your user id (not your name or email) are sent so it can be
-              fixed. Nothing else you do in Calsko is tracked;
+              <strong>PostHog</strong>: page views and error reports. Each page you open in Calsko is recorded (its
+              address, when, the page you came from, and your browser, device and rough location), so we can see
+              which parts get used. When something breaks, the technical details of the error are sent so it can be
+              fixed. Both carry your user id, not your name or email. Clicks, typing and what you write are not
+              tracked, and nothing is stored in cookies;
             </li>
             <li>
               <strong>Microsoft</strong>: the “Continue with Microsoft” step, if you use it;
