@@ -15,7 +15,7 @@ import './index.css'
 // A tab left open across a deploy reloads itself instead of failing to open pages.
 watchForStaleBuild()
 
-// Uncaught errors go to PostHog when POSTHOG_KEY is set (the library loads only once one happens).
+// Errors and page views go to PostHog when POSTHOG_KEY is set (the library loads after the first paint).
 startErrorTracking()
 
 // A measuring tool for request counts, loaded only when asked for with ?requests=1.

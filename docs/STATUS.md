@@ -65,15 +65,18 @@ Secrets per project: function secrets `RESEND_API_KEY`, `EMAIL_WORKER_SECRET`, o
 `email_worker_url` (`https://<ref>.supabase.co/functions/v1/send-emails`) and `email_worker_secret` (= `EMAIL_WORKER_SECRET`).
 Without the Vault secrets the queue waits; nothing is lost.
 
-Error tracking: **PostHog** (`src/lib/error-tracking.ts`), errors only (no pageviews, clicks or replay). Vercel variable
-`POSTHOG_KEY` (the project's public `phc_` key, passed to the bundle by name in `vite.config.ts`), set for Production
-only (previews and Dev don't report); the host is US (`us.i.posthog.com`). Only production builds send. posthog-js (~100 KB gz) loads only when a page's first error happens, so a session
-without errors downloads and sends nothing. Reported: uncaught errors and rejections, route error pages, React root errors
-and failed Supabase calls (`toDataError`, skipped offline); `supabase_project` tells Dev from live; people are identified
-by user id only. The browser sends through `/_relay` on our own domain (a `vercel.json` rewrite to `us.i.posthog.com`), so
-ad blockers don't drop reports. Edge Functions report too (`supabase/functions/_shared/report-errors.ts`, one
+Analytics and error tracking: **PostHog** (`src/lib/error-tracking.ts`): page views and errors (no clicks, replay or
+cookies). Vercel variable `POSTHOG_KEY` (the project's public `phc_` key, passed to the bundle by name in `vite.config.ts`),
+set for Production only (previews and Dev don't report); the host is US. posthog-js (~100 KB gz, own chunk) loads in the
+background after the first paint (owner's choice, 2026-10-30), so first-load size is unchanged; one `$pageview` per route
+change plus `$pageleave`, session per tab (sessionStorage). Errors: uncaught errors and rejections, route error pages, React
+root errors, failed Supabase calls (`toDataError`, skipped offline) and `logError` (caught failures);
+`supabase_project` tells Dev from live; people are identified by user id only. The browser sends through `/_relay` on our
+own domain (a `vercel.json` rewrite to `us.i.posthog.com`, `:path(.*)` so `/e/` matches), so ad blockers don't drop
+events. Edge Functions report errors too (`supabase/functions/_shared/report-errors.ts`, one
 `startErrorReporting('<name>')` per function): every `console.error` and anything uncaught, sent in the background with
-`EdgeRuntime.waitUntil`, tagged `function`; needs the function secret `POSTHOG_KEY` (live only). Stack traces are minified until source maps are uploaded to PostHog (not set up yet).
+`EdgeRuntime.waitUntil`, tagged `function`; needs the function secret `POSTHOG_KEY` (live only). Stack traces are minified
+until source maps are uploaded to PostHog (not set up yet).
 
 Each email kind is a sub-feature of the `email` flag, per group (/admin → Feature flags): checked when it is queued and
 again when it is sent. `email_meetings` is off by default: meeting invites go through Google Calendar for now, and Calsko's
