@@ -28,6 +28,8 @@ export function useUserIdentity() {
       text(profile.data?.display_name) ??
       text(meta.full_name) ??
       text(meta.name) ??
+      // GitHub accounts often have no name, only a username.
+      text(meta.user_name) ??
       user.email ??
       'Signed in',
     avatarUrl: text(profile.data?.avatar_url) ?? text(meta.avatar_url) ?? text(meta.picture),
@@ -35,7 +37,7 @@ export function useUserIdentity() {
   }
 }
 
-/** Google or Microsoft sign-in (the browser leaves for the provider on success). */
+/** Google, Microsoft or GitHub sign-in (the browser leaves for the provider on success). */
 export function useSignInWithProvider(next: string) {
   return useMutation({ mutationFn: ({ provider, remember }: { provider: SignInProvider; remember: boolean }) => signInWithProvider(provider, next, remember) })
 }

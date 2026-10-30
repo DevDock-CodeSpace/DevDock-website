@@ -31,6 +31,9 @@ Server secrets (JaaS, GitHub App, Gemini) are Edge Function secrets: `supabase s
 - **Google Cloud → Google Auth Platform:** External app; scopes `openid`, `email`, `profile` (+ `calendar.events` for Calendar sync).
   Web client: JS origin = each site origin; redirect URI = `https://<project-ref>.supabase.co/auth/v1/callback`.
 - **Microsoft Entra:** app for "any Entra tenant + personal accounts", redirect URI = the same Supabase callback, tenant URL `/common`.
+- **GitHub (sign-in):** an **OAuth App** (Settings → Developer settings → OAuth Apps; not the DevDock GitHub App, which only
+  connects repos). Homepage = the site; Authorization callback URL = the same Supabase callback. One OAuth App per Supabase
+  project (Dev and live), because GitHub allows one callback URL per OAuth App.
 - **Supabase → Authentication:** enable the providers with their client IDs and secrets (dashboard only). Site URL =
   `https://www.calsko.com`; Redirect URLs = each origin's `/auth/callback` (and Vercel previews). The app always uses
   `window.location.origin + '/auth/callback'`.

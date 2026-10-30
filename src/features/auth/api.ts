@@ -36,11 +36,14 @@ export function rememberedChoice(): boolean {
   return authStorage().remembered()
 }
 
-/** The sign-in providers on /login. `azure` is Supabase's name for Microsoft (work, school and personal accounts). */
-export type SignInProvider = 'google' | 'azure'
+/**
+ * The sign-in providers on /login. `azure` is Supabase's name for Microsoft (work, school and personal accounts).
+ * GitHub shares the account's verified primary email, so it links to an existing account with that email.
+ */
+export type SignInProvider = 'google' | 'azure' | 'github'
 
 /**
- * Starts the OAuth redirect to Google or Microsoft. Resolves just before the browser leaves the page.
+ * Starts the OAuth redirect to Google, Microsoft or GitHub. Resolves just before the browser leaves the page.
  * `remember` decides where the session will be kept (lib/auth-storage); it is set
  * before the redirect because the PKCE verifier is stored the same way.
  */
