@@ -9,7 +9,7 @@ export type FeedbackKind = 'problem' | 'idea' | 'other'
 
 export const FEEDBACK_KINDS: { value: FeedbackKind; label: string; placeholder: string }[] = [
   { value: 'problem', label: 'Something’s wrong', placeholder: 'What happened, and what did you expect? Where was it?' },
-  { value: 'idea', label: 'An idea', placeholder: 'What would make DevDock better for you?' },
+  { value: 'idea', label: 'An idea', placeholder: 'What would make Calsko better for you?' },
   { value: 'other', label: 'Something else', placeholder: 'Tell us anything.' },
 ]
 

@@ -1,7 +1,7 @@
 import { DockSpinner } from '@/components/DockSpinner'
 
 /** Full-screen placeholder while the session is restored or the OAuth callback completes. */
-export function AuthLoading({ label = 'Loading DevDock…' }: { label?: string }) {
+export function AuthLoading({ label = 'Loading Calsko…' }: { label?: string }) {
   return (
     <div
       className="flex min-h-svh items-center justify-center bg-background text-muted-foreground"

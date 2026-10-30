@@ -17,7 +17,7 @@ const NotesPanel = lazy(loadPanel)
 const HIGHLIGHT_MS = 2500
 
 /**
- * The header's Notes button, next to Ask DevDock: opens all your notes in a panel on the right.
+ * The header's Notes button, next to Calsko AI: opens all your notes in a panel on the right.
  * `?note=<id>` on any page (a note's notification, an old /reminders link) opens it at that note;
  * `?note=open` just opens it. The parameter is dropped once read.
  */
@@ -25,7 +25,7 @@ export function NotesButton() {
   const [open, setOpen] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const [highlight, setHighlight] = useState<string | null>(null)
-  // Opened by DevDock (a note's time came) rather than by a click: see NotesPanel's `quiet`.
+  // Opened by Calsko (a note's time came) rather than by a click: see NotesPanel's `quiet`.
   const [quiet, setQuiet] = useState(false)
   const [params, setParams] = useSearchParams()
   const asked = params.get('note')

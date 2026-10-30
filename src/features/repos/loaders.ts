@@ -37,7 +37,7 @@ export type GitHubCallbackResult =
 
 /**
  * /github/callback: GitHub sends a group owner/admin here after installing
- * the DevDock App (?installation_id, ?code, ?state). The `github` Edge
+ * the Calsko App (?installation_id, ?code, ?state). The `github` Edge
  * Function verifies it all with GitHub; on success we go back to Group settings.
  */
 export async function githubCallbackLoader({ request }: LoaderFunctionArgs): Promise<GitHubCallbackResult | Response> {

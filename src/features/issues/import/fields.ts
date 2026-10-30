@@ -26,7 +26,7 @@ export type ColumnMapping = Record<ImportField, number | null>
 export const FIELDS: { field: ImportField; label: string; hint: string }[] = [
   { field: 'title', label: 'Title', hint: 'Required. Rows without one are left out.' },
   { field: 'description', label: 'Description', hint: 'Markdown becomes formatted text.' },
-  { field: 'status', label: 'Status', hint: 'Each value is matched to a DevDock status below.' },
+  { field: 'status', label: 'Status', hint: 'Each value is matched to a Calsko status below.' },
   { field: 'priority', label: 'Priority', hint: 'Urgent, High, Medium, Low, or a number.' },
   { field: 'assignee', label: 'Assignee', hint: 'Matched to people in this project by name. Anyone else keeps the name from the file until you match them.' },
   { field: 'labels', label: 'Labels', hint: 'Separated by commas. Missing labels are created.' },

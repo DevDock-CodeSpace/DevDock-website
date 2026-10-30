@@ -37,7 +37,7 @@ import { CreateWorkspaceDialog } from '@/features/workspaces/components/CreateWo
 import { useRecentVisits, useWorkspaceStars } from '@/features/workspaces/hooks'
 import { pickSidebarItems } from '@/features/workspaces/recent'
 
-// Active item: accent background (from shadcn) + DevDock-blue icon.
+// Active item: accent background (from shadcn) + Calsko-blue icon.
 const activeIcon = 'data-active:[&_svg]:text-brand'
 
 /**

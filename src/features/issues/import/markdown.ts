@@ -23,7 +23,7 @@ const BLOCKS = new Set(['paragraph', 'heading', 'bulletList', 'orderedList', 'ta
 
 /**
  * What the editor can't show: images become links (its image node holds only files stored in
- * DevDock, and the export's links need the other tool's sign-in), and tables become code blocks
+ * Calsko, and the export's links need the other tool's sign-in), and tables become code blocks
  * so their text survives (there is no table node).
  */
 function prepare(text: string): string {

@@ -5,7 +5,7 @@ import { PageHeader } from '@/components/PageHeader'
 import { adminFeedbackQuery, adminOverviewQuery } from '@/features/admin/api'
 import { formatShortDate } from '@/lib/format'
 
-/** /admin: totals across DevDock (counts only) and sign-ups per week. */
+/** /admin: totals across Calsko (counts only) and sign-ups per week. */
 export function AdminOverviewPage() {
   const [{ data: overview }, { data: feedback }] = useSuspenseQueries({ queries: [adminOverviewQuery(), adminFeedbackQuery()] })
   const newFeedback = feedback.filter((f) => f.status === 'new').length
@@ -22,7 +22,7 @@ export function AdminOverviewPage() {
 
   return (
     <>
-      <PageHeader title="Overview" description="Everyone on DevDock, in numbers. Group content is never shown here." />
+      <PageHeader title="Overview" description="Everyone on Calsko, in numbers. Group content is never shown here." />
       {newFeedback > 0 && (
         <Link
           to="/admin/feedback"

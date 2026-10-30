@@ -49,7 +49,7 @@ function eventBody(session: LiveSession, invitees: string[], url: string, series
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
   // The first meeting is the event itself; the rest are listed as extra dates.
   const rdate = toRdate(series.map((s) => new Date(s.starts_at)), timeZone)
-  const description = [session.description?.trim(), `Join in DevDock: ${url}`].filter(Boolean).join('\n\n')
+  const description = [session.description?.trim(), `Join in Calsko: ${url}`].filter(Boolean).join('\n\n')
   return {
     summary: session.title,
     description,
@@ -57,7 +57,7 @@ function eventBody(session: LiveSession, invitees: string[], url: string, series
     start: { dateTime: session.starts_at, timeZone },
     end: { dateTime: session.ends_at, timeZone },
     attendees: invitees.map((email) => ({ email })),
-    source: { title: 'DevDock', url },
+    source: { title: 'Calsko', url },
     guestsCanInviteOthers: false,
     reminders: { useDefault: true },
     ...(rdate ? { recurrence: [rdate] } : {}),
@@ -121,7 +121,7 @@ async function deleteEvent(token: string, eventId: string): Promise<void> {
 type GoogleEvent = { id: string; attendees?: { email?: string; responseStatus?: string; self?: boolean }[] }
 
 /**
- * Mirrors the event's attendee replies into DevDock. The organizer is skipped
+ * Mirrors the event's attendee replies into Calsko. The organizer is skipped
  * (they're not an invitee), and only their own token is ever used, so nobody
  * else has to connect a calendar for this to work.
  */
@@ -154,7 +154,7 @@ async function googleError(response: Response): Promise<DataError> {
   console.error('[calendar] Google Calendar API error', response.status, detail)
   const message =
     response.status === 403
-      ? 'Google Calendar refused the change. Make sure you allowed DevDock to manage calendar events.'
+      ? 'Google Calendar refused the change. Make sure you allowed Calsko to manage calendar events.'
       : 'Couldn’t update Google Calendar. Please try again.'
   return new DataError(message, String(response.status))
 }

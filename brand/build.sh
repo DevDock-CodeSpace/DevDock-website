@@ -4,24 +4,15 @@
 set -e
 cd "$(dirname "$0")/.."
 
-# square <mark.svg> <size> <padding> <background or none> <out>: the mark centred on a square canvas.
-square() {
-  inner=$(sed -e '1d' -e '$d' "$1")
-  side=$(( $2 - 2 * $3 ))
-  fill=""
-  [ "$4" != none ] && fill="<rect width=\"$2\" height=\"$2\" fill=\"$4\"/>"
-  printf '<svg xmlns="http://www.w3.org/2000/svg" width="%s" height="%s" viewBox="0 0 %s %s">%s<svg x="%s" y="%s" width="%s" height="%s" viewBox="12 38 256 221">%s</svg></svg>\n' \
-    "$2" "$2" "$2" "$2" "$fill" "$3" "$3" "$side" "$side" "$inner" > "$5.svg"
-}
+# Browser tab: the app icon as delivered (black mark on a white rounded square), which reads on light and dark tabs.
+cp brand/source/calsko-app-icon.svg public/favicon.svg
+# Android / large tab icons: the same, as a PNG fallback.
+rsvg-convert -w 192 -h 192 brand/source/calsko-app-icon.svg -o public/favicon-192.png
 
-# Browser tab: the flat mark (gradients turn to mud at 16-32 px).
-square brand/devdock-mark-flat.svg 32 0 none public/favicon
-# Android / large tab icons keep the gradients.
-square brand/devdock-mark.svg 192 8 none /tmp/devdock-192
-rsvg-convert /tmp/devdock-192.svg -o public/favicon-192.png
-# iOS home screen: an opaque square with room around the mark.
-square brand/devdock-mark.svg 180 22 '#ffffff' /tmp/devdock-touch
-rsvg-convert /tmp/devdock-touch.svg -o public/apple-touch-icon.png
-rm -f /tmp/devdock-192.svg /tmp/devdock-touch.svg
+# iOS home screen: an opaque white square with room around the mark (iOS rounds the corners itself).
+inner=$(sed -e '1d' -e '$d' brand/calsko-mark.svg)
+printf '<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180" viewBox="0 0 180 180"><rect width="180" height="180" fill="#ffffff"/><svg x="36" y="30" width="108" height="120" viewBox="184 118 655 788">%s</svg></svg>\n' "$inner" > /tmp/calsko-touch.svg
+rsvg-convert /tmp/calsko-touch.svg -o public/apple-touch-icon.png
+rm -f /tmp/calsko-touch.svg
 
 echo "Favicons written to public/."

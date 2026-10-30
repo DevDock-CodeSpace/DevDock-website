@@ -12,7 +12,7 @@ function sample(table: CsvTable, column: number | null) {
   return line.length > 80 ? `${line.slice(0, 80)}…` : line
 }
 
-/** Which column each DevDock field reads, with an example from the file. */
+/** Which column each Calsko field reads, with an example from the file. */
 export function ColumnMappingSection({
   table,
   mapping,

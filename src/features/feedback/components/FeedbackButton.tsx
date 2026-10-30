@@ -8,7 +8,7 @@ import { useCurrentTeam } from '@/features/teams/hooks'
 const loadDialog = () => import('./FeedbackDialog')
 const FeedbackDialog = lazy(() => loadDialog().then((m) => ({ default: m.FeedbackDialog })))
 
-/** The header's Feedback button: tell the DevDock team about a problem or an idea. No request until sent. */
+/** The header's Feedback button: tell the Calsko team about a problem or an idea. No request until sent. */
 export function FeedbackButton() {
   const { team } = useCurrentTeam()
   const [open, setOpen] = useState(false)

@@ -6,7 +6,7 @@ const EVENT = 'devdock:open-notes'
 export type OpenNotesRequest = {
   /** A note to scroll to and outline. */
   noteId?: string
-  /** Opened by DevDock, not by a click: slide in without taking focus or covering the page. */
+  /** Opened by Calsko, not by a click: slide in without taking focus or covering the page. */
   quiet?: boolean
 }
 

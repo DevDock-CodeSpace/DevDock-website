@@ -19,7 +19,7 @@ export function AdminFlagsPage() {
     <>
       <PageHeader
         title="Feature flags"
-        description="Switch features on or off per group. Groups see a change the next time they open DevDock."
+        description="Switch features on or off per group. Groups see a change the next time they open Calsko."
       />
       {flags.length === 0 ? (
         <p className="py-10 text-center text-sm text-muted-foreground">No feature flags yet.</p>

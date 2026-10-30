@@ -13,7 +13,7 @@ const AskDevDockPanel = panel.Component
 const isMac = typeof navigator !== 'undefined' && /mac|iphone|ipad/i.test(navigator.platform)
 
 /**
- * The header's Ask DevDock button (⌘K / Ctrl+K). Shown only in groups with the ask_devdock feature flag
+ * The header's Calsko AI button (⌘K / Ctrl+K). Shown only in groups with the ask_devdock feature flag
  * (AppLayout; the platform admin switches it per group). To turn the assistant off everywhere, set the
  * function's AI_ENABLED secret to "false"; the panel then says so.
  */
@@ -47,7 +47,7 @@ export function AskDevDockButton() {
             variant="ghost"
             size="sm"
             className="text-muted-foreground"
-            aria-label="Ask DevDock"
+            aria-label="Calsko AI"
             // Pointing at the button loads the panel and mounts it closed, so the click only opens it.
             onPointerEnter={warmUp}
             onFocus={warmUp}
@@ -61,7 +61,7 @@ export function AskDevDockButton() {
           </Button>
         </TooltipTrigger>
         <TooltipContent>
-          Ask DevDock <kbd className="ml-1 font-mono text-[10px] opacity-70">{isMac ? '⌘K' : 'Ctrl K'}</kbd>
+          Calsko AI <kbd className="ml-1 font-mono text-[10px] opacity-70">{isMac ? '⌘K' : 'Ctrl K'}</kbd>
         </TooltipContent>
       </Tooltip>
       {loaded && (

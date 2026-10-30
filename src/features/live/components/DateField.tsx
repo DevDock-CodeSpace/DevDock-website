@@ -22,7 +22,7 @@ type DateFieldProps = {
   className?: string
 }
 
-/** A date field that opens DevDock's month calendar (the one Meetings uses for "specific dates"). */
+/** A date field that opens Calsko's month calendar (the one Meetings uses for "specific dates"). */
 export function DateField({ id, value, onChange, min, disabled, className }: DateFieldProps) {
   const [open, setOpen] = useState(false)
   const selected = parseDateKey(value)

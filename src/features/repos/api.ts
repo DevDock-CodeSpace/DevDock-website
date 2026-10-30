@@ -8,7 +8,7 @@ import { supabase } from '@/lib/supabase'
 // Group owners/admins add and remove repos; workspace managers link and
 // unlink them. RLS enforces it; see the repos_and_issue_repo migration.
 //
-// Connecting GitHub (the DevDock GitHub App) goes through the `github` Edge
+// Connecting GitHub (the Calsko GitHub App) goes through the `github` Edge
 // Function, which verifies with GitHub and is the only writer of
 // github_installations and of a repo's GitHub id/installation.
 
@@ -176,7 +176,7 @@ export type GitHubInstallation = {
   account_type: 'User' | 'Organization'
   created_at: string
 }
-/** A repo the group's installations can reach (from GitHub, not yet necessarily in DevDock). */
+/** A repo the group's installations can reach (from GitHub, not yet necessarily in Calsko). */
 export type GitHubRepo = { githubRepoId: number; owner: string; name: string; private: boolean }
 
 /** The App's public slug (github.com/apps/<slug>); unset = GitHub isn't set up for this deployment. */
@@ -203,12 +203,12 @@ export const githubInstallationsQuery = (teamId: string) =>
   })
 
 const githubErrors: Record<string, string> = {
-  not_configured: 'GitHub isn’t set up for DevDock yet. Ask whoever runs DevDock to add the GitHub App keys.',
+  not_configured: 'GitHub isn’t set up for Calsko yet. Ask whoever runs Calsko to add the GitHub App keys.',
   unauthorized: 'Your session expired. Sign in again and retry.',
   forbidden: 'Only group owners and admins can do that.',
   state_invalid: 'That GitHub link expired or was already used. Start again from Group settings.',
   installation_denied: 'Your GitHub account can’t access that installation, so it wasn’t connected.',
-  repo_not_found: 'The DevDock GitHub App can’t see that repository. Give it access on GitHub first.',
+  repo_not_found: 'The Calsko GitHub App can’t see that repository. Give it access on GitHub first.',
   not_found: 'That no longer exists, or you don’t have access to it.',
   no_repo: 'Set the issue’s repository first (this project has several).',
   repo_not_connected: 'That repository isn’t connected to GitHub. Add it from GitHub in Group settings → Repositories.',
@@ -259,7 +259,7 @@ export const githubReposQuery = (teamId: string) =>
 export const addGitHubRepo = async (teamId: string, githubRepoId: number) =>
   (await callGitHub<{ repo: Repo }>('add_repo', { teamId, githubRepoId })).repo
 
-/** Forgets the connection in DevDock; repos stay, marked not connected. The App stays installed on GitHub. */
+/** Forgets the connection in Calsko; repos stay, marked not connected. The App stays installed on GitHub. */
 export async function disconnectGitHub(teamId: string, installationId: number) {
   const { data, error } = await supabase
     .from('github_installations')

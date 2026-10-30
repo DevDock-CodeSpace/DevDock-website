@@ -53,7 +53,7 @@ export function AdminFeedbackPage() {
     <>
       <PageHeader
         title="Feedback"
-        description={counts.new === 0 ? 'Nothing new. Everything people sent is below under Done.' : `${counts.new} new ${counts.new === 1 ? 'message' : 'messages'} from people using DevDock.`}
+        description={counts.new === 0 ? 'Nothing new. Everything people sent is below under Done.' : `${counts.new} new ${counts.new === 1 ? 'message' : 'messages'} from people using Calsko.`}
       />
       <div role="tablist" aria-label="Show" className="mb-4 flex gap-1 border-b">
         {FILTERS.map((f) => (

@@ -1,5 +1,5 @@
 // Shared types for the AI agent. Nothing here knows about a model provider or
-// about any DevDock feature: tools, the registry, the runner and the
+// about any Calsko feature: tools, the registry, the runner and the
 // confirmation flow all meet through these.
 
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2'
@@ -30,7 +30,7 @@ export type ObjectSchema = {
 
 // ------------------------------------------------------------------- tools
 
-/** read: no change. write: changes DevDock data. external: reaches another person. destructive: can't be undone. */
+/** read: no change. write: changes Calsko data. external: reaches another person. destructive: can't be undone. */
 export type AiToolRisk = 'read' | 'write' | 'external' | 'destructive'
 
 /** What the model is shown. Nothing about how the tool runs belongs here. */
@@ -82,7 +82,7 @@ export type AiToolExecutor<A = unknown> = {
   confirm?: boolean
   execute: (args: A, context: AiExecutionContext) => Promise<AiToolResult>
   /**
-   * For confirmed tools: check the arguments against DevDock **without changing anything**
+   * For confirmed tools: check the arguments against Calsko **without changing anything**
    * and describe what will happen. Required when the tool needs confirmation.
    */
   prepare?: (args: A, context: AiExecutionContext) => Promise<AiToolResult<PreparedAction<A>>>
@@ -131,7 +131,7 @@ export type AiExecutionContext = {
   currentEntity?: AiCurrentEntity
   /** Supabase as the caller: every query and RPC runs under their RLS. */
   db: SupabaseClient
-  /** Calls another DevDock Edge Function as the caller. */
+  /** Calls another Calsko Edge Function as the caller. */
   callFunction: (name: string, body: Record<string, unknown>) => Promise<AiToolResult>
   /** Set while a confirmed action runs: the pending action's id, for idempotent writes. */
   idempotencyKey?: string

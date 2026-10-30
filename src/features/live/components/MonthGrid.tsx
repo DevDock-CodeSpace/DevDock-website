@@ -17,7 +17,7 @@ type MonthGridProps = {
   minDay?: Date
 }
 
-/** A small month calendar (DevDock style): ‹ month › header, weekday letters, and a grid of days. */
+/** A small month calendar (Calsko style): ‹ month › header, weekday letters, and a grid of days. */
 export function MonthGrid({ month, onMonthChange, isSelected, onPick, minDay }: MonthGridProps) {
   const today = startOfDay(new Date())
   const min = minDay ? startOfDay(minDay) : null

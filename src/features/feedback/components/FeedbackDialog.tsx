@@ -30,7 +30,7 @@ export function FeedbackDialog({ open, onOpenChange, teamId }: { open: boolean; 
       setMessage('')
       setKind('problem')
       onOpenChange(false)
-      toast.success('Thanks! Your feedback reached the DevDock team.')
+      toast.success('Thanks! Your feedback reached the Calsko team.')
     } catch (e) {
       setError(errorMessage(e))
     } finally {
@@ -44,7 +44,7 @@ export function FeedbackDialog({ open, onOpenChange, teamId }: { open: boolean; 
         <form onSubmit={(e) => void submit(e)} className="space-y-4" data-feedback-form>
           <DialogHeader>
             <DialogTitle>Send feedback</DialogTitle>
-            <DialogDescription>Found a problem or have an idea? It goes straight to the people who build DevDock.</DialogDescription>
+            <DialogDescription>Found a problem or have an idea? It goes straight to the people who build Calsko.</DialogDescription>
           </DialogHeader>
           <div role="radiogroup" aria-label="Kind of feedback" className="flex flex-wrap gap-1.5">
             {FEEDBACK_KINDS.map((k) => (

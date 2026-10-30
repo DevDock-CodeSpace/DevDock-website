@@ -202,7 +202,7 @@ export function LiveSessionView({ session, workspaceId }: LiveSessionViewProps) 
           {joinable
             ? status === 'upcoming' && canWrite && Date.parse(session.starts_at) - now > EARLY_JOIN_MS
               ? 'You can open the room early to set up.'
-              : 'Opens in DevDock. Your camera and mic are off until you turn them on.'
+              : 'Opens in Calsko. Your camera and mic are off until you turn them on.'
             : status === 'upcoming'
               ? `Opens 15 minutes before it starts (${formatTime(new Date(Date.parse(session.starts_at) - EARLY_JOIN_MS).toISOString())}).`
               : 'This meeting has ended.'}
@@ -286,7 +286,7 @@ export function LiveSessionView({ session, workspaceId }: LiveSessionViewProps) 
                     <TooltipContent className="max-w-xs">
                       {session.calendar_event_id
                         ? 'Updates the event in your Google Calendar and emails everyone this meeting is for again, so they see the change.'
-                        : 'Creates the event in your Google Calendar and emails an invite to everyone this meeting is for. They don’t need a DevDock or Google account to receive it.'}
+                        : 'Creates the event in your Google Calendar and emails an invite to everyone this meeting is for. They don’t need a Calsko or Google account to receive it.'}
                     </TooltipContent>
                   </Tooltip>
                 </span>

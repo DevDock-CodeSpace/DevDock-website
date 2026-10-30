@@ -24,7 +24,7 @@ export type Issue = {
   status: IssueStatus
   priority: IssuePriority
   assignee_id: string | null
-  /** Imported issues only: the assignee as the file named them, until someone in DevDock is matched. */
+  /** Imported issues only: the assignee as the file named them, until someone in Calsko is matched. */
   import_assignee: string | null
   /** The plan (a goal in the group) this issue is part of, or null. */
   plan_id: string | null
@@ -304,7 +304,7 @@ export const pullRequestsQuery = (issueId: string) =>
     },
   })
 
-/** A branch DevDock created (or adopted) on GitHub for the issue. */
+/** A branch Calsko created (or adopted) on GitHub for the issue. */
 export type IssueBranch = {
   id: string
   name: string

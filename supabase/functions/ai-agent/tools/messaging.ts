@@ -114,7 +114,7 @@ export const messagingTools = [
   defineTool<SendArgs>({
     name: 'send_message',
     description:
-      'Send a DevDock message as the user. To message a person directly, pass recipientUserId (an id from find_user); ' +
+      'Send a Calsko message as the user. To message a person directly, pass recipientUserId (an id from find_user); ' +
       'to post in a channel or group chat, pass conversationId (from find_conversation). Write the text as the user would say it, in the first person. ' +
       'This does not send at once: the user is shown the message and must confirm, so never say it was sent.',
     domain: 'messaging',

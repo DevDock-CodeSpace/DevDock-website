@@ -45,7 +45,7 @@ export function NoteComposer() {
           setText('')
           setTime(null)
           box.current?.focus()
-          toast.success(remindAt ? `Saved. DevDock will open it ${formatReminderWhen(remindAt, Date.now()).toLowerCase()}.` : 'Note saved.')
+          toast.success(remindAt ? `Saved. Calsko will open it ${formatReminderWhen(remindAt, Date.now()).toLowerCase()}.` : 'Note saved.')
         },
         onError: (error) => toast.error(errorMessage(error)),
       },

@@ -1,10 +1,10 @@
-// github-webhook: receives the DevDock GitHub App's webhooks.
+// github-webhook: receives the Calsko GitHub App's webhooks.
 //
 // GitHub POSTs events here (no Supabase login; the gateway JWT check is off).
 // Every request must carry a valid X-Hub-Signature-256 made with
 // GITHUB_WEBHOOK_SECRET, and each X-GitHub-Delivery is handled once.
 //
-//   pull_request   A PR in a connected repo comes from a branch DevDock made
+//   pull_request   A PR in a connected repo comes from a branch Calsko made
 //                  for an issue (issue_branches), or mentions CAP-12 in its
 //                  branch or title, or "fixes CAP-12" in its description → for each such
 //                  issue in a project linked to that repo, record the PR and
@@ -103,7 +103,7 @@ async function onPullRequest(admin: SupabaseClient, payload: Record<string, unkn
   const moved: string[] = []
 
   for (const repo of repos ?? []) {
-    // Branches DevDock created: they keep matching even after a project
+    // Branches Calsko created: they keep matching even after a project
     // renames its issue key (wa-2-… on an issue that's now WEB-2).
     const { data: stored, error: storedError } = await admin
       .from('issue_branches')

@@ -1,5 +1,5 @@
 // Where to send the user after sign-in. Only same-origin app paths are allowed,
-// so a crafted ?next= can't turn DevDock into an open redirect.
+// so a crafted ?next= can't turn Calsko into an open redirect.
 
 const NEXT_KEY = 'devdock:auth-next'
 export const DEFAULT_AFTER_LOGIN = '/app'

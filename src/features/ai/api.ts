@@ -2,7 +2,7 @@ import { FunctionsHttpError } from '@supabase/supabase-js'
 import { DataError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
 
-// Ask DevDock: the browser's side of the `ai-agent` Edge Function. The model
+// Calsko AI: the browser's side of the `ai-agent` Edge Function. The model
 // provider's key, the tools and every permission check live in the function;
 // the browser sends what was typed and where the person is, and never a user id.
 // How it works: docs/AI_AGENT.md.
@@ -40,15 +40,15 @@ export type AiHistoryTurn = { role: 'user' | 'assistant'; text: string }
 /** The longest request the function accepts. */
 export const AI_MESSAGE_MAX = 2000
 
-const UNAVAILABLE = 'DevDock AI is temporarily unavailable. Your other DevDock features are unaffected.'
+const UNAVAILABLE = 'Calsko AI is temporarily unavailable. Your other Calsko features are unaffected.'
 
 const httpErrors: Record<string, string> = {
-  unauthorized: 'Your session expired. Sign in again to use DevDock AI.',
+  unauthorized: 'Your session expired. Sign in again to use Calsko AI.',
   not_found: 'You don’t have access to this group or project anymore.',
   rate_limited: 'That’s a lot of requests. Wait a minute and try again.',
-  disabled: 'DevDock AI is switched off.',
-  not_enabled: 'DevDock AI isn’t switched on for this group.',
-  not_configured: 'DevDock AI isn’t set up yet. The group owner needs to add its key.',
+  disabled: 'Calsko AI is switched off.',
+  not_enabled: 'Calsko AI isn’t switched on for this group.',
+  not_configured: 'Calsko AI isn’t set up yet. The group owner needs to add its key.',
   bad_request: 'That request couldn’t be read. Try a shorter message.',
 }
 

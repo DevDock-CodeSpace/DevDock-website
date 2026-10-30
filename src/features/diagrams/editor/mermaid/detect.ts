@@ -2,7 +2,7 @@
 // (```mermaid … ``` with sentences around it). Kept apart from the parser so the editor
 // can check every paste without loading it. No imports: Deno tests run it as is.
 
-/** The diagram types DevDock turns into shapes. */
+/** The diagram types Calsko turns into shapes. */
 export const IMPORTABLE = ['flowchart', 'erDiagram'] as const
 export type ImportableType = (typeof IMPORTABLE)[number]
 

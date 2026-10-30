@@ -7,7 +7,7 @@ export const loginErrorMessages: Record<LoginErrorCode, string> = {
   oauth: 'The sign-in couldn’t be completed. Please try again.',
   callback: 'We couldn’t finish signing you in. Please try again.',
   session: 'Your session couldn’t be restored. Please sign in again.',
-  unavailable: 'DevDock can’t reach the sign-in service right now. Check your connection and try again.',
+  unavailable: 'Calsko can’t reach the sign-in service right now. Check your connection and try again.',
   'not-configured': 'That way of signing in isn’t set up here yet. Try another one.',
   credentials: 'That email or password isn’t right.',
 }
