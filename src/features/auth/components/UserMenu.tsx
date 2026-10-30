@@ -1,4 +1,4 @@
-import { LogOut, MessageSquareText, ShieldCheck } from 'lucide-react'
+import { Check, LogOut, MessageSquareText, ShieldCheck } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -8,30 +8,42 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { LazyFeedbackDialog, preloadFeedbackDialog } from '@/features/feedback/components/LazyFeedbackDialog'
+import { StatusDot, StatusMark } from '@/features/status/components/StatusDot'
+import { CHOOSABLE, statusLabel, writeChosen } from '@/features/status/status'
+import { useChosenStatus, useUserStatus } from '@/features/status/store'
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar'
 import { initials } from '@/lib/utils'
-import { useSignOut, useUserIdentity } from '../hooks'
+import { useAuth, useSignOut, useUserIdentity } from '../hooks'
 
 /**
  * Signed-in user in the sidebar footer: avatar + name, which opens the account
- * menu upward, as wide as the button, with the email in its header, Send feedback, Privacy policy and Sign out.
+ * menu upward, as wide as the button, with the email in its header, your status, then the rest.
  * Collapsed to icons, only the avatar shows.
  */
 export function UserMenu() {
   const { name, email, avatarUrl, profileUnavailable } = useUserIdentity()
   const signOut = useSignOut()
+  const { user } = useAuth()
+  const chosen = useChosenStatus()
+  const status = useUserStatus(user.id)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
   const [feedbackWanted, setFeedbackWanted] = useState(false)
 
   const avatar = (
-    <Avatar className="size-5 rounded-full">
-      {/* Google avatar URLs can reject requests that send a Referer. */}
-      {avatarUrl && <AvatarImage src={avatarUrl} alt="" referrerPolicy="no-referrer" />}
-      <AvatarFallback className="rounded-full text-[10px]">{initials(name)}</AvatarFallback>
-    </Avatar>
+    <span className="relative inline-flex shrink-0">
+      <Avatar className="size-5 rounded-full">
+        {/* Google avatar URLs can reject requests that send a Referer. */}
+        {avatarUrl && <AvatarImage src={avatarUrl} alt="" referrerPolicy="no-referrer" />}
+        <AvatarFallback className="rounded-full text-[10px]">{initials(name)}</AvatarFallback>
+      </Avatar>
+      <StatusDot userId={user.id} className="size-2" />
+    </span>
   )
 
   return (
@@ -71,6 +83,24 @@ export function UserMenu() {
                 Profile couldn’t be loaded. Showing your Google account details.
               </p>
             )}
+            <DropdownMenuSeparator />
+            {/* Your status (features/status): one line showing it, the choices beside it (like Teams). Picked here and
+                remembered in this browser; In a call and Away are automatic. */}
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <StatusMark status={status === 'offline' ? chosen : status} className="mx-[3px]" />
+                {statusLabel[status === 'offline' ? chosen : status]}
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="min-w-44">
+                {CHOOSABLE.map((option) => (
+                  <DropdownMenuItem key={option} onSelect={() => writeChosen(option)}>
+                    <StatusMark status={option} className="mx-[3px]" />
+                    {statusLabel[option]}
+                    {chosen === option && <Check className="ml-auto" />}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onPointerEnter={preloadFeedbackDialog}

@@ -73,6 +73,7 @@ export function TeamMembersPage() {
             <PersonRow
               key={member.user_id}
               profile={member.profile}
+              userId={member.user_id}
               isYou={isYou}
               role={teamRoleLabel[member.role]}
               highlight={member.role === 'owner'}

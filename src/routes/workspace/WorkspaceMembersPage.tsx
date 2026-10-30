@@ -122,6 +122,7 @@ export function WorkspaceMembersPage() {
               <PersonRow
                 key={member.user_id}
                 profile={member.profile}
+                userId={member.user_id}
                 isYou={isYou}
                 role={workspaceRoleLabel[member.role]}
                 highlight={member.role === 'lead'}
@@ -183,6 +184,7 @@ export function WorkspaceMembersPage() {
               <PersonRow
                 key={person.user_id}
                 profile={person.profile}
+                userId={person.user_id}
                 isYou={person.user_id === user.id}
                 role={workspaceRoleLabel.member}
                 actions={
