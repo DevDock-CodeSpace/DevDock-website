@@ -642,6 +642,53 @@ export type Database = {
         }
         Relationships: []
       }
+      feedback: {
+        Row: {
+          context: Json
+          created_at: string
+          done_at: string | null
+          id: string
+          kind: string
+          message: string
+          page: string | null
+          status: string
+          team_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          context?: Json
+          created_at?: string
+          done_at?: string | null
+          id?: string
+          kind: string
+          message: string
+          page?: string | null
+          status?: string
+          team_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          context?: Json
+          created_at?: string
+          done_at?: string | null
+          id?: string
+          kind?: string
+          message?: string
+          page?: string | null
+          status?: string
+          team_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       file_shares: {
         Row: {
           created_at: string
@@ -2911,6 +2958,23 @@ export type Database = {
           updated_at: string
         }[]
       }
+      admin_feedback: {
+        Args: never
+        Returns: {
+          context: Json
+          created_at: string
+          done_at: string
+          id: string
+          kind: string
+          message: string
+          page: string
+          sender_email: string
+          sender_id: string
+          sender_name: string
+          status: string
+          team_name: string
+        }[]
+      }
       admin_groups: {
         Args: never
         Returns: {
@@ -2928,6 +2992,10 @@ export type Database = {
         }[]
       }
       admin_overview: { Args: never; Returns: Json }
+      admin_set_feedback_status: {
+        Args: { p_id: string; p_status: string }
+        Returns: undefined
+      }
       admin_set_flag_default: {
         Args: { p_enabled: boolean; p_key: string }
         Returns: undefined
@@ -3154,6 +3222,16 @@ export type Database = {
           parent_id: string
           team_id: string
         }[]
+      }
+      send_feedback: {
+        Args: {
+          p_context: Json
+          p_kind: string
+          p_message: string
+          p_page: string
+          p_team: string
+        }
+        Returns: string
       }
       send_message: {
         Args: {

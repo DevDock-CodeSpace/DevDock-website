@@ -1,11 +1,14 @@
-import { useSuspenseQuery } from '@tanstack/react-query'
+import { useSuspenseQueries } from '@tanstack/react-query'
+import { MessageSquareText } from 'lucide-react'
+import { Link } from 'react-router'
 import { PageHeader } from '@/components/PageHeader'
-import { adminOverviewQuery } from '@/features/admin/api'
+import { adminFeedbackQuery, adminOverviewQuery } from '@/features/admin/api'
 import { formatShortDate } from '@/lib/format'
 
 /** /admin: totals across Calsko (counts only) and sign-ups per week. */
 export function AdminOverviewPage() {
-  const overview = useSuspenseQuery(adminOverviewQuery()).data
+  const [{ data: overview }, { data: feedback }] = useSuspenseQueries({ queries: [adminOverviewQuery(), adminFeedbackQuery()] })
+  const newFeedback = feedback.filter((f) => f.status === 'new').length
 
   const stats = [
     { label: 'Users', value: overview.users },
@@ -20,6 +23,20 @@ export function AdminOverviewPage() {
   return (
     <>
       <PageHeader title="Overview" description="Everyone on Calsko, in numbers. Group content is never shown here." />
+      {newFeedback > 0 && (
+        <Link
+          to="/admin/feedback"
+          data-overview-feedback
+          className="mb-6 flex items-center gap-2 rounded-lg border border-brand/40 bg-brand/5 px-3 py-2.5 text-sm hover:bg-brand/10"
+        >
+          <MessageSquareText className="size-4 text-brand" />
+          <span>
+            <span className="font-medium">{newFeedback} new feedback</span>
+            <span className="text-muted-foreground"> · {feedback.find((f) => f.status === 'new')?.message.slice(0, 80)}</span>
+          </span>
+          <span className="ml-auto text-xs text-muted-foreground">Read →</span>
+        </Link>
+      )}
       <dl className="grid grid-cols-2 gap-x-6 gap-y-5 border-b pb-6 sm:grid-cols-4 xl:grid-cols-7">
         {stats.map((stat) => (
           <div key={stat.label} className="min-w-0">
