@@ -1,156 +1,50 @@
 ---
 name: devdock-performance
-description: Keep DevDock fast. Use before and while writing any code that fetches data, adds or changes a route, query, list, realtime subscription, dependency, editor or large component, or anything that could add requests, JavaScript weight or render cost. Holds the speed rules, the budgets, the pre-flight questions, and when to stop and ask the owner before slowing the app down.
+description: Keep the app (Calsko, formerly DevDock) fast. Use before and while writing any code that fetches data, adds or changes a route, query, list, realtime subscription, dependency, editor or large component, or anything that could add requests, JavaScript weight or render cost. Holds the speed rules, the budgets, the pre-flight questions, and when to stop and ask the owner before slowing the app down.
 ---
 
-# DevDock performance rules
+# Performance rules
 
-DevDock feels instant for specific, deliberate reasons. Every change must keep them true. If a change
-would make the app slower, **stop and ask the owner before building it** (see "Stop and ask").
+The app feels instant for deliberate reasons: no app server in the request path (browser → Supabase, RLS decides), cache first
+(TanStack Query, Realtime invalidates narrow prefixes, nothing polls), requests start together, optimistic edits, small split
+JavaScript, small data filtered in the browser, few requests per action (every request is a log line on Supabase's Free plan).
 
-## Why the app is fast (don't break these)
+## Pre-flight questions
 
-1. **No app server in the request path.** The browser talks straight to Supabase; permissions live in RLS.
-   The page code is static files on a CDN (no SSR, no cold starts). Edge Functions are only for rare actions.
-2. **Cache first.** TanStack Query (`staleTime` 60 s). Revisiting a page shows cached data. Realtime events
-   *invalidate* narrow query prefixes; nothing polls.
-3. **Requests start together.** Route loaders prefetch what a page needs in parallel
-   (`issuesLoader` is the model); independent reads in a component are batched with `useSuspenseQueries`.
-4. **Instant feedback.** Edits and sends are optimistic (rollback + toast on failure).
-5. **Small, split JavaScript.** First load is about 320 KB gzipped. Editors (TipTap), diagrams (React Flow),
-   video (Jitsi) and code highlighting are separate chunks loaded only when opened.
-6. **Small data, filtered in the browser.** One query per scope; tabs, filters and grouping make no requests.
-7. **Few requests per action.** Every request is also a log line on Supabase, and log ingestion is the Free plan
-   meter closest to its limit (1 GB a cycle). Request count is a budget of its own, not only a speed concern.
-
-## Pre-flight: answer these before writing the code
-
-1. Which requests does this add, on which screen, and are they independent? (independent means parallel)
-2. Does it add anything to the **first load** (JS or CSS)?
-3. Does the cost grow with the amount of data (rows, messages, members)?
-4. Does it make navigation or first paint wait on something slow?
-5. Does it poll, use timers, or do work on every render, scroll or keystroke?
-6. Does it add a query to the shell, or a write that runs without the user doing something? Each is paid on
-   every page load, and each write is echoed to every open tab as a refetch.
+1. Which requests does this add, on which screen, and are they independent (then parallel)?
+2. Does it add to the **first load** (JS or CSS)? 3. Does its cost grow with the data (rows, messages, members)?
+4. Does navigation or first paint wait on something slow? 5. Does it poll, or work on every render, scroll or keystroke?
+6. Does it add a shell query, or a write the user didn't ask for (each write is echoed to every open tab as a refetch)?
 
 ## Rules
 
-**Fetching**
-- **No waterfalls.** Never read independent queries with several `useSuspenseQuery` calls in a row: each one
-  waits for the one before. Use `useSuspenseQueries`, and put the page's queries in a route loader with
-  `queryClient.prefetchQuery` inside `Promise.all` (loaders only block on what the page needs first). A query
-  that truly needs another's result (an issue's comments need the issue's id) is a real dependency: keep the
-  dependent step to one parallel batch.
-- **No N+1.** Never a request per row, message or item. Fetch for the whole scope and group in the browser
-  (`conversationReactionsQuery` is the model; the per-message version fired ~150 requests per page).
-- **Don't suspend a stable screen on a re-query.** Use `useQuery` with `placeholderData: keepPreviousData`
-  (see `ConversationView`) so a refetch or a changed key doesn't blank the page.
-- Select only the columns you use. Every new `where`/`order by` column gets an index in the migration.
-- Don't run a write on every refetch (we once called `ensure_general_channel` on each message event).
-- Keep query keys under the existing prefixes so Realtime `AFFECTS` invalidates them; a new table needs an
-  `AFFECTS` entry and a publication migration. Invalidate narrow prefixes, not `['issues']`.
-- Optimistic update for anything the user expects to feel instant (edits, sends, toggles).
+- **No waterfalls:** a page's loader starts everything it reads on first render (`Promise.all` of `prefetchQuery`); read
+  independent queries with `useSuspenseQueries`, never several `useSuspenseQuery` in a row. Real dependencies: one batch each.
+- **No N+1:** fetch per scope, group in the browser (`conversationReactionsQuery` is the model).
+- Don't suspend a stable screen on a re-query: `useQuery` + `placeholderData: keepPreviousData` (see `ConversationView`).
+- Select only used columns; index every new `where`/`order by` column. Never write on every refetch.
+- Keys under existing prefixes; a new table needs an `AFFECTS` entry and a publication migration. Invalidate narrowly.
+- Shell data that rarely changes uses `SETTLED_STALE_MS` (10 min). Don't refetch on tab return what Realtime delivers
+  (`lib/live.ts`; unpublished tables under a live root go in `NOT_LIVE`).
+- **Autosave** costs exactly one request in the saving tab and none elsewhere: `ownSave(table, id)` before, its result with the
+  returned `updated_at` after, update the cache yourself, invalidate lists only for changes they show.
+- Don't write when nothing would change: check the cache first (read positions, notifications).
+- **Bundle:** anything over ~20 KB gz not needed for the first screen is lazy, via `preloadable()` (never bare `lazy()`): start
+  the code in the loader beside the data, or on hover for panels. Import single icons.
+- `npm run check` must pass: first-load JS ≤ 345 KB gz, CSS ≤ 30 KB gz, editors/diagram/video/highlighter not in the first load.
+- **Rendering:** lists that can pass ~200 rows page or virtualize; no per-row queries or timers; `useMemo` for derived data on
+  keystrokes or events; keep editor `onUpdate` cheap; don't change layout inside `dragstart`.
 
-**Requests the user never asked for**
-- **Shell data that rarely changes uses `SETTLED_STALE_MS`** (10 min, `lib/query-client.ts`): groups, members, the
-  workspace list and roles, pins, saved views, message preferences. The default 60 s `staleTime` re-requests a
-  query on every return to the tab; realtime already refreshes these when they change. Only for tables in the
-  `supabase_realtime` publication, and not for things that must feel immediate (unread counts, notifications).
-- **A write is never free.** Realtime echoes it to every open tab, and each tab refetches the queries in `AFFECTS`.
-  Don't write when nothing would change: check the cache first (`ConversationView` saves the read position only
-  when the cached count says something is unread, and clears notifications only when the bell has some). If the
-  cache can lag, make the check re-run when it updates so the write still happens.
-- **Keep `AFFECTS` entries as narrow as the change.** List only the prefixes a table's change can alter. For a
-  table busy enough to matter, use a function of the change to pick the scope (`messageQueries` narrows a chat
-  message to its conversation, and a reply to that conversation's threads). Use the event's ids only to choose
-  queries; never show row data from an event.
-- After a mutation, invalidate only what it changed (sending without a file doesn't refetch attachments).
-- **Autosave is the costliest thing in the app**: a save fires about once a second while someone types. A save
-  must cost exactly one request in the saving tab and none in tabs that don't have the item open. Call
-  `ownSave(table, id)` before the request (and its result with the returned `updated_at` after), update the cache yourself, and invalidate lists only for a change
-  they show (a rename). `rowQueries` in `lib/realtime.ts` does the same judgment for other tabs.
-- **Don't refetch on return to the tab what live updates already deliver** (`lib/live.ts`). A query under a
-  live root that reads an unpublished table must be added to `NOT_LIVE` or it will go stale.
+## Stop and ask the owner first
 
-**Bundle**
-- Anything over about 20 KB gzipped that isn't needed to paint the first screen is lazy-loaded
-  (`lazy()` or its own route). Import single icons, never whole libraries.
-- **Lazy screens use `preloadable()`** (`lib/preloadable.ts`), never bare `lazy()`: start the code in the
-  route's loader, side by side with its data (`Promise.all([...data, x.preload()])`), or on hover for a
-  panel or tab. Bare `lazy()` suspends on its first render even when the code has arrived, and React
-  then holds the reveal ~300 ms; measured 2026-10-26, that was most of the wait on docs, whiteboards,
-  issues, lessons, Ask DevDock and Notes (e.g. doc 480 → 165 ms). A lazy panel is also mounted closed on
-  hover, so the click only opens it.
-- **A page's loader starts everything the page reads on its first render**, including the blocks
-  further down (the issue page's comments, activity, PRs and branches were three rounds; now one).
-  Measure clicks in-page (pointerdown → painted), not with Playwright's own waits, which add ~400 ms.
-- `npm run build && npm run perf` must pass: first-load JS <= 345 KB gz, CSS <= 30 KB gz, and the editors,
-  diagram, video and highlighter must not appear in the first load. The script prints the numbers.
-- New dependencies need the owner's OK (CLAUDE.md); check their cost with the build before proposing one.
-
-**Rendering**
-- Lists that can pass about 200 rows: paginate or virtualize. No per-row queries, subscriptions or timers.
-- Derived data that is recomputed on every keystroke or realtime event goes in `useMemo`.
-- Keep editor `onUpdate` handlers cheap (set state only when the value changes).
-- Don't change layout or the dragged element inside `dragstart` (it cancels the drag); defer that styling.
-
-## Stop and ask
-
-Before implementing, **stop and ask the owner** (AskUserQuestion) if the feature would:
-
-- add a request to every page's shell or first paint (`AppLayout`, sidebar, header, a loader on all routes);
-- add more than about 10 KB gzipped to the first load, add a dependency over about 20 KB gzipped, or need a budget raised;
-- make a screen wait on more than two sequential round trips, or add a waterfall that can't be flattened;
-- fetch unbounded data for a list that can grow (no limit or pagination);
-- add polling, intervals, or work on every render, scroll or keystroke;
-- make navigation wait on slow data.
-
-Say what gets slower (numbers when you can get them), the cheaper options (lazy-load, prefetch in parallel,
-paginate, load on open, cache), and your recommendation. Build the slower version only if the owner agrees,
-and add it to "Accepted trade-offs" below.
+If a change would add a request to every page's shell or first paint; add more than ~10 KB gz to the first load or a dependency
+over ~20 KB gz, or need a budget raised; make a screen wait on more than two sequential round trips; fetch unbounded data;
+poll or work on every render/scroll/keystroke; or make navigation wait on slow data. Say what gets slower (with numbers), the
+cheaper options (lazy, parallel prefetch, paginate, load on open, cache) and your recommendation.
 
 ## Done means
 
-- `npm run typecheck && npm run lint && npm run build && npm run perf` all pass.
-- For data changes, count the requests on the affected screen on a cold and a warm visit. Say it in the PR
-  ("first visit: N requests in M rounds"). For anything that writes or listens to realtime, also count the
-  requests one action causes in the acting tab and in a second open tab. A new screen with two or more queries gets a test that holds every
-  request open and asserts they all started before any finished (see `parallel.test.tsx` in the PR that added
-  this guide for the pattern: `deferred` promises in the fake client).
-
-## Measuring real traffic
-
-Supabase dashboard → Logs, **API Gateway**, last 24 hours, then expand **Pathname**: it lists request counts per
-path. Shell paths with near-equal counts mean that many shell loads; one path far ahead of the rest is something
-called repeatedly. The Free plan keeps about a day of logs, so look soon after a change. PgBouncer and
-`supabase-infra` health-check lines are Supabase's own and are constant.
-
-History (October 2026): the first version of messaging fetched reactions, attachments and replies per message
-(about 150 requests per conversation) and ran `ensure_general_channel` on every refetch; with realtime on, that
-produced about 25,000 requests a day during development. After that was fixed, the shell was still about half
-of all requests and each chat message cost about ten requests per open tab, which the rules above address.
-
-## Known gaps (fix when you touch them)
-
-Components that read several independent queries in a row (verify, then batch or prefetch): `WorkspaceGitHubPage`,
-`MessagesPage`, `TeamReposSection`, `TeamWorkspacesPage`, `TeamDocsPage` and `WorkspaceDocsPage`
-(docs + folders), `LearningProgressPage`, `AddWorkspaceMembersDialog`, and the hooks in `features/teams`,
-`features/learning` and `features/docs`.
-
-A reader's unread counts are fetched twice per message (the message event, then the read-position write).
-Creating or deleting something refetches the lists it appears in, never the whole feature
-(`invalidateQueries({ queryKey: ['documents'] })` also re-asks for folders and every open doc), and reports the
-new or deleted row with `ownWrite` so its echo isn't refetched as well. Changing an issue to In Progress costs
-about 7 requests because it also creates the GitHub branch.
-
-Measured October 2026 after these rules (requests in the acting tab / in a tab watching a list): doc save 1/0,
-diagram save 1/0, issue description save 1/0, issue field change 3/1, message 2/2, return to the tab 0 to 1.
-Before: 3/2, 2/1, 4/1, about 7/2, 4/2, and 10 to 12.
-Create a doc 3 (was 5), an issue 2 (was 8), a channel 12 (was 21); In Progress 7 (was 14).
-
-Scale limits (the app is sized for single-digit users): the Issues pages load every issue of a workspace in
-one query. Revisit (server-side filtering and paging) before a workspace passes about 500 issues.
-
-## Accepted trade-offs
-
-- **2026-10-18, Meetings list pages from the server** (owner's choice over rendering more of a single request): 10 meetings per request as the reader scrolls (`meetingsPageQuery`). First visit is 2 requests (upcoming and past, in parallel), each further page 1; a write refetches every loaded page (`live_sessions` has no realtime, so only the writer's tab). The calendar asks for its visible range (1 request per month or week). Diagrams and Docs stay one request per scope: their lists are small, and paging them would also need `listsAlreadyShow` (realtime) to understand paged caches.
+`npm run check` passes. For data changes, count requests on the screen cold and warm ("first visit: N requests in M rounds"),
+and for writes or realtime, in the acting tab and in a second tab. Measure real traffic in Supabase → Logs → API Gateway.
+Known gaps: some pages still read queries in a row (`WorkspaceGitHubPage`, `TeamReposSection`, `LearningProgressPage`).
+Accepted trade-off (2026-10-18): Meetings lists page from the server, 10 per request.
