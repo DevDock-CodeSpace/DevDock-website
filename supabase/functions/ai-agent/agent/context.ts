@@ -27,7 +27,7 @@ export type ContextResult =
 const bad: ContextResult = { ok: false, status: 400, code: 'bad_request' }
 // One answer for "doesn't exist" and "not yours": the difference is not the caller's to learn.
 const notFound: ContextResult = { ok: false, status: 404, code: 'not_found' }
-// The group hasn't been given Ask DevDock (the ask_devdock feature flag, switched per group by the platform admin).
+// The group hasn't been given Calsko AI (the ask_devdock feature flag, switched per group by the platform admin).
 const notEnabled: ContextResult = { ok: false, status: 403, code: 'not_enabled' }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

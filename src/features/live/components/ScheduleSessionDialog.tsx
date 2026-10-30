@@ -249,7 +249,7 @@ export function ScheduleSessionDialog({
                 ? session.series_id
                   ? 'This changes only this meeting of the series.'
                   : 'Changes are sent to everyone invited when the calendar invite is updated.'
-                : 'A video call in DevDock. Everyone it’s for can see it here and join from the meeting page.'}
+                : 'A video call in Calsko. Everyone it’s for can see it here and join from the meeting page.'}
             </DialogDescription>
           </DialogHeader>
 

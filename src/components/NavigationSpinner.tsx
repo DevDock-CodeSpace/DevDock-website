@@ -3,7 +3,7 @@ import { useNavigation } from 'react-router'
 import { DockSpinner } from '@/components/DockSpinner'
 
 /**
- * DevDock's spinner over the page area while the next page's loader runs, so a click always shows
+ * Calsko's spinner over the page area while the next page's loader runs, so a click always shows
  * that something is happening. It appears only after 150 ms, so fast navigations show nothing; the
  * current page stays underneath (dimmed) until the next one is ready.
  */

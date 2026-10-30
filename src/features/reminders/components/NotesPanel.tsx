@@ -18,7 +18,7 @@ type Props = {
   /** A note to scroll to and outline (from its notification). */
   highlight: string | null
   /**
-   * Opened by DevDock because a note's time came, not by a click: no dim overlay, focus stays where
+   * Opened by Calsko because a note's time came, not by a click: no dim overlay, focus stays where
    * it was (someone may be typing), and clicking the page doesn't close it. Close or Esc does.
    */
   quiet: boolean

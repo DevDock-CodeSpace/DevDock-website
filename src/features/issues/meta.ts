@@ -52,7 +52,7 @@ export const issueIdentifier = (key: string, number: number) => `${key}-${number
 
 /**
  * The git branch for an issue: dock/cap-12-add-login-page. The dock/ prefix
- * groups DevDock's branches on GitHub; the github-webhook function finds the
+ * groups Calsko's branches on GitHub; the github-webhook function finds the
  * issue from the cap-12 part (and from the stored name). Same as branchName()
  * in supabase/functions/github/index.ts.
  */

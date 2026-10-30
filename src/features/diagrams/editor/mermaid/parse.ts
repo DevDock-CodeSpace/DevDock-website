@@ -142,7 +142,7 @@ function toHsl(value: string): [number, number, number] | null {
   return [h * 60, s, l]
 }
 
-/** The nearest DevDock color key to a CSS color. Grays, white and black are `default`. */
+/** The nearest Calsko color key to a CSS color. Grays, white and black are `default`. */
 export function nearestColor(value: string): Color | null {
   const hsl = toHsl(value)
   if (!hsl) return null
@@ -222,7 +222,7 @@ const BRACKETS: [string, string[], Shape][] = [
   ['>', [']'], 'rectangle'],
 ]
 
-/** Mermaid's newer `A@{ shape: … }` names (and their aliases) → the nearest DevDock shape. */
+/** Mermaid's newer `A@{ shape: … }` names (and their aliases) → the nearest Calsko shape. */
 const SHAPE_NAMES: Record<string, Shape> = {}
 const shapeAliases: [Shape, string][] = [
   ['rectangle', 'rect rectangle proc process subproc subprocess subroutine fr-rect framed-rectangle div-rect div-proc divided-rectangle divided-process lin-rect lin-proc lined-rectangle lined-process shaded-process win-pane internal-storage window-pane notch-rect card notched-rectangle tag-rect tag-proc tagged-rectangle tagged-process odd flag bolt com-link lightning-bolt delay half-rounded-rectangle curv-trap curved-trapezoid display bow-rect stored-data bow-tie-rectangle notch-pent loop-limit notched-pentagon fork join hourglass collate'],
@@ -860,7 +860,7 @@ export function parseMermaid(code: string): ParseResult {
   const type = first.split(/\s/, 1)[0]
   return {
     ok: false,
-    error: `“${type}” diagrams can't be imported yet. DevDock imports Mermaid flowcharts and ER diagrams.`,
+    error: `“${type}” diagrams can't be imported yet. Calsko imports Mermaid flowcharts and ER diagrams.`,
     skipped: [],
   }
 }

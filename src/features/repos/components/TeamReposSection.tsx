@@ -180,14 +180,14 @@ function GitHubConnection({ installations }: { installations: GitHubInstallation
             </Button>
             {installations.length === 0 && (
               <p className="text-xs text-muted-foreground">
-                GitHub asks which repositories DevDock may see. DevDock can then list them here and, later, create
+                GitHub asks which repositories Calsko may see. Calsko can then list them here and, later, create
                 branches and follow pull requests.
               </p>
             )}
           </div>
         ) : (
           installations.length === 0 && (
-            <p className="text-xs text-muted-foreground">GitHub isn’t set up for this DevDock yet, so repositories are added by name.</p>
+            <p className="text-xs text-muted-foreground">GitHub isn’t set up for this Calsko yet, so repositories are added by name.</p>
           )
         ))}
 
@@ -195,7 +195,7 @@ function GitHubConnection({ installations }: { installations: GitHubInstallation
         open={confirm !== null}
         onOpenChange={(open) => !open && setConfirm(null)}
         title={confirm ? `Disconnect ${confirm.account_login}?` : ''}
-        description="Repositories stay in the group and on their issues, but are marked Not connected. To remove DevDock’s access on GitHub too, uninstall it from Manage."
+        description="Repositories stay in the group and on their issues, but are marked Not connected. To remove Calsko’s access on GitHub too, uninstall it from Manage."
         confirmLabel="Disconnect"
         pending={disconnect.isPending}
         onConfirm={() =>
@@ -234,7 +234,7 @@ function AddFromGitHubDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Add a repository</DialogTitle>
-          <DialogDescription>Repositories DevDock can see on GitHub that aren’t in this group yet.</DialogDescription>
+          <DialogDescription>Repositories Calsko can see on GitHub that aren’t in this group yet.</DialogDescription>
         </DialogHeader>
         {open && (
           <GitHubRepoChooser

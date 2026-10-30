@@ -1,4 +1,4 @@
-// Ask DevDock's conversation, kept in this browser for good (owner's choice, 2026-10-26): per person
+// Calsko AI's conversation, kept in this browser for good (owner's choice, 2026-10-26): per person
 // and per group, so reopening the panel, reloading or coming back tomorrow shows it again. "New chat"
 // clears it. Nothing goes to the server; another person signing in on the same browser has their own.
 // Read back as untrusted (it's storage anyone with the browser can edit), so bad entries are dropped.

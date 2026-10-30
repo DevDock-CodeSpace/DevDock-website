@@ -81,7 +81,7 @@ export function InactivityGuard() {
         <AlertDialogHeader>
           <AlertDialogTitle>Still there?</AlertDialogTitle>
           <AlertDialogDescription>
-            You’ll be signed out in <Countdown key={deadline} deadline={deadline} /> because you haven’t used DevDock for a while.
+            You’ll be signed out in <Countdown key={deadline} deadline={deadline} /> because you haven’t used Calsko for a while.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

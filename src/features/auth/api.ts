@@ -54,7 +54,7 @@ export async function signInWithProvider(provider: SignInProvider, next: string,
       // Fixed callback URL (must be in Supabase's Redirect URLs allow list);
       // the post-login destination travels in sessionStorage instead.
       redirectTo: `${window.location.origin}${AUTH_CALLBACK_PATH}`,
-      // Microsoft sends the email only when asked for it; DevDock matches people by email.
+      // Microsoft sends the email only when asked for it; Calsko matches people by email.
       ...(provider === 'azure' ? { scopes: 'openid email profile' } : {}),
       queryParams: { prompt: 'select_account' },
     },

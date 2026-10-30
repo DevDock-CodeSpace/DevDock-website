@@ -1,4 +1,4 @@
-// Cell text → DevDock values: statuses and priorities as Linear, Jira and Notion name them,
+// Cell text → Calsko values: statuses and priorities as Linear, Jira and Notion name them,
 // dates in the formats they export, estimates, labels and people. A value it can't read gives
 // null, and the page asks (statuses, priorities, people, sprints) or leaves it empty.
 // No imports: Deno tests run it as is (npm run test:import).
@@ -138,8 +138,8 @@ const utcDay = (time: number) => new Date(time).toISOString().slice(0, 10)
 /**
  * A sprint described by the file (Linear's Cycle Number, Name, Start and End), or null without
  * readable dates. Linear's end is the moment the next cycle starts, so the sprint ends the day
- * before (DevDock's sprints include their last day and may not overlap). A name that only repeats
- * the number ("Cycle 3") is dropped: DevDock shows "Sprint 3" itself.
+ * before (Calsko's sprints include their last day and may not overlap). A name that only repeats
+ * the number ("Cycle 3") is dropped: Calsko shows "Sprint 3" itself.
  */
 export function fileSprint(ref: string, name: string, start: string, end: string): FileSprint | null {
   const from = Date.parse(start)

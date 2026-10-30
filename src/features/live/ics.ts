@@ -3,7 +3,7 @@ import { inferRecurrence } from './recurrence'
 
 // Calendar files (RFC 5545). A meeting downloads as an .ics that any calendar
 // opens — Outlook/Teams, Google, Apple — so nobody needs to connect an account
-// and DevDock needs no API keys for it.
+// and Calsko needs no API keys for it.
 //
 // Times are written in UTC (the "Z" form), which needs no VTIMEZONE block. A
 // repeating series is one event whose other occurrences are RDATE lines, each
@@ -56,7 +56,7 @@ function sequence(updatedAt: string): number {
 export type IcsOptions = {
   /** The meetings to write: one meeting, or a whole series (soonest first). */
   sessions: LiveSession[]
-  /** Link back to a meeting in DevDock, put in its description and location. */
+  /** Link back to a meeting in Calsko, put in its description and location. */
   url: (session: LiveSession) => string
 }
 
@@ -64,7 +64,7 @@ export type IcsOptions = {
  * One VEVENT per meeting.
  *
  * A series is written as separate events rather than one repeating event with
- * RDATE: in DevDock each occurrence really is its own meeting that can be moved
+ * RDATE: in Calsko each occurrence really is its own meeting that can be moved
  * or cancelled on its own, and clients disagree about whether an RDATE-only
  * event includes its DTSTART in the recurrence set (ical.js drops it), which
  * would silently lose the first meeting.
@@ -75,7 +75,7 @@ export function buildIcs({ sessions, url }: IcsOptions): string {
 
   const events = sessions.flatMap((session) => {
     const link = url(session)
-    const description = [session.description?.trim(), `Join in DevDock: ${link}`].filter(Boolean).join('\n\n')
+    const description = [session.description?.trim(), `Join in Calsko: ${link}`].filter(Boolean).join('\n\n')
     return [
       'BEGIN:VEVENT',
       // Stable per meeting, so re-adding updates that event instead of duplicating it.
@@ -97,7 +97,7 @@ export function buildIcs({ sessions, url }: IcsOptions): string {
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//DevDock//Meetings//EN',
+    'PRODID:-//Calsko//Meetings//EN',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     ...events,
@@ -147,7 +147,7 @@ function stampRange(session: LiveSession): string {
 }
 
 function body(session: LiveSession, link: string): string {
-  return [session.description?.trim(), `Join in DevDock: ${link}`].filter(Boolean).join('\n\n')
+  return [session.description?.trim(), `Join in Calsko: ${link}`].filter(Boolean).join('\n\n')
 }
 
 /**

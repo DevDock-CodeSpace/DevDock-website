@@ -167,7 +167,7 @@ export function TeamSwitcher() {
   )
 }
 
-/** A group's custom icon logo when it has one, else the given fallback (the DevDock mark or type icon). */
+/** A group's custom icon logo when it has one, else the given fallback (the Calsko mark or type icon). */
 function GroupIcon({ team, className, fallback }: { team: Team; className?: string; fallback: ReactNode }) {
   if (!team.logo_path) return fallback
   return <img src={teamLogoUrl(team.logo_path)} alt="" className={cn('shrink-0 rounded-md object-cover', className)} />

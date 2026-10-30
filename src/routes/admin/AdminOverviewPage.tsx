@@ -3,7 +3,7 @@ import { PageHeader } from '@/components/PageHeader'
 import { adminOverviewQuery } from '@/features/admin/api'
 import { formatShortDate } from '@/lib/format'
 
-/** /admin: totals across DevDock (counts only) and sign-ups per week. */
+/** /admin: totals across Calsko (counts only) and sign-ups per week. */
 export function AdminOverviewPage() {
   const overview = useSuspenseQuery(adminOverviewQuery()).data
 
@@ -19,7 +19,7 @@ export function AdminOverviewPage() {
 
   return (
     <>
-      <PageHeader title="Overview" description="Everyone on DevDock, in numbers. Group content is never shown here." />
+      <PageHeader title="Overview" description="Everyone on Calsko, in numbers. Group content is never shown here." />
       <dl className="grid grid-cols-2 gap-x-6 gap-y-5 border-b pb-6 sm:grid-cols-4 xl:grid-cols-7">
         {stats.map((stat) => (
           <div key={stat.label} className="min-w-0">

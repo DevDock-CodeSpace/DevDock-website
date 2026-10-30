@@ -5,11 +5,11 @@ import type { GitHubCallbackResult } from '@/features/repos/loaders'
 const copy: Record<GitHubCallbackResult['kind'], { title: string; body?: string }> = {
   requested: {
     title: 'Install requested',
-    body: 'An owner of that GitHub organization has to approve the DevDock app. Once they do, connect again from Group settings → Repositories.',
+    body: 'An owner of that GitHub organization has to approve the Calsko app. Once they do, connect again from Group settings → Repositories.',
   },
   updated: {
     title: 'GitHub settings saved',
-    body: 'Changes to which repositories DevDock can see apply right away.',
+    body: 'Changes to which repositories Calsko can see apply right away.',
   },
   error: { title: 'GitHub wasn’t connected' },
 }
@@ -24,7 +24,7 @@ export function GitHubCallbackPage() {
       <h1 className="text-xl font-semibold">{title}</h1>
       <p className="max-w-md text-sm text-muted-foreground">{result.kind === 'error' ? result.message : body}</p>
       <Button asChild>
-        <Link to="/app">Back to DevDock</Link>
+        <Link to="/app">Back to Calsko</Link>
       </Button>
     </div>
   )

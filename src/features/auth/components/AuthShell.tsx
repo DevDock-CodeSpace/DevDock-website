@@ -20,7 +20,7 @@ const TOUR_MS = 6000
 const reducedMotion = () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 /**
- * The sign-in pages' frame (/login, /admin-login): on wide screens a showcase of what DevDock is
+ * The sign-in pages' frame (/login, /admin-login): on wide screens a showcase of what Calsko is
  * on the left, drawn in plain markup over a faint grid (no images, nothing to download), and the
  * sign-in column on the right; on phones the column with a strip of the tools above it.
  * Lazy-loaded with the pages, so signed-in users never download it.
@@ -49,7 +49,7 @@ export function AuthShell({ title, subtitle, children }: { title: string; subtit
         </div>
 
         <footer className="flex items-center justify-between gap-4 px-6 py-5 text-xs text-muted-foreground">
-          <span>© DevDock</span>
+          <span>© Calsko</span>
           <Link to="/privacy" className="hover:text-foreground">
             Privacy policy
           </Link>
@@ -59,7 +59,7 @@ export function AuthShell({ title, subtitle, children }: { title: string; subtit
   )
 }
 
-/** Phones only: the tools in one line, so the page still says what DevDock is. */
+/** Phones only: the tools in one line, so the page still says what Calsko is. */
 function MobileStrip() {
   return (
     <div className="mb-8 flex flex-wrap gap-1.5 lg:hidden">
@@ -73,7 +73,7 @@ function MobileStrip() {
   )
 }
 
-/** The left half on wide screens: what DevDock is, shown rather than told. */
+/** The left half on wide screens: what Calsko is, shown rather than told. */
 function Showcase() {
   const [tool, setTool] = useState<Tool>('issues')
   const [paused, setPaused] = useState(reducedMotion)
@@ -118,7 +118,7 @@ function Showcase() {
         </div>
       </div>
 
-      <div role="tablist" aria-label="DevDock tools" className="relative flex flex-wrap gap-1 px-8 pb-7 xl:px-14">
+      <div role="tablist" aria-label="Calsko tools" className="relative flex flex-wrap gap-1 px-8 pb-7 xl:px-14">
         {TOOLS.map(({ id, label, icon: Icon }) => {
           const active = id === tool
           return (

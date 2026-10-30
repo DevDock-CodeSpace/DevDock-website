@@ -157,7 +157,7 @@ function BrandingSection() {
       title="Logo"
       description={
         can.canEditTeam
-          ? 'Shown in the sidebar in place of the DevDock mark. A square PNG, JPG or WebP works best (max 2 MB).'
+          ? 'Shown in the sidebar in place of the Calsko mark. A square PNG, JPG or WebP works best (max 2 MB).'
           : 'Only owners and admins can change the logo.'
       }
     >

@@ -35,7 +35,7 @@ export function reloadForNewVersion(): boolean {
 /**
  * Vite fires `vite:preloadError` when a lazy chunk fails to load: reload right
  * away. The error isn't cancelled (that would hand the page an empty module),
- * so the route error screen shows "DevDock was just updated" until the reload lands.
+ * so the route error screen shows "Calsko was just updated" until the reload lands.
  */
 export function watchForStaleBuild() {
   window.addEventListener('vite:preloadError', () => {

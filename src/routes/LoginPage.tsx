@@ -33,13 +33,13 @@ export function LoginPage() {
     message || redirecting
       ? null
       : inactive
-        ? 'You were signed out because you hadn’t used DevDock for a while. Sign in to pick up where you left off.'
+        ? 'You were signed out because you hadn’t used Calsko for a while. Sign in to pick up where you left off.'
         : expired
           ? 'Your sign-in reached its time limit. Sign in again to pick up where you left off.'
           : null
 
   return (
-    <AuthShell title="Welcome back" subtitle="Sign in to your DevDock workspace.">
+    <AuthShell title="Welcome back" subtitle="Sign in to your Calsko workspace.">
       {notice && (
         <div role="status" className="mb-6 flex gap-2.5 rounded-lg border bg-muted/40 px-3 py-2.5 text-sm text-muted-foreground">
           <Clock className="mt-0.5 size-4 shrink-0" />
@@ -71,7 +71,7 @@ export function LoginPage() {
       </div>
       <p className="mt-2.5 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
         <ShieldCheck className="size-3.5 shrink-0" />
-        DevDock never sees your Google or Microsoft password.
+        Calsko never sees your Google or Microsoft password.
       </p>
 
       <RememberMe checked={remember} onChange={setRemember} disabled={redirecting} className="mt-5" />

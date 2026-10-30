@@ -100,7 +100,7 @@ export const router = createBrowserRouter([
           { path: 'flags', loader: adminFlagsLoader, lazy: async () => ({ Component: (await import('@/routes/admin')).AdminFlagsPage }) },
         ],
       },
-      // Back from installing the DevDock GitHub App (verified by the github Edge Function).
+      // Back from installing the Calsko GitHub App (verified by the github Edge Function).
       {
         path: 'github/callback',
         loader: githubCallbackLoader,

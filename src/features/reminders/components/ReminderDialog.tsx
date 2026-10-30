@@ -149,7 +149,7 @@ export function ReminderDialog({ reminder, defaults, draft, onSaved, children, o
         <form onSubmit={submit} className="flex min-h-0 flex-col gap-4">
           <DialogHeader>
             <DialogTitle>{editing ? 'Edit note' : 'New note'}</DialogTitle>
-            <DialogDescription>Only you can see it. Pick a time if you want DevDock to open it for you then; otherwise it stays a note.</DialogDescription>
+            <DialogDescription>Only you can see it. Pick a time if you want Calsko to open it for you then; otherwise it stays a note.</DialogDescription>
           </DialogHeader>
 
           <div className="-mr-2 min-h-0 flex-1 space-y-4 overflow-y-auto pr-2">
