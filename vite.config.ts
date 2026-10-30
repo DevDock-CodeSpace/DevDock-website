@@ -11,7 +11,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react(), tailwindcss()],
     define: {
-      __POSTHOG_KEY__: JSON.stringify(env.POSTHOG_KEY ?? ''),
+      __POSTHOG_KEY__: JSON.stringify((env.POSTHOG_KEY ?? '').trim().replace(/^["']|["']$/g, '')),
     },
     resolve: {
       alias: {
