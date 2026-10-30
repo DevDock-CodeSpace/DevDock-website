@@ -33,6 +33,9 @@ import { AiProviderError, type AiAgentResponse, type AiExecutionContext } from '
 import { createProvider } from './providers/index.ts'
 import { confirmPendingAction, supabasePendingStore } from './safety/confirmation.ts'
 import { createToolRegistry } from './tools/index.ts'
+import { startErrorReporting } from '../_shared/report-errors.ts'
+
+startErrorReporting('ai-agent')
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
