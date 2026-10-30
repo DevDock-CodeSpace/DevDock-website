@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { ArrowLeft, CircleAlert, KeyRound, LoaderCircle, Plus, type LucideIcon } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { Link, useNavigate, useSearchParams } from 'react-router'
 import { LogoMark, LogoWordmark } from '@/components/Logo'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { Button } from '@/components/ui/button'
@@ -233,7 +233,9 @@ function JoinTeamForm() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const [code, setCode] = useState('')
+  // An emailed invite links here with ?code=, so the person only has to press Join.
+  const [searchParams] = useSearchParams()
+  const [code, setCode] = useState(() => searchParams.get('code') ?? '')
 
   const join = useMutation({
     mutationFn: () => joinTeam(code),

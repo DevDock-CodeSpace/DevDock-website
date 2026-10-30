@@ -133,6 +133,10 @@ export function PrivacyPage() {
               it;
             </li>
             <li>
+              <strong>Resend</strong>: sends the invite emails a group owner or admin asks for. The address is passed
+              on to deliver that one email and isn’t stored in Calsko;
+            </li>
+            <li>
               <strong>Microsoft</strong>: the “Continue with Microsoft” step, if you use it;
             </li>
             <li>
