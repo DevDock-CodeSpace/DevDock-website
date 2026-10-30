@@ -1,6 +1,7 @@
 import { FunctionsHttpError } from '@supabase/supabase-js'
 import { DataError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
+import { logError } from '@/lib/error-tracking'
 
 // Calsko AI: the browser's side of the `ai-agent` Edge Function. The model
 // provider's key, the tools and every permission check live in the function;
@@ -62,7 +63,7 @@ async function call(body: Record<string, unknown>): Promise<AiResponse> {
         .then((b: { error?: string }) => b.error)
         .catch(() => undefined)
     }
-    console.error('[ai] request failed', code ?? error)
+    logError('[ai] request failed', code ?? error)
     throw new DataError((code && httpErrors[code]) ?? UNAVAILABLE, code, { cause: error })
   }
   return data

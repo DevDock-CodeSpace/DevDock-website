@@ -6,6 +6,7 @@ import { useSendReply } from '../hooks'
 import { authorName, formatFullDate, formatTime } from '../names'
 import { MessageBody } from './MessageBody'
 import { MessageComposer } from './MessageComposer'
+import { logError } from '@/lib/error-tracking'
 
 type Props = {
   conversationId: string
@@ -32,7 +33,7 @@ export function ThreadReplyBox({ conversationId, teamId, teamSlug, parentId, rep
 
   // Looking at the thread (and any reply that arrives while it's open) counts as reading it.
   useEffect(() => {
-    markThreadRead(parentId).catch((error: unknown) => console.error('[messaging] Could not mark thread read', error))
+    markThreadRead(parentId).catch((error: unknown) => logError('[messaging] Could not mark thread read', error))
   }, [parentId, replies.length])
 
   return (

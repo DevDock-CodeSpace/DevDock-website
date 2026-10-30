@@ -4,6 +4,7 @@ import type { PersonProfile } from '@/features/teams/api'
 import type { WorkspaceType } from '@/features/workspaces/api'
 import { DataError, requireAffected, toDataError } from '@/lib/errors'
 import { supabase } from '@/lib/supabase'
+import { logError } from '@/lib/error-tracking'
 
 // Meetings (live_sessions): scheduled Jitsi (JaaS) calls. Same scope model and access
 // rules as docs (workspace_id null = group-wide): readers see and join, writers
@@ -325,7 +326,7 @@ export async function fetchJaasToken(sessionId: string): Promise<JaasToken> {
         .then((body: { error?: string }) => body.error)
         .catch(() => undefined)
     }
-    console.error('[live] jaas-token failed', code ?? error)
+    logError('[live] jaas-token failed', code ?? error)
     throw new DataError((code && tokenErrors[code]) ?? 'Couldn’t join the call. Please try again.', code, {
       cause: error,
     })
