@@ -75,3 +75,47 @@ export function joinEditing(
     },
   }
 }
+
+// --- who is online in a group, and their status (features/status) -----------------------------
+// One channel per group, joined by the app shell; one presence entry per browser tab. Nothing is
+// stored: the realtime server keeps it in memory and drops a tab's entry when its connection goes.
+
+/** One tab's entry, as sent by other browsers (unchecked: features/status validates it). */
+export type StatusTabMeta = { userId?: unknown; status?: unknown; presence_ref?: string }
+export type GroupStatusRoom = { set: (meta: { userId: string; status: string }) => void; leave: () => void }
+
+export function joinGroupStatus(teamId: string, onTabs: (tabs: Map<string, StatusTabMeta>) => void): GroupStatusRoom {
+  const tab = crypto.randomUUID()
+  let live = false
+  let current: { userId: string; status: string } | null = null
+  const channel = supabase.channel(`status:${teamId}`, { config: { presence: { key: tab } } })
+  const send = () => {
+    if (live && current) void channel.track(current)
+  }
+  const tabs = new Map<string, StatusTabMeta>()
+  channel
+    .on('presence', { event: 'join' }, ({ key, newPresences }) => {
+      const latest = newPresences.at(-1) as StatusTabMeta | undefined
+      if (latest) tabs.set(key, latest)
+      onTabs(new Map(tabs))
+    })
+    .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
+      const ref = tabs.get(key)?.presence_ref
+      if (leftPresences.some((left) => left.presence_ref === ref)) tabs.delete(key)
+      onTabs(new Map(tabs))
+    })
+    .subscribe((state) => {
+      live = state === 'SUBSCRIBED'
+      send()
+    })
+  return {
+    set(meta) {
+      if (current && current.userId === meta.userId && current.status === meta.status) return
+      current = meta
+      send()
+    },
+    leave() {
+      void supabase.removeChannel(channel)
+    },
+  }
+}

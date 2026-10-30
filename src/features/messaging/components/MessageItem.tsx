@@ -165,7 +165,7 @@ export function MessageItem({ message, conversationId, teamId, teamSlug, people,
           {compact ? (
             <time className="block pt-1 text-right font-mono text-[10px] text-transparent group-hover:text-muted-foreground" dateTime={message.created_at} title={formatFullDate(message.created_at)}>{time}</time>
           ) : (
-            <PersonAvatar profile={person?.profile ?? null} className="size-8" fallbackClassName="text-xs" />
+            <PersonAvatar profile={person?.profile ?? null} userId={message.author_id} className="size-8" fallbackClassName="text-xs" />
           )}
         </div>
       )}
